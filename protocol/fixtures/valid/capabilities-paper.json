@@ -1,0 +1,66 @@
+{
+  "protocolVersion": "1.0",
+  "type": "capabilities",
+  "messageId": "00000000-0000-4000-8000-000000000003",
+  "requestId": null,
+  "serverId": "main",
+  "sessionId": null,
+  "requesterUuid": null,
+  "sentAt": "2026-09-23T15:10:00Z",
+  "deadlineAt": null,
+  "payload": {
+    "capabilities": [
+      {
+        "name": "server.status",
+        "source": "Paper",
+        "version": "1.21.8"
+      },
+      {
+        "name": "player.list",
+        "source": "Paper",
+        "version": "1.21.8"
+      },
+      {
+        "name": "player.lookup",
+        "source": "Paper",
+        "version": "1.21.8"
+      },
+      {
+        "name": "player.location",
+        "source": "Paper",
+        "version": "1.21.8"
+      },
+      {
+        "name": "staff.self_teleport",
+        "source": "Paper",
+        "version": "1.21.8"
+      },
+      {
+        "name": "history.lookup",
+        "source": "CoreProtect",
+        "version": "24.1"
+      },
+      {
+        "name": "region.lookup",
+        "source": "WorldGuard",
+        "version": "7.0.18"
+      }
+    ],
+    "tools": [
+      "get_server_status",
+      "get_online_players",
+      "get_player",
+      "get_player_location",
+      "teleport_staff",
+      "lookup_area_history",
+      "lookup_player_history",
+      "get_regions_at_location",
+      "get_region_info"
+    ],
+    "limits": {
+      "maxMessageBytes": 65536,
+      "maxToolCallsPerRequest": 8,
+      "maxModelRoundTripsPerRequest": 4
+    }
+  }
+}

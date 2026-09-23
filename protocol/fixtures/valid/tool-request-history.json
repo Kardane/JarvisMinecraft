@@ -1,0 +1,30 @@
+{
+  "protocolVersion": "1.0",
+  "type": "tool.request",
+  "messageId": "00000000-0000-4000-8000-000000000013",
+  "requestId": "0fe39919-d3e6-500e-a2a1-7d22e2cbf546",
+  "serverId": "main",
+  "sessionId": "0c88e99c-70ad-5335-a01e-907878772227",
+  "requesterUuid": "17949e0d-c8d6-57bb-b7a1-cf830959e8b9",
+  "sentAt": "2026-09-23T15:10:00Z",
+  "deadlineAt": "2026-09-23T15:10:30Z",
+  "payload": {
+    "tool": "lookup_area_history",
+    "arguments": {
+      "center": {
+        "worldId": "world",
+        "x": 183.4,
+        "y": 64,
+        "z": -721.8,
+        "yaw": 90,
+        "pitch": 0
+      },
+      "radius": 10,
+      "lookbackSeconds": 1800,
+      "cursor": null,
+      "limit": 100
+    }
+  },
+  "toolCallId": "a667ad9b-5916-579a-ac73-e0f9ed8a79ac",
+  "actionId": null
+}

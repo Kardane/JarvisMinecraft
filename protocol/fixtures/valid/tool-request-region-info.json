@@ -1,0 +1,20 @@
+{
+  "protocolVersion": "1.0",
+  "type": "tool.request",
+  "messageId": "10000000-0000-4000-8000-000000000108",
+  "requestId": "0fe39919-d3e6-500e-a2a1-7d22e2cbf546",
+  "serverId": "main",
+  "sessionId": "0c88e99c-70ad-5335-a01e-907878772227",
+  "requesterUuid": "17949e0d-c8d6-57bb-b7a1-cf830959e8b9",
+  "sentAt": "2026-09-23T15:10:00Z",
+  "deadlineAt": "2026-09-23T15:10:30Z",
+  "payload": {
+    "tool": "get_region_info",
+    "arguments": {
+      "worldId": "world",
+      "regionId": "spawn"
+    }
+  },
+  "toolCallId": "20000000-0000-4000-8000-000000000008",
+  "actionId": null
+}

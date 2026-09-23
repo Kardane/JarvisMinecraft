@@ -1,0 +1,19 @@
+{
+  "protocolVersion": "1.0",
+  "type": "hello",
+  "messageId": "00000000-0000-4000-8000-000000000001",
+  "requestId": null,
+  "serverId": "main",
+  "sessionId": null,
+  "requesterUuid": null,
+  "sentAt": "2026-09-23T15:10:00Z",
+  "deadlineAt": null,
+  "payload": {
+    "side": "adapter",
+    "adapterInstanceId": "11cdf99a-e0ac-5cc6-a05d-95e880d7dc1e",
+    "platform": "paper",
+    "minecraftVersion": "1.21.8",
+    "adapterVersion": "0.1.0-dev",
+    "platformVersion": "1.21.8-123"
+  }
+}

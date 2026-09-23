@@ -1,0 +1,19 @@
+{
+  "protocolVersion": "1.0",
+  "type": "tool.request",
+  "messageId": "00000000-0000-4000-8000-000000000006",
+  "requestId": "0fe39919-d3e6-500e-a2a1-7d22e2cbf546",
+  "serverId": "main",
+  "sessionId": "0c88e99c-70ad-5335-a01e-907878772227",
+  "requesterUuid": "17949e0d-c8d6-57bb-b7a1-cf830959e8b9",
+  "sentAt": "2026-09-23T15:10:00Z",
+  "deadlineAt": "2026-09-23T15:10:30Z",
+  "payload": {
+    "tool": "get_player_location",
+    "arguments": {
+      "playerUuid": "54ed1ac1-0319-52f1-b55f-46382ce9bf02"
+    }
+  },
+  "toolCallId": "2c6b8072-4943-590d-82be-f4f003ad9ab3",
+  "actionId": null
+}

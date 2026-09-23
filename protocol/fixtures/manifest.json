@@ -1,0 +1,76 @@
+{
+  "schema": "../schema/protocol.schema.json",
+  "draft": "2020-12",
+  "formatValidationRequired": true,
+  "valid": [
+    "capabilities-paper.json",
+    "chat-message-direct.json",
+    "chat-response.json",
+    "hello-adapter.json",
+    "hello-brain.json",
+    "ping.json",
+    "pong.json",
+    "tool-request-history.json",
+    "tool-request-location.json",
+    "tool-request-nearby.json",
+    "tool-request-online-players.json",
+    "tool-request-player-by-name.json",
+    "tool-request-player-history.json",
+    "tool-request-region-info.json",
+    "tool-request-region.json",
+    "tool-request-regions-at-location.json",
+    "tool-request-server-status.json",
+    "tool-request-teleport.json",
+    "tool-request-world-info.json",
+    "tool-result-build-permission.json",
+    "tool-result-history-empty.json",
+    "tool-result-location.json",
+    "tool-result-nearby.json",
+    "tool-result-not-found.json",
+    "tool-result-online-players.json",
+    "tool-result-player.json",
+    "tool-result-region-info.json",
+    "tool-result-regions-at-location.json",
+    "tool-result-server-status.json",
+    "tool-result-teleport.json",
+    "tool-result-world-info.json"
+  ],
+  "invalid": [
+    {
+      "file": "unknown-envelope-field.json",
+      "reason": "Unknown top-level fields are rejected."
+    },
+    {
+      "file": "protocol-major-mismatch.json",
+      "reason": "Protocol 1.0 schema rejects a 2.0 envelope."
+    },
+    {
+      "file": "chat-null-requester.json",
+      "reason": "chat.message requires an authenticated requester UUID."
+    },
+    {
+      "file": "unregistered-tool.json",
+      "reason": "Only catalogued Tool names are allowed."
+    },
+    {
+      "file": "teleport-missing-action-id.json",
+      "reason": "State-changing teleport_staff requires actionId."
+    },
+    {
+      "file": "readonly-has-action-id.json",
+      "reason": "Read-only tools require actionId=null."
+    },
+    {
+      "file": "history-radius-too-large.json",
+      "reason": "History radius is capped at 64 blocks."
+    },
+    {
+      "file": "error-result-has-data.json",
+      "reason": "ERROR/UNSUPPORTED results must have data=null."
+    },
+    {
+      "file": "unknown-tool-argument.json",
+      "reason": "Tool arguments are strict; unknown fields are rejected."
+    }
+  ]
+}
