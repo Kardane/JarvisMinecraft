@@ -1,0 +1,18 @@
+[versions]
+minecraft = "1.21.8"
+paper = "1.21.8-R0.1-SNAPSHOT"
+fabric-loader = "0.17.2"
+fabric-api = "0.133.4+1.21.8"
+yarn = "1.21.8+build.1"
+fabric-loom = "1.12.2"
+neoforge = "21.8.52"
+moddev = "2.0.147"
+
+[libraries]
+paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper" }
+fabric-loader = { module = "net.fabricmc:fabric-loader", version.ref = "fabric-loader" }
+fabric-api = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fabric-api" }
+
+[plugins]
+fabric-loom = { id = "fabric-loom", version.ref = "fabric-loom" }
+neoforge-moddev = { id = "net.neoforged.moddev", version.ref = "moddev" }

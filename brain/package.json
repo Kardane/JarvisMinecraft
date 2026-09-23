@@ -1,0 +1,24 @@
+{
+  "name": "@jarvisminecraft/brain",
+  "version": "0.1.0-dev",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "typecheck": "tsc --project tsconfig.json --noEmit",
+    "test:protocol": "node ./scripts/validate-protocol.mjs",
+    "check": "npm run typecheck && npm run test:protocol"
+  },
+  "dependencies": {
+    "@typesafe-ai/sdk": "0.6.0",
+    "openai": "7.22.0"
+  },
+  "devDependencies": {
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1",
+    "typescript": "5.9.2"
+  }
+}
