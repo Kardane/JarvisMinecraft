@@ -6,6 +6,10 @@ pluginManagement {
     }
 }
 
+plugins {
+    id("net.neoforged.moddev.repositories") version "2.0.147"
+}
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
