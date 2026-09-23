@@ -1,0 +1,11 @@
+.gradle/
+**/build/
+brain/node_modules/
+brain/dist/
+.env
+.env.*
+!.env.example
+.idea/
+*.iml
+*.log
+.DS_Store

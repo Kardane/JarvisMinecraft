@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  java-build:
+    name: Java / Gradle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/wrapper-validation@v4
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build and bootstrap dependency locks
+        run: ./gradlew --write-locks build --stacktrace
+
+      - name: Upload Gradle lock files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t02-gradle-locks
+          path: |
+            **/gradle.lockfile
+          if-no-files-found: warn
+
+  brain-build:
+    name: Brain / Node
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Bootstrap package lock
+        working-directory: brain
+        run: npm install --package-lock-only --ignore-scripts
+
+      - name: Install locked dependencies
+        working-directory: brain
+        run: npm ci
+
+      - name: Typecheck and validate protocol fixtures
+        working-directory: brain
+        run: npm run check
+
+      - name: Build Brain
+        working-directory: brain
+        run: npm run build
+
+      - name: Upload npm lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t02-npm-lock
+          path: brain/package-lock.json
+          if-no-files-found: error
