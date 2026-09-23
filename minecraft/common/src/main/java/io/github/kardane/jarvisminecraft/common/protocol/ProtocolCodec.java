@@ -8,6 +8,13 @@ import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import com.google.gson.JsonParser;
+import com.google.gson.JsonDeserializationContext;
+import com.google.gson.JsonDeserializer;
+import com.google.gson.JsonPrimitive;
+import com.google.gson.JsonSerializationContext;
+import com.google.gson.JsonSerializer;
+
+import java.lang.reflect.Type;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -41,7 +48,10 @@ public final class ProtocolCodec {
         "toolCallId", "actionId"
     );
 
-    private final Gson gson = new GsonBuilder().serializeNulls().create();
+    private final Gson gson = new GsonBuilder()
+        .serializeNulls()
+        .registerTypeAdapter(Instant.class, new InstantJsonAdapter())
+        .create();
 
     public ProtocolMessage decode(String json) {
         if (json == null) {
@@ -1001,5 +1011,23 @@ public final class ProtocolCodec {
 
     private ProtocolException invalid(String message) {
         return new ProtocolException(ErrorCode.INVALID_ARGUMENT, message);
+    }
+
+    private static final class InstantJsonAdapter
+        implements JsonSerializer<Instant>, JsonDeserializer<Instant> {
+
+        @Override
+        public JsonElement serialize(Instant src, Type typeOfSrc, JsonSerializationContext context) {
+            return new JsonPrimitive(src.toString());
+        }
+
+        @Override
+        public Instant deserialize(
+            JsonElement json,
+            Type typeOfT,
+            JsonDeserializationContext context
+        ) throws JsonParseException {
+            return Instant.parse(json.getAsString());
+        }
     }
 }
