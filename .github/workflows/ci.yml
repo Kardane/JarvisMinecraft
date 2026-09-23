@@ -25,17 +25,8 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
 
-      - name: Build and bootstrap dependency locks
-        run: ./gradlew --write-locks build --stacktrace
-
-      - name: Upload Gradle lock files
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: t02-gradle-locks
-          path: |
-            **/gradle.lockfile
-          if-no-files-found: warn
+      - name: Build with committed dependency locks
+        run: ./gradlew build --stacktrace
 
   brain-build:
     name: Brain / Node
@@ -46,10 +37,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
-
-      - name: Bootstrap package lock
-        working-directory: brain
-        run: npm install --package-lock-only --ignore-scripts
+          cache: npm
+          cache-dependency-path: brain/package-lock.json
 
       - name: Install locked dependencies
         working-directory: brain
@@ -62,11 +51,3 @@ jobs:
       - name: Build Brain
         working-directory: brain
         run: npm run build
-
-      - name: Upload npm lock
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: t02-npm-lock
-          path: brain/package-lock.json
-          if-no-files-found: error
