@@ -1,5 +1,5 @@
 plugins {
-    alias(libs.plugins.neoforge.moddev)
+    id("net.neoforged.moddev")
 }
 
 java {
