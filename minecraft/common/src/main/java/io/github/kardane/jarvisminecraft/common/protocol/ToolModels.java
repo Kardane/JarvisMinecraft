@@ -1,6 +1,8 @@
 package io.github.kardane.jarvisminecraft.common.protocol;
 
 import java.time.Instant;
+import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -185,6 +187,11 @@ public final class ToolModels {
         List<String> members,
         Map<String, Object> flags
     ) implements ToolData {
+        public RegionInfoData {
+            flags = flags == null
+                ? Map.of()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(flags));
+        }
     }
 
     public record BuildPermissionData(
@@ -202,7 +209,9 @@ public final class ToolModels {
         Map<String, Object> details
     ) {
         public ErrorObject {
-            details = details == null ? Map.of() : Map.copyOf(details);
+            details = details == null
+                ? Map.of()
+                : Collections.unmodifiableMap(new LinkedHashMap<>(details));
         }
 
         public static ErrorObject of(ErrorCode code, String message, boolean retryable) {
