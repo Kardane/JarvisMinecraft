@@ -19,6 +19,7 @@ const ajv = new Ajv2020({
   allErrors: true,
   strict: true,
   allowUnionTypes: true,
+  strictTypes: false,
 });
 addFormats(ajv);
 
