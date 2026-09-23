@@ -314,7 +314,7 @@ function validateArguments(name: string, value: JsonObject): JsonObject {
     case "get_nearby_players":
       exactKeys(value, ["center", "radius", "limit"]);
       location(value.center, "center");
-      numberRange(value.radius, "radius", Number.MIN_VALUE, 64, true);
+      numberRange(value.radius, "radius", 0, 64, true);
       integer(value.limit, "limit", 1, 100);
       return value;
     case "get_world_info":
