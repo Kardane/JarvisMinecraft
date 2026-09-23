@@ -1,0 +1,17 @@
+{
+  "protocolVersion": "1.0",
+  "type": "hello",
+  "messageId": "00000000-0000-4000-8000-000000000002",
+  "requestId": null,
+  "serverId": "main",
+  "sessionId": null,
+  "requesterUuid": null,
+  "sentAt": "2026-09-23T15:10:00Z",
+  "deadlineAt": null,
+  "payload": {
+    "side": "brain",
+    "brainInstanceId": "147de985-b899-5eb9-a5a6-e9feb98e22c8",
+    "brainVersion": "0.1.0-dev",
+    "accepted": true
+  }
+}
