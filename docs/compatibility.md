@@ -213,7 +213,7 @@ CMI 문서는 offline player 정보 로드가 대량 실행 시 서버에 부담
 | Fabric API | Apache-2.0 | 플랫폼 mod dependency로 선언 |
 | Fabric Loom | MIT | 빌드 전용 |
 | NeoForge | LGPL-2.1 | 플랫폼 dependency, NeoForge 자체 미번들 |
-| ModDevGradle | upstream 조건 준수 | 빌드 전용 |
+| ModDevGradle | LGPL-2.1 | 빌드 전용 |
 | OpenAI JS SDK | Apache-2.0 | Brain npm dependency |
 | TypeSafe JS SDK | MIT | Brain npm dependency |
 | CoreProtect | Artistic-2.0 | provided/compileOnly, plugin 미번들 |
