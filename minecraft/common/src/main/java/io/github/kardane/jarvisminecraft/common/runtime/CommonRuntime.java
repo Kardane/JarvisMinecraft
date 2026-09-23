@@ -96,6 +96,12 @@ public final class CommonRuntime {
 
                 ProtocolMessage.ToolRequest request = (ProtocolMessage.ToolRequest) message.payload();
                 ToolName tool = request.tool();
+                if (tool.stateChanging() && message.actionId() == null) {
+                    throw new ProtocolException(ErrorCode.INVALID_ARGUMENT, "State-changing Tool requires actionId.");
+                }
+                if (!tool.stateChanging() && message.actionId() != null) {
+                    throw new ProtocolException(ErrorCode.INVALID_ARGUMENT, "Read-only Tool requires actionId=null.");
+                }
                 if (!activeTools.contains(tool) || !registry.contains(tool)) {
                     throw new ProtocolException(ErrorCode.UNSUPPORTED, "Tool is not active on this server.");
                 }
