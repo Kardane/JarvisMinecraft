@@ -10,7 +10,8 @@
     "build": "tsc --project tsconfig.json",
     "typecheck": "tsc --project tsconfig.json --noEmit",
     "test:protocol": "node ./scripts/validate-protocol.mjs",
-    "check": "npm run typecheck && npm run test:protocol"
+    "check": "npm run typecheck && npm run test:protocol && npm run test:core",
+    "test:core": "npm run build && node --test ./test/core/*.test.mjs"
   },
   "dependencies": {
     "@typesafe-ai/sdk": "0.6.0",
