@@ -52,6 +52,13 @@ Protocol fixture 검증:
 
 Gradle의 모든 subproject는 dependency locking을 켠다. npm은 `package-lock.json`을 사용한다.
 
-T02 bootstrap CI가 첫 dependency resolution에서 lock 파일을 생성하며, T02 완료 전 생성물을 저장소에 커밋한다. 이후 CI는 lock 파일을 갱신하지 않고 그대로 소비한다.
+T02 bootstrap CI에서 실제 dependency resolution으로 생성한 lock 파일을 저장소에 커밋했다. 현재 CI는 `--write-locks`를 사용하지 않으며 커밋된 lock 파일과 `brain/package-lock.json`을 그대로 소비한다.
+
+잠금 파일:
+- `minecraft/common/gradle.lockfile`
+- `minecraft/paper/gradle.lockfile`
+- `minecraft/fabric/gradle.lockfile`
+- `minecraft/neoforge/gradle.lockfile`
+- `brain/package-lock.json`
 
 루트 Gradle/build/CI 파일은 T02 병합 후 통합 담당만 수정한다. 다른 작업은 의존성 변경 요청을 인계한다.
