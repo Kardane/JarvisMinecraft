@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "policy": {
+    "opOnly": true,
+    "replyRequesterOnly": true,
+    "warningEnabled": false,
+    "rollbackEnabled": false
+  },
+  "audit": {
+    "format": "jsonl",
+    "retentionDays": 7,
+    "maxTotalBytes": 104857600,
+    "maxFileBytes": 8388608,
+    "maxQueue": 512
+  }
+}
