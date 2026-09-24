@@ -11,8 +11,36 @@ java {
     withSourcesJar()
 }
 
+val prepareT08BootSmoke by tasks.registering {
+    group = "verification"
+    description = "Prepares an isolated NeoForge dedicated-server boot smoke directory."
+    doLast {
+        val runDir = file("run/t08-boot-smoke")
+        runDir.mkdirs()
+        runDir.resolve("eula.txt").writeText("eula=true\n")
+    }
+}
+
 neoForge {
     version = libs.versions.neoforge.get()
+
+    mods {
+        create("jarvisminecraft") {
+            sourceSet(sourceSets.main.get())
+        }
+    }
+
+    runs {
+        create("t08BootSmoke") {
+            server()
+            gameDirectory = file("run/t08-boot-smoke")
+            programArgument("--nogui")
+            systemProperty("jarvis.t08BootSmoke", "true")
+            systemProperty("jarvis.sharedSecret", "correct-horse-battery-staple")
+            taskBefore(prepareT08BootSmoke)
+            disableIdeRun()
+        }
+    }
 }
 
 dependencies {
@@ -64,4 +92,5 @@ val t08Verification by tasks.registering(JavaExec::class) {
 tasks.named("check") {
     dependsOn(verifyNoClientImports)
     dependsOn(t08Verification)
+    dependsOn("runT08BootSmoke")
 }
