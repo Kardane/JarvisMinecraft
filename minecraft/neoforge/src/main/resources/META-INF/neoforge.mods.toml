@@ -1,0 +1,24 @@
+modLoader="javafml"
+loaderVersion="[1,)"
+license="All Rights Reserved"
+
+[[mods]]
+modId="jarvisminecraft"
+version="0.1.0-SNAPSHOT"
+displayName="Minecraft JARVIS"
+description='''Private AI operations assistant for Minecraft server operators.'''
+displayTest="IGNORE_ALL_VERSION"
+
+[[dependencies.jarvisminecraft]]
+modId="neoforge"
+type="required"
+versionRange="[21.8.52,)"
+ordering="NONE"
+side="SERVER"
+
+[[dependencies.jarvisminecraft]]
+modId="minecraft"
+type="required"
+versionRange="[1.21.8,1.21.9)"
+ordering="NONE"
+side="SERVER"
