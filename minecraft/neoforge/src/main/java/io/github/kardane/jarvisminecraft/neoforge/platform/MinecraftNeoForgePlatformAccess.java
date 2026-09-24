@@ -19,9 +19,14 @@ public final class MinecraftNeoForgePlatformAccess implements NeoForgePlatformAc
     private static final String PRIVATE_PREFIX = "[JARVIS] ";
 
     private final MinecraftServer server;
+    private final NeoForgeTickSampler tickSampler;
 
-    public MinecraftNeoForgePlatformAccess(MinecraftServer server) {
+    public MinecraftNeoForgePlatformAccess(
+        MinecraftServer server,
+        NeoForgeTickSampler tickSampler
+    ) {
         this.server = server;
+        this.tickSampler = tickSampler;
     }
 
     @Override
@@ -75,10 +80,8 @@ public final class MinecraftNeoForgePlatformAccess implements NeoForgePlatformAc
     public ServerStatusSnapshot serverStatus() {
         requireServerThread();
 
-        double mspt = Math.max(0.0, server.getAverageTickTime());
-        double tpsEstimate = mspt <= 0.0
-            ? 20.0
-            : Math.min(20.0, 1000.0 / Math.max(50.0, mspt));
+        double mspt = tickSampler.averageMspt();
+        double tpsEstimate = tickSampler.estimatedTps();
 
         int loadedChunks = 0;
         for (ServerLevel world : server.getAllLevels()) {
@@ -165,10 +168,10 @@ public final class MinecraftNeoForgePlatformAccess implements NeoForgePlatformAc
             );
         }
 
-        String fromWorld = worldId(requester.serverLevel());
-        String toWorld = worldId(target.serverLevel());
+        String fromWorld = worldId(serverLevel(requester));
+        String toWorld = worldId(serverLevel(target));
         boolean completed = requester.teleportTo(
-            target.serverLevel(),
+            serverLevel(target),
             target.getX(),
             target.getY(),
             target.getZ(),
@@ -229,7 +232,7 @@ public final class MinecraftNeoForgePlatformAccess implements NeoForgePlatformAc
             player.getGameProfile().getName(),
             true,
             new LocationSnapshot(
-                worldId(player.serverLevel()),
+                worldId(serverLevel(player)),
                 player.getX(),
                 player.getY(),
                 player.getZ(),
@@ -237,6 +240,13 @@ public final class MinecraftNeoForgePlatformAccess implements NeoForgePlatformAc
                 player.getXRot()
             )
         );
+    }
+
+    private ServerLevel serverLevel(ServerPlayer player) {
+        if (player.level() instanceof ServerLevel level) {
+            return level;
+        }
+        throw new IllegalStateException("Server player is not attached to a ServerLevel.");
     }
 
     private String worldId(ServerLevel world) {
