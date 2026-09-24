@@ -185,7 +185,26 @@ The smoke:
 
 This exists because NeoForge dev-source runs do not model the packaged common-runtime layout accurately enough for JARVIS's multi-project JAR.
 
-Final boot-smoke run evidence is recorded in the PR once completed.
+Verified packaged-JAR boot smoke:
+
+- commit: `6bbeb3d5ba9455b30cddc796aad85e43099091e5`
+- GitHub Actions run: #48
+- `:minecraft:neoforge:prepareT08BootSmoke`: PASS
+- `:minecraft:neoforge:runT08BootSmoke`: PASS
+- loader reported `Minecraft JARVIS 0.1.0-SNAPSHOT (jarvisminecraft)`
+- loader reported `NeoForge 21.8.52 (neoforge)`
+- JARVIS reached `ServerStartedEvent` and logged `T08 dedicated server boot smoke OK`
+- Minecraft server logged `Stopping server` and `Saving worlds`
+- `:minecraft:neoforge:verifyT08BootSmoke`: PASS
+- overall: `BUILD SUCCESSFUL`
+
+The smoke task remains reproducible but opt-in:
+
+```bash
+./gradlew :minecraft:neoforge:verifyT08BootSmoke
+```
+
+It is intentionally not attached to the ordinary `check` lifecycle after evidence was captured, avoiding a full dedicated-server boot on every routine build.
 
 ## Remaining limits
 
