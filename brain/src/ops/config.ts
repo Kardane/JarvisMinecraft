@@ -120,7 +120,7 @@ function requiredSecret(
     throw new Error(name + " must not contain whitespace.");
   }
   if (
-    /^(change_me|changeme|replace_me|replace-with|your[_-]?key|example|test)$/i.test(
+    /^(change[_-]?me|replace([_-].*)?|your[_-]?.*key.*|example.*|test.*)$/i.test(
       value,
     )
   ) {
