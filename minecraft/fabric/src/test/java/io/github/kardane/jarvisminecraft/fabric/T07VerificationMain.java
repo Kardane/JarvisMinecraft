@@ -181,6 +181,7 @@ public final class T07VerificationMain {
         ServerStatusData statusData = (ServerStatusData) status.data();
         require(statusData.tps().value() == 19.9, "TPS snapshot mismatch");
         require("tps".equals(statusData.tps().unit()), "TPS unit missing");
+        require("FabricTickTimes".equals(statusData.tps().source()), "Fabric TPS source must identify derivation");
 
         ToolResult page = execute(
             registry,
