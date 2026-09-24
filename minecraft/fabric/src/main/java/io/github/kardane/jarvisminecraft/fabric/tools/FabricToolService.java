@@ -98,7 +98,7 @@ public final class FabricToolService {
         return result(
             ResultStatus.OK,
             new ServerStatusData(
-                metric(status.tpsOneMinute(), "tps", 60_000L, observedAt),
+                metric(status.tpsEstimate(), "tps", null, observedAt, "FabricTickTimes"),
                 metric(status.msptAverage(), "ms", null, observedAt),
                 metric((double) status.onlinePlayers(), "players", null, observedAt),
                 metric((double) status.loadedChunks(), "chunks", null, observedAt),
@@ -279,7 +279,17 @@ public final class FabricToolService {
         Long windowMs,
         Instant observedAt
     ) {
-        return new Metric(value, unit, windowMs, observedAt, SOURCE);
+        return metric(value, unit, windowMs, observedAt, SOURCE);
+    }
+
+    private Metric metric(
+        double value,
+        String unit,
+        Long windowMs,
+        Instant observedAt,
+        String source
+    ) {
+        return new Metric(value, unit, windowMs, observedAt, source);
     }
 
     private PlayerRef playerRef(PlayerSnapshot player) {
