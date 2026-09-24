@@ -647,6 +647,9 @@ function safePayload(message) {
       tool: message.payload?.tool ?? null,
       status: message.payload?.result?.status ?? null,
       source: message.payload?.result?.source ?? null,
+      observedAt: message.payload?.result?.observedAt ?? null,
+      truncated: message.payload?.result?.truncated ?? null,
+      data: message.payload?.result?.data ?? null,
     };
   }
   if (message.type === "cancel") {
