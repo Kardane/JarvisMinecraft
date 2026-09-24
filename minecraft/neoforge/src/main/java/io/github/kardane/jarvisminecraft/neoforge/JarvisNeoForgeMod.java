@@ -149,8 +149,14 @@ public final class JarvisNeoForgeMod {
             reconnectExecutor
         );
         runtime = next;
-        brain.start();
 
+        if (Boolean.getBoolean("jarvis.t08BootSmoke")) {
+            LOGGER.info("T08 dedicated server boot smoke OK");
+            server.halt(false);
+            return;
+        }
+
+        brain.start();
         LOGGER.info(
             "JARVIS NeoForge Adapter enabled for serverId="
                 + config.serverId()
