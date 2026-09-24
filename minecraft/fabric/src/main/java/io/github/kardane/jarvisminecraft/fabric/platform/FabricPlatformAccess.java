@@ -48,7 +48,7 @@ public interface FabricPlatformAccess {
     ) {}
 
     record ServerStatusSnapshot(
-        double tpsOneMinute,
+        double tpsEstimate,
         double msptAverage,
         int onlinePlayers,
         int loadedChunks,
