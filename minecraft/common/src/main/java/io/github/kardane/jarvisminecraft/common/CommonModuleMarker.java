@@ -1,7 +1,7 @@
 package io.github.kardane.jarvisminecraft.common;
 
 /**
- * T02 build marker. Runtime DTO/transport code is introduced by T03.
+ * Common protocol/runtime module shared by Paper, Fabric and NeoForge adapters.
  */
 public final class CommonModuleMarker {
     public static final String PROTOCOL_VERSION = "1.0";
