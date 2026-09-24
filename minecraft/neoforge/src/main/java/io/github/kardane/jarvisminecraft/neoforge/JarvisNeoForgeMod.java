@@ -9,6 +9,7 @@ import io.github.kardane.jarvisminecraft.neoforge.chat.NeoForgeChatController;
 import io.github.kardane.jarvisminecraft.neoforge.platform.MinecraftNeoForgePlatformAccess;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAccess;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgeServerScheduler;
+import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgeTickSampler;
 import io.github.kardane.jarvisminecraft.neoforge.tools.NeoForgeToolService;
 import io.github.kardane.jarvisminecraft.neoforge.transport.NeoForgeBrainConnection;
 import net.minecraft.SharedConstants;
@@ -46,7 +47,8 @@ public final class JarvisNeoForgeMod {
         NeoForge.EVENT_BUS.addListener(this::onServerStopping);
         NeoForge.EVENT_BUS.addListener(this::onChat);
         NeoForge.EVENT_BUS.addListener(this::onPlayerLoggedOut);
-        NeoForge.EVENT_BUS.addListener(this::onServerTick);
+        NeoForge.EVENT_BUS.addListener(this::onServerTickPre);
+        NeoForge.EVENT_BUS.addListener(this::onServerTickPost);
     }
 
     private void onServerStarted(ServerStartedEvent event) {
@@ -77,8 +79,9 @@ public final class JarvisNeoForgeMod {
         }
 
         Clock clock = Clock.systemUTC();
+        NeoForgeTickSampler tickSampler = new NeoForgeTickSampler();
         NeoForgePlatformAccess platform =
-            new MinecraftNeoForgePlatformAccess(server);
+            new MinecraftNeoForgePlatformAccess(server, tickSampler);
         ServerScheduler serverScheduler = new NeoForgeServerScheduler(server);
 
         ToolRegistry registry = new ToolRegistry();
@@ -142,6 +145,7 @@ public final class JarvisNeoForgeMod {
             server,
             brain,
             chat,
+            tickSampler,
             reconnectExecutor
         );
         runtime = next;
@@ -180,9 +184,17 @@ public final class JarvisNeoForgeMod {
         }
     }
 
-    private void onServerTick(ServerTickEvent.Post event) {
+    private void onServerTickPre(ServerTickEvent.Pre event) {
         RuntimeState current = runtime;
         if (current != null && current.server() == event.getServer()) {
+            current.tickSampler().beginTick(System.nanoTime());
+        }
+    }
+
+    private void onServerTickPost(ServerTickEvent.Post event) {
+        RuntimeState current = runtime;
+        if (current != null && current.server() == event.getServer()) {
+            current.tickSampler().endTick(System.nanoTime());
             current.chat().onServerTick();
         }
     }
@@ -239,6 +251,7 @@ public final class JarvisNeoForgeMod {
         MinecraftServer server,
         NeoForgeBrainConnection brain,
         NeoForgeChatController chat,
+        NeoForgeTickSampler tickSampler,
         ScheduledExecutorService reconnectExecutor
     ) {
         void close() {
