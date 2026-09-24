@@ -1,3 +1,4 @@
+import org.gradle.jvm.tasks.Jar
 import org.gradle.api.tasks.SourceSetContainer
 
 plugins {
@@ -11,13 +12,26 @@ java {
     withSourcesJar()
 }
 
+val t08BootRunDir = file("run/t08-boot-smoke")
+val t08BootMarker = t08BootRunDir.resolve("boot-ok.marker")
+
 val prepareT08BootSmoke by tasks.registering {
     group = "verification"
     description = "Prepares an isolated NeoForge dedicated-server boot smoke directory."
+    dependsOn(tasks.named("jar"))
     doLast {
-        val runDir = file("run/t08-boot-smoke")
-        runDir.mkdirs()
-        runDir.resolve("eula.txt").writeText("eula=true\n")
+        t08BootRunDir.mkdirs()
+        t08BootRunDir.resolve("eula.txt").writeText("eula=true\n")
+        t08BootMarker.delete()
+
+        val modsDir = t08BootRunDir.resolve("mods")
+        modsDir.mkdirs()
+        modsDir.listFiles()
+            ?.filter { it.name.startsWith("neoforge-") || it.name.startsWith("jarvis") || it.name.contains("JARVIS", ignoreCase = true) }
+            ?.forEach { it.delete() }
+
+        val jarFile = tasks.named<Jar>("jar").get().archiveFile.get().asFile
+        jarFile.copyTo(modsDir.resolve("jarvisminecraft-t08-smoke.jar"), overwrite = true)
     }
 }
 
@@ -33,12 +47,28 @@ neoForge {
     runs {
         create("t08BootSmoke") {
             server()
-            gameDirectory = file("run/t08-boot-smoke")
+            loadedMods.set(emptySet())
+            gameDirectory = t08BootRunDir
             programArgument("--nogui")
             systemProperty("jarvis.t08BootSmoke", "true")
+            systemProperty("jarvis.t08BootMarker", t08BootMarker.absolutePath)
             systemProperty("jarvis.sharedSecret", "correct-horse-battery-staple")
             taskBefore(prepareT08BootSmoke)
             disableIdeRun()
+        }
+    }
+}
+
+val verifyT08BootSmoke by tasks.registering {
+    group = "verification"
+    description = "Boots the packaged JAR on NeoForge dedicated server and verifies the entrypoint marker."
+    dependsOn("runT08BootSmoke")
+    doLast {
+        check(t08BootMarker.isFile) {
+            "NeoForge dedicated-server smoke did not reach the JARVIS SERVER_STARTED entrypoint."
+        }
+        check(t08BootMarker.readText().trim() == "T08 dedicated server boot smoke OK") {
+            "NeoForge dedicated-server smoke marker was invalid."
         }
     }
 }
@@ -92,5 +122,5 @@ val t08Verification by tasks.registering(JavaExec::class) {
 tasks.named("check") {
     dependsOn(verifyNoClientImports)
     dependsOn(t08Verification)
-    dependsOn("runT08BootSmoke")
+    dependsOn(verifyT08BootSmoke)
 }
