@@ -184,6 +184,7 @@ async function scenarioA03() {
   );
 
   clearMessages();
+  const beforeEnd = gateway.chatMessages(SERVER_ID).length;
   admin.chat("대화 끝");
   await waitForMessage(admin, "[JARVIS] 대화를 종료했습니다.", 10_000);
   await sleep(300);
@@ -193,12 +194,18 @@ async function scenarioA03() {
       !messagesOf(otherOp).some((line) => line.includes("대화를 종료했습니다")),
   );
   pass(
-    "A03-session-end-cancel",
-    gateway.snapshot().records.some(
-      (record) =>
-        record.kind === "inbound.cancel" &&
-        record.payload?.reason === "SESSION_ENDED",
-    ),
+    "A03-end-not-forwarded-to-brain",
+    gateway.chatMessages(SERVER_ID).length === beforeEnd,
+  );
+
+  clearMessages();
+  const beforeAfterEnd = gateway.chatMessages(SERVER_ID).length;
+  admin.chat("종료 후 일반 채팅");
+  await waitForAnyMessage([nonOp, otherOp], "종료 후 일반 채팅", 10_000);
+  await sleep(300);
+  pass(
+    "A03-session-really-ended",
+    gateway.chatMessages(SERVER_ID).length === beforeAfterEnd,
   );
 }
 
