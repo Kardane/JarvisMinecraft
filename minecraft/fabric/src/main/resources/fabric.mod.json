@@ -3,12 +3,17 @@
   "id": "jarvisminecraft",
   "version": "0.1.0-SNAPSHOT",
   "name": "Minecraft JARVIS",
-  "description": "T02 build skeleton; runtime entrypoints are added in T07.",
+  "description": "Private AI operations assistant for Minecraft server operators.",
   "environment": "server",
   "depends": {
     "fabricloader": ">=0.17.2",
     "fabric-api": "*",
     "minecraft": "1.21.8",
     "java": ">=21"
+  },
+  "entrypoints": {
+    "main": [
+      "io.github.kardane.jarvisminecraft.fabric.JarvisFabricMod"
+    ]
   }
 }
