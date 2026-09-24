@@ -366,7 +366,7 @@ public final class PaperBrainConnection {
             return;
         }
 
-        runtime.execute(message).whenComplete((result, failure) -> {
+        serverScheduler.submit(() -> runtime.execute(message)).whenComplete((result, failure) -> {
             ToolResult terminal = failure == null
                 ? result
                 : ToolResult.error(
