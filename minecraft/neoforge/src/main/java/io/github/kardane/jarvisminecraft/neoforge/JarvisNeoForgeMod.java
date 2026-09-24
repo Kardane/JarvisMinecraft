@@ -24,6 +24,9 @@ import net.neoforged.neoforge.event.server.ServerStartedEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -151,6 +154,7 @@ public final class JarvisNeoForgeMod {
         runtime = next;
 
         if (Boolean.getBoolean("jarvis.t08BootSmoke")) {
+            writeBootSmokeMarker();
             LOGGER.info("T08 dedicated server boot smoke OK");
             server.halt(false);
             return;
@@ -202,6 +206,27 @@ public final class JarvisNeoForgeMod {
         if (current != null && current.server() == event.getServer()) {
             current.tickSampler().endTick(System.nanoTime());
             current.chat().onServerTick();
+        }
+    }
+
+    private void writeBootSmokeMarker() {
+        String marker = System.getProperty("jarvis.t08BootMarker");
+        if (marker == null || marker.isBlank()) {
+            throw new IllegalStateException("T08 boot smoke marker path is missing.");
+        }
+        try {
+            Path path = Path.of(marker);
+            Path parent = path.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
+            Files.writeString(
+                path,
+                "T08 dedicated server boot smoke OK\n",
+                StandardCharsets.UTF_8
+            );
+        } catch (Exception failure) {
+            throw new IllegalStateException("Could not write T08 boot smoke marker.", failure);
         }
     }
 
