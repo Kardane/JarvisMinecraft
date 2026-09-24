@@ -1,0 +1,6 @@
+name: JarvisMinecraft
+version: 0.1.0-dev
+main: io.github.kardane.jarvisminecraft.paper.JarvisPaperPlugin
+api-version: '1.21'
+description: Private AI operations assistant for Minecraft server operators.
+authors: [Kardane]
