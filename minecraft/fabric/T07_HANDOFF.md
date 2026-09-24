@@ -92,7 +92,7 @@ No Minecraft/Fabric object crosses into common protocol DTOs or Brain state.
 - T03 `X-Jarvis-Secret` transport authentication is used.
 - Adapter hello -> Brain hello -> capabilities -> ACTIVE.
 - Reconnect creates a fresh T03 connection runtime and clears request bindings.
-- Brain messages must match the current Paper-originated equivalent Fabric request binding:
+- Brain messages must match the current Fabric-originated request binding:
   - requestId
   - requesterUuid
   - sessionId
