@@ -25,7 +25,7 @@ if (!["paper", "fabric", "neoforge"].includes(PLATFORM)) {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(HERE, "../../..");
-const RUN_ROOT = join(ROOT, ".t10", PLATFORM);
+const RUN_ROOT = join(ROOT, "tests", "acceptance", ".t10", PLATFORM);
 const OUT_DIR = join(ROOT, "tests", "acceptance", "out");
 const PORT = 25565;
 const BRAIN_PORT = 8181;
