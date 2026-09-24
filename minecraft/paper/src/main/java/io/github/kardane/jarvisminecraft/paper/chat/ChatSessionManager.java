@@ -73,6 +73,18 @@ public final class ChatSessionManager {
         sessions.remove(requesterUuid);
     }
 
+    public synchronized List<SessionHandle> pruneExpired() {
+        Instant now = clock.instant();
+        List<SessionHandle> removed = new ArrayList<>();
+        for (Map.Entry<UUID, Session> entry : List.copyOf(sessions.entrySet())) {
+            if (!now.isBefore(entry.getValue().expiresAt())) {
+                sessions.remove(entry.getKey());
+                removed.add(new SessionHandle(entry.getKey(), entry.getValue().sessionId()));
+            }
+        }
+        return List.copyOf(removed);
+    }
+
     public synchronized List<UUID> pruneInvalid(Predicate<UUID> stillAuthorized) {
         List<UUID> removed = new ArrayList<>();
         for (UUID uuid : List.copyOf(sessions.keySet())) {
@@ -97,6 +109,8 @@ public final class ChatSessionManager {
     }
 
     private record Session(UUID sessionId, Instant expiresAt) {}
+
+    public record SessionHandle(UUID requesterUuid, UUID sessionId) {}
 
     public enum Kind {
         PUBLIC_CHAT,
