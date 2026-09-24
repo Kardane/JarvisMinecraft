@@ -1,0 +1,4 @@
+server-id: main
+brain-url: ws://127.0.0.1:8181/ws
+shared-secret: CHANGE_ME
+reconnect-delay-ticks: 40
