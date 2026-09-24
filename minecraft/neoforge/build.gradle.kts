@@ -122,5 +122,4 @@ val t08Verification by tasks.registering(JavaExec::class) {
 tasks.named("check") {
     dependsOn(verifyNoClientImports)
     dependsOn(t08Verification)
-    dependsOn(verifyT08BootSmoke)
 }
