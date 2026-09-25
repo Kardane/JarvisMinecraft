@@ -141,7 +141,7 @@ export class BrainWebSocketServer {
 
     await new Promise<void>((resolve, reject) => {
       server.close((error) => {
-        if (error !== undefined) {
+        if (error != null) {
           reject(error);
         } else {
           resolve();
