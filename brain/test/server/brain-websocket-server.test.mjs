@@ -218,6 +218,17 @@ test("OP_REVOKED cancel during model wait prevents a later state-changing Tool r
       },
     });
 
+    await waitUntil(
+      () =>
+        fixture.events.some(
+          (event) =>
+            event.kind === "cancel" &&
+            event.requestId === requestId &&
+            event.details?.reason === "OP_REVOKED",
+        ),
+      200,
+    );
+
     gate.resolve({
       kind: "tools",
       calls: [{
