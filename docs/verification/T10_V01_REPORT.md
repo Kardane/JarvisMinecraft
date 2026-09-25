@@ -2,34 +2,56 @@
 
 Date: 2026-09-25  
 Branch: `codex/t10-acceptance`  
-Scope: v0.1 acceptance evidence for T03-T09
+Scope: v0.1 acceptance evidence after T03-T09 plus the production Brain daemon integration
 
 ## Overall status
 
-**PARTIAL — release gate not complete.**
+**PARTIAL — implementation E2E is green; external-provider and dedicated-performance gates remain open.**
 
-The deterministic policy suite and the real Minecraft platform/client scenarios have strong passing evidence. The v0.1 release gate remains incomplete because:
+The deterministic policy suite and the real Minecraft platform/client scenarios now pass through the **production `BrainWebSocketServer` transport**. The v0.1 release gate is still not marked complete because:
 
-1. A09 has not been run against the real TypeSafe Jev provider; `TYPESAFE_API_KEY` is not configured in the repository Actions environment.
+1. A09 has not been run against the real TypeSafe Jev provider; `TYPESAFE_API_KEY` is not configured in repository Actions.
 2. A10 has not been run against the real OpenAI + TypeSafe providers; `OPENAI_API_KEY` and `TYPESAFE_API_KEY` are not configured.
-3. A11 live MSPT testing passed on Paper and NeoForge but the first Fabric measurement exceeded the <=5ms target on a GitHub-hosted runner. A same-scenario retry was requested without changing the threshold or formula.
-4. The repository still has no production Brain WebSocket server entrypoint. T10 uses a test-only authenticated WebSocket gateway under `tests/acceptance/**` to connect the real Adapters to `BrainCore`. This proves the Adapter/protocol/Core path but is not a deployable production Brain daemon.
+3. A11 passes on all three platforms in the latest production-transport run, but an earlier Fabric run on a GitHub shared runner exceeded the +5ms target and an unchanged retry passed. A dedicated fixed-load host is still required before treating the performance target as closed.
 
-No missing gate is converted into a PASS.
+No missing external gate is converted into a PASS.
+
+## Production Brain transport status
+
+The deployability gap previously found by T10 is resolved.
+
+Production daemon integration:
+
+- PR: #12
+- merge commit: `5aebf3bb5cbba4624088e455af6cc9913657f087`
+- startup: `cd brain && npm ci && npm run build && npm start`
+- endpoint: `ws://127.0.0.1:8181/ws`
+- authentication: `X-Jarvis-Secret`
+- composition:
+  - OpsRuntime
+  - TypeSafe Jev
+  - GPT-6 Luna
+  - JarvisAiModel
+  - BrainCore
+  - BrainWebSocketServer
+
+Production transport unit/integration checks passed 6/6 for authentication, hello/capabilities, Tool round trip, reconnect replacement, cancellation, and serverId binding.
+
+The live acceptance harness no longer implements an independent WebSocket server. `tests/acceptance/live/gateway.mjs` is a thin harness around the production `BrainWebSocketServer` with a deterministic ModelPort and in-memory audit observer.
 
 ## Evidence layers
 
 ### 1. Deterministic policy / state-machine acceptance
 
-Stable successful evidence:
+Latest production-transport acceptance run:
 
 - workflow: `T10 Acceptance TEMP`
-- run: #3
-- run id: `35948489552`
-- commit: `cae359ed5181636723ad40064188a6b0c66d65bb`
-- result: PASS
+- run: #10
+- run id: `36110556203`
+- commit: `457a4fbca6c56671340f4a1ad8861c4f69ce2224`
+- deterministic result: **10/10 PASS**
 
-The deterministic suite passed 10/10 tests:
+Coverage:
 
 | Acceptance | Result | Evidence |
 |---|---|---|
@@ -47,106 +69,89 @@ The deterministic suite passed 10/10 tests:
 
 A14 is v0.2-only and is not a v0.1 gate.
 
-### 2. Real Minecraft server + protocol-client acceptance
+### 2. Real Minecraft server + protocol-client acceptance through production transport
 
-Stable successful evidence:
+Run #10 exercised:
 
-- workflow: `T10 Acceptance TEMP`
-- run: #3
-- run id: `35948489552`
-- commit: `cae359ed5181636723ad40064188a6b0c66d65bb`
-
-Test shape:
-
-- actual Minecraft 1.21.8 dedicated server
-- actual packaged platform Adapter JAR
-- authenticated loopback test Brain gateway
-- three real Minecraft protocol sessions via Mineflayer 4.39.0:
+- actual Minecraft 1.21.8 dedicated servers;
+- actual packaged platform Adapter JARs;
+- the production `BrainWebSocketServer`;
+- three real Minecraft protocol sessions through Mineflayer 4.39.0:
   - `AdminA`: OP
   - `NonOp`: non-OP
   - `OtherOp`: second OP
-- offline-mode server only for isolated CI test identities
+- a deterministic ModelPort so Minecraft/platform behavior can be tested without provider credentials.
 
 These are real protocol clients, not Mojang GUI clients. No GUI-client visual evidence is claimed.
 
-| Platform | Server boot | JARVIS loaded | Live checks | Result |
-|---|---:|---:|---:|---|
-| Paper 1.21.8 | PASS | PASS | 22/22 | PASS |
-| Fabric 1.21.8 | PASS | PASS | 22/22 | PASS |
-| NeoForge 21.8.52 / MC 1.21.8 | PASS | PASS | 22/22 | PASS |
+| Platform | Server boot | JARVIS loaded | Production transport | Live checks | Result |
+|---|---:|---:|---:|---:|---|
+| Paper 1.21.8 | PASS | PASS | PASS | 23/23 | PASS |
+| Fabric 1.21.8 | PASS | PASS | PASS | 23/23 | PASS |
+| NeoForge 21.8.52 / MC 1.21.8 | PASS | PASS | PASS | 23/23 | PASS |
 
-The live scenarios verify:
+Each platform recorded 41 accepted Brain chat messages and 42 Tool requests during the full scenario.
 
-- non-OP JARVIS-looking chat causes zero Brain chat submissions;
+Live scenarios verify:
+
+- non-OP JARVIS-looking chat causes zero Brain submissions;
 - requester OP receives private JARVIS response;
-- non-OP and other OP do not receive that response;
+- non-OP and another OP do not receive the response;
 - direct OP chat reaches Brain exactly once;
-- follow-up is forwarded as `FOLLOW_UP`;
-- `!내용` does not reach Brain and is public;
-- `대화 끝` is private/local and stops further session forwarding;
-- player location returned by the Adapter matches the target protocol client's observed position;
+- follow-up is routed as `FOLLOW_UP`;
+- `!내용` bypasses Brain and remains public;
+- `대화 끝` ends locally/private and stops forwarding;
+- Adapter player location matches the target protocol client's observed position;
 - `teleport_staff` actually moves the requesting OP to the target;
-- server metrics contain unit + observation timestamp;
+- server metrics contain unit and observation timestamp;
 - state-changing Tool request has an actionId;
-- after deop, JARVIS-looking chat does not reach Brain;
-- after re-op, a new session can start;
+- deop blocks JARVIS intake and re-op can start a new session;
 - unregistered command execution remains zero;
-- missing CoreProtect/WorldGuard provider Tools are not advertised;
-- Brain gateway restart causes Adapter reconnect;
-- server remains responsive after Brain reconnect.
+- absent CoreProtect/WorldGuard provider Tools are not advertised;
+- production Brain transport restart causes Adapter reconnect;
+- server remains responsive after reconnect;
+- A11 fixed dual-OP load measurement is collected.
 
-Evidence artifacts from run #3:
+Evidence artifacts from run #10:
 
-- Paper: artifact `10786844612`
-- Fabric: artifact `10787672426`
-- NeoForge: artifact `10787279999`
+- Paper: `10852703286`
+- Fabric: `10853410459`
+- NeoForge: `10852673920`
 
 ### 3. A11 live MSPT load measurement
 
-A later live run added a fixed dual-OP status-query load without changing the product limits.
-
-Workflow run id: `36104584773`
-
 Method:
 
-1. collect eight sequential baseline `get_server_status` MSPT observations;
+1. collect eight sequential `get_server_status` MSPT observations;
 2. run twelve rounds of two simultaneous OP status requests;
 3. collect 24 load MSPT observations;
 4. calculate p95 for baseline and load;
 5. require `loadP95 - baselineP95 <= 5ms`.
 
-Observed results so far:
+Latest production-transport run #10:
 
 | Platform | Baseline p95 | Load p95 | Delta | Result |
 |---|---:|---:|---:|---|
-| Paper | 6.419 ms | 6.427 ms | +0.008 ms | PASS |
-| Fabric first attempt | 50.375 ms | 92.359 ms | +41.984 ms | FAIL |
-| Fabric same-scenario retry | 13.903 ms | 8.052 ms | -5.851 ms | PASS |
-| NeoForge | 23.951 ms | 20.850 ms | -3.101 ms | PASS |
+| Paper | 7.466 ms | 4.752 ms | -2.714 ms | PASS |
+| Fabric | 17.888 ms | 4.897 ms | -12.991 ms | PASS |
+| NeoForge | 16.152 ms | 11.098 ms | -5.053 ms | PASS |
 
-The Fabric failure is recorded as observed. The test threshold and calculation were not relaxed. A same-scenario retry, using the same workflow run and unchanged test, passed with baseline p95 13.903ms, load p95 8.052ms and delta -5.851ms.
+Historical Fabric evidence must still be retained:
 
-Because the two Fabric observations conflict strongly on GitHub-hosted shared runners, A11 remains PARTIAL rather than being promoted to PASS. A fixed dedicated performance environment should repeat the exact load shape before the <=5ms product target is considered closed.
+| Fabric observation | Baseline p95 | Load p95 | Delta | Result |
+|---|---:|---:|---:|---|
+| earlier first attempt | 50.375 ms | 92.359 ms | +41.984 ms | FAIL |
+| unchanged retry | 13.903 ms | 8.052 ms | -5.851 ms | PASS |
+| production-transport run #10 | 17.888 ms | 4.897 ms | -12.991 ms | PASS |
 
-Fabric jobs:
-- first attempt: job `107974177099` — FAIL on A11 performance only
-- unchanged retry: job `107975254865` — PASS
-
-The deterministic A11 queue-bound checks pass independently of this live performance target.
+The threshold and calculation were never relaxed. Because the first shared-runner result conflicts sharply with the later two results, A11 remains **PARTIAL** pending repetition on a dedicated fixed-load host. The deterministic queue-bound portion of A11 is PASS.
 
 ### 4. A09 / A10 external model live
 
-A dedicated temporary workflow attempted live verification without exposing secret values.
+A temporary provider workflow safely checked credential availability without printing secret values.
 
-Workflow:
-
-- name: `T10 Model Live TEMP`
-- run: #1
+- workflow: `T10 Model Live TEMP`
 - run id: `36104376507`
-- result: workflow SUCCESS, provider tests SKIPPED because credentials were absent
-
-Credential availability recorded by the workflow:
-
 - OpenAI configured: **no**
 - TypeSafe configured: **no**
 
@@ -157,53 +162,32 @@ Therefore:
 | A09 | UNVERIFIED | `TYPESAFE_API_KEY` unavailable |
 | A10 | UNVERIFIED | `OPENAI_API_KEY` and `TYPESAFE_API_KEY` unavailable |
 
-The existing assets remain ready:
+Ready-to-run real-provider assets:
 
 - `evals/t05/jev-korean-cases.jsonl`: 200 labeled Korean examples
-- `evals/t05/run-jev-eval.mjs`: real Jev evaluation with dev-only threshold selection and holdout reporting
+- `evals/t05/run-jev-eval.mjs`: real Jev evaluation with holdout reporting
 - `evals/t05/live-models.mjs`: real Jev + GPT-6 Luna Tool-call/result smoke
 
-No mock result is reported as live provider evidence.
+No deterministic or mocked result is reported as live provider evidence.
 
 ## Acceptance matrix
 
 | ID | Status | Notes |
 |---|---|---|
-| A01 | PASS | deterministic + all three live platforms |
-| A02 | PASS | deterministic + live deop/re-op on all three platforms |
-| A03 | PASS | deterministic TTL; live follow-up/end/public escape on all three |
+| A01 | PASS | deterministic + three production-transport live platforms |
+| A02 | PASS | deterministic + live deop/re-op |
+| A03 | PASS | deterministic TTL + live follow-up/end/public escape |
 | A04 | PASS | deterministic server/UUID/session isolation |
 | A05 | PASS | real location comparison and real self-teleport on all three |
-| A06 | PASS | no arbitrary command Tool path; live and deterministic |
-| A07 | PASS | reconnect and no automatic uncertain state-change retry |
+| A06 | PASS | arbitrary command Tool path absent |
+| A07 | PASS | production transport reconnect + no uncertain mutation retry |
 | A08 | PASS | deterministic Jev/Luna failure policy |
 | A09 | UNVERIFIED | real TypeSafe credential unavailable |
 | A10 | UNVERIFIED | real OpenAI + TypeSafe credentials unavailable |
-| A11 | PARTIAL | queue bounds pass; Paper/NeoForge live perf pass; Fabric first attempt failed and unchanged retry passed, so dedicated-host confirmation is still required |
-| A12 | PASS | provider Tools absent when providers absent |
+| A11 | PARTIAL | queue bounds PASS; latest three-platform live perf PASS; historical Fabric shared-runner outlier requires dedicated-host confirmation |
+| A12 | PASS | unavailable provider Tools remain unexposed |
 | A13 | PASS | concrete T09 audit failure is fail-closed |
 | A14 | N/A | v0.2 only |
-
-## Important implementation gap discovered by T10
-
-The protocol states that Brain opens a loopback WebSocket server and the Adapter connects to it.
-
-The product repository currently contains:
-
-- Adapter outbound WebSocket clients;
-- Brain Core;
-- AI integration;
-- operations/audit runtime;
-
-but it does **not** yet contain the production Brain WebSocket listener/handshake/orchestration entrypoint that composes those pieces into a runnable daemon.
-
-The T10 live suite therefore implements an authenticated test-only gateway at:
-
-`tests/acceptance/live/gateway.mjs`
-
-This gateway is appropriate acceptance scaffolding and proved the real platform Adapter wire behavior, but it must not be presented as the production Brain transport implementation.
-
-A production release still needs that daemon entrypoint before v0.1 can be considered deployable.
 
 ## Reproduction
 
@@ -227,6 +211,15 @@ npm run live:fabric
 npm run live:neoforge
 ```
 
+Production Brain process:
+
+```bash
+cd brain
+npm ci
+npm run build
+npm start
+```
+
 Live model verification, once credentials are deliberately supplied:
 
 ```bash
@@ -238,15 +231,16 @@ TYPESAFE_API_KEY=... node evals/t05/run-jev-eval.mjs --output /tmp/jev-report.js
 OPENAI_API_KEY=... TYPESAFE_API_KEY=... node evals/t05/live-models.mjs
 ```
 
-Do not commit credentials or generated provider-secret files.
+Never commit credentials or credential-bearing environment files.
 
 ## Release conclusion
 
-The v0.1 platform adapters and deterministic security/policy boundaries have substantially stronger evidence than before T10, including actual Paper/Fabric/NeoForge servers and actual Minecraft protocol clients.
+The v0.1 implementation now has passing deterministic policy evidence and passing live Paper/Fabric/NeoForge E2E evidence through the production Brain WebSocket transport.
 
-The release gate is intentionally **not marked complete** until:
+The release gate remains **PARTIAL**, not complete, until:
 
-1. A09 real Jev evaluation is run and the holdout target is evaluated;
-2. A10 real Luna/Jev Tool-call evidence is captured;
-3. the mixed Fabric A11 performance observations are resolved under a dedicated fixed-load environment;
-4. a production Brain WebSocket server/daemon entrypoint exists and is included in end-to-end verification.
+1. A09 real Jev 200-case evaluation is run and its holdout target is reported;
+2. A10 real GPT-6 Luna + Jev Tool-call/result evidence is captured;
+3. A11 is confirmed on a dedicated fixed-load performance host.
+
+The previously identified production Brain transport/daemon gap is closed.
