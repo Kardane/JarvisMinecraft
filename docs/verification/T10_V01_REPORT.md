@@ -120,10 +120,17 @@ Observed results so far:
 | Platform | Baseline p95 | Load p95 | Delta | Result |
 |---|---:|---:|---:|---|
 | Paper | 6.419 ms | 6.427 ms | +0.008 ms | PASS |
-| Fabric | 50.375 ms | 92.359 ms | +41.984 ms | FAIL on first run |
+| Fabric first attempt | 50.375 ms | 92.359 ms | +41.984 ms | FAIL |
+| Fabric same-scenario retry | 13.903 ms | 8.052 ms | -5.851 ms | PASS |
 | NeoForge | 23.951 ms | 20.850 ms | -3.101 ms | PASS |
 
-The Fabric failure is recorded as observed. The test threshold and calculation were not relaxed. A same-scenario retry was requested to distinguish reproducible product cost from shared-runner noise; the final report should retain both measurements.
+The Fabric failure is recorded as observed. The test threshold and calculation were not relaxed. A same-scenario retry, using the same workflow run and unchanged test, passed with baseline p95 13.903ms, load p95 8.052ms and delta -5.851ms.
+
+Because the two Fabric observations conflict strongly on GitHub-hosted shared runners, A11 remains PARTIAL rather than being promoted to PASS. A fixed dedicated performance environment should repeat the exact load shape before the <=5ms product target is considered closed.
+
+Fabric jobs:
+- first attempt: job `107974177099` — FAIL on A11 performance only
+- unchanged retry: job `107975254865` — PASS
 
 The deterministic A11 queue-bound checks pass independently of this live performance target.
 
@@ -172,7 +179,7 @@ No mock result is reported as live provider evidence.
 | A08 | PASS | deterministic Jev/Luna failure policy |
 | A09 | UNVERIFIED | real TypeSafe credential unavailable |
 | A10 | UNVERIFIED | real OpenAI + TypeSafe credentials unavailable |
-| A11 | PARTIAL | queue bounds pass; Paper/NeoForge live perf pass; Fabric first live perf run fails target |
+| A11 | PARTIAL | queue bounds pass; Paper/NeoForge live perf pass; Fabric first attempt failed and unchanged retry passed, so dedicated-host confirmation is still required |
 | A12 | PASS | provider Tools absent when providers absent |
 | A13 | PASS | concrete T09 audit failure is fail-closed |
 | A14 | N/A | v0.2 only |
@@ -241,5 +248,5 @@ The release gate is intentionally **not marked complete** until:
 
 1. A09 real Jev evaluation is run and the holdout target is evaluated;
 2. A10 real Luna/Jev Tool-call evidence is captured;
-3. the Fabric A11 performance result is resolved/repeated under a suitable fixed-load environment;
+3. the mixed Fabric A11 performance observations are resolved under a dedicated fixed-load environment;
 4. a production Brain WebSocket server/daemon entrypoint exists and is included in end-to-end verification.
