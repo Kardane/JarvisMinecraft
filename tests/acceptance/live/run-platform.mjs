@@ -137,6 +137,7 @@ async function scenarioA01() {
   });
 
   clearMessages();
+  const beforeOp = gateway.chatMessages(SERVER_ID).length;
   admin.chat("자비스 서버 상태 어때?");
   const response = await waitForMessage(admin, "[JARVIS] SERVER_STATUS", 15_000);
   pass("A01-requester-received", response.includes("SERVER_STATUS"));
@@ -151,12 +152,13 @@ async function scenarioA01() {
     },
   );
 
-  const adminChats = gateway
-    .chatMessages(SERVER_ID)
-    .filter((record) => record.payload?.requesterName === "AdminA");
   pass(
     "A01-op-chat-reached-brain-once",
-    adminChats.some((record) => record.payload?.text === "자비스 서버 상태 어때?"),
+    gateway.chatMessages(SERVER_ID).length === beforeOp + 1,
+    {
+      before: beforeOp,
+      after: gateway.chatMessages(SERVER_ID).length,
+    },
   );
 }
 
@@ -245,20 +247,26 @@ async function scenarioA05() {
     target: vector(otherOp.entity.position),
   });
 
-  const snapshot = gateway.snapshot();
-  const statusResult = snapshot.records.find(
-    (record) =>
-      record.kind === "inbound.tool.result" &&
-      record.payload?.tool === "get_server_status",
+  clearMessages();
+  admin.chat("자비스 서버 상태 metric 확인");
+  const statusLine = await waitForMessage(
+    admin,
+    "[JARVIS] SERVER_STATUS ",
+    15_000,
   );
+  const statusJson = statusLine.slice(
+    statusLine.indexOf("SERVER_STATUS ") + 14,
+  );
+  const statusData = JSON.parse(statusJson);
   pass(
     "A05-metrics-have-unit-and-observedAt",
-    typeof statusResult?.payload?.data?.tps?.unit === "string" &&
-      typeof statusResult?.payload?.data?.tps?.observedAt === "string" &&
-      Number.isFinite(Date.parse(statusResult.payload.data.tps.observedAt)),
-    { statusResult: statusResult?.payload ?? null },
+    typeof statusData?.tps?.unit === "string" &&
+      typeof statusData?.tps?.observedAt === "string" &&
+      Number.isFinite(Date.parse(statusData.tps.observedAt)),
+    { statusData },
   );
 
+  const snapshot = gateway.snapshot();
   const teleportRequest = snapshot.records.find(
     (record) =>
       record.kind === "outbound.tool.request" &&
@@ -354,47 +362,30 @@ async function scenarioA07() {
 async function scenarioA11Live() {
   const [admin, , otherOp] = bots;
 
-  const baselineStart = toolResults("get_server_status").length;
   const baselineSamples = [];
   for (let index = 0; index < 8; index += 1) {
-    clearMessages();
-    const before = toolResults("get_server_status").length;
-    admin.chat("자비스 서버 상태 baseline " + index);
-    await waitForMessage(admin, "[JARVIS] SERVER_STATUS", 15_000);
-    await waitUntil(
-      () => toolResults("get_server_status").length > before,
-      10_000,
-      "baseline status Tool result",
+    const value = await requestStatusMspt(
+      admin,
+      "자비스 서버 상태 baseline " + index,
     );
-    const latest = toolResults("get_server_status").at(-1);
-    baselineSamples.push(Number(latest?.payload?.data?.mspt?.value));
+    baselineSamples.push(value);
     await sleep(100);
   }
 
-  clearMessages();
-  otherOp.chat("자비스 서버 상태 load 준비");
-  await waitForMessage(otherOp, "[JARVIS] SERVER_STATUS", 15_000);
+  await requestStatusMspt(otherOp, "자비스 서버 상태 load 준비");
 
   const loadSamples = [];
   for (let index = 0; index < 12; index += 1) {
     clearMessages();
-    const before = toolResults("get_server_status").length;
     admin.chat("자비스 서버 상태 load-a " + index);
     otherOp.chat("서버 상태 load-b " + index);
 
-    await Promise.all([
-      waitForMessage(admin, "[JARVIS] SERVER_STATUS", 15_000),
-      waitForMessage(otherOp, "[JARVIS] SERVER_STATUS", 15_000),
+    const [adminLine, otherLine] = await Promise.all([
+      waitForMessage(admin, "[JARVIS] SERVER_STATUS ", 15_000),
+      waitForMessage(otherOp, "[JARVIS] SERVER_STATUS ", 15_000),
     ]);
-    await waitUntil(
-      () => toolResults("get_server_status").length >= before + 2,
-      10_000,
-      "concurrent load status Tool results",
-    );
-    const latest = toolResults("get_server_status").slice(-2);
-    for (const result of latest) {
-      loadSamples.push(Number(result?.payload?.data?.mspt?.value));
-    }
+    loadSamples.push(parseStatusMspt(adminLine));
+    loadSamples.push(parseStatusMspt(otherLine));
     await sleep(50);
   }
 
@@ -416,20 +407,22 @@ async function scenarioA11Live() {
       baselineP95,
       loadP95,
       increaseMs,
-      baselineResultCountDelta:
-        toolResults("get_server_status").length - baselineStart,
     },
   );
 }
 
-function toolResults(tool) {
-  return gateway
-    .snapshot()
-    .records.filter(
-      (record) =>
-        record.kind === "inbound.tool.result" &&
-        record.payload?.tool === tool,
-    );
+async function requestStatusMspt(bot, text) {
+  clearMessages();
+  bot.chat(text);
+  const line = await waitForMessage(bot, "[JARVIS] SERVER_STATUS ", 15_000);
+  return parseStatusMspt(line);
+}
+
+function parseStatusMspt(line) {
+  const marker = "SERVER_STATUS ";
+  const json = line.slice(line.indexOf(marker) + marker.length);
+  const data = JSON.parse(json);
+  return Number(data?.mspt?.value);
 }
 
 function percentile95(values) {
