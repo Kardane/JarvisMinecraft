@@ -86,6 +86,7 @@ try {
   await scenarioA02();
   await scenarioA06A12();
   await scenarioA07();
+  await scenarioA11Live();
 
   evidence.gateway = gateway.snapshot();
   evidence.passed = true;
@@ -348,6 +349,93 @@ async function scenarioA07() {
   admin.chat("자비스 서버 상태 재연결 확인");
   await waitForMessage(admin, "[JARVIS] SERVER_STATUS", 15_000);
   pass("A07-server-still-responsive-after-brain-restart", true);
+}
+
+async function scenarioA11Live() {
+  const [admin, , otherOp] = bots;
+
+  const baselineStart = toolResults("get_server_status").length;
+  const baselineSamples = [];
+  for (let index = 0; index < 8; index += 1) {
+    clearMessages();
+    const before = toolResults("get_server_status").length;
+    admin.chat("자비스 서버 상태 baseline " + index);
+    await waitForMessage(admin, "[JARVIS] SERVER_STATUS", 15_000);
+    await waitUntil(
+      () => toolResults("get_server_status").length > before,
+      10_000,
+      "baseline status Tool result",
+    );
+    const latest = toolResults("get_server_status").at(-1);
+    baselineSamples.push(Number(latest?.payload?.data?.mspt?.value));
+    await sleep(100);
+  }
+
+  clearMessages();
+  otherOp.chat("자비스 서버 상태 load 준비");
+  await waitForMessage(otherOp, "[JARVIS] SERVER_STATUS", 15_000);
+
+  const loadSamples = [];
+  for (let index = 0; index < 12; index += 1) {
+    clearMessages();
+    const before = toolResults("get_server_status").length;
+    admin.chat("자비스 서버 상태 load-a " + index);
+    otherOp.chat("서버 상태 load-b " + index);
+
+    await Promise.all([
+      waitForMessage(admin, "[JARVIS] SERVER_STATUS", 15_000),
+      waitForMessage(otherOp, "[JARVIS] SERVER_STATUS", 15_000),
+    ]);
+    await waitUntil(
+      () => toolResults("get_server_status").length >= before + 2,
+      10_000,
+      "concurrent load status Tool results",
+    );
+    const latest = toolResults("get_server_status").slice(-2);
+    for (const result of latest) {
+      loadSamples.push(Number(result?.payload?.data?.mspt?.value));
+    }
+    await sleep(50);
+  }
+
+  const cleanBaseline = baselineSamples.filter(Number.isFinite);
+  const cleanLoad = loadSamples.filter(Number.isFinite);
+  const baselineP95 = percentile95(cleanBaseline);
+  const loadP95 = percentile95(cleanLoad);
+  const increaseMs = loadP95 - baselineP95;
+
+  pass(
+    "A11-mspt-p95-increase-under-5ms",
+    cleanBaseline.length === 8 &&
+      cleanLoad.length === 24 &&
+      Number.isFinite(increaseMs) &&
+      increaseMs <= 5,
+    {
+      baselineSamples: cleanBaseline,
+      loadSamples: cleanLoad,
+      baselineP95,
+      loadP95,
+      increaseMs,
+      baselineResultCountDelta:
+        toolResults("get_server_status").length - baselineStart,
+    },
+  );
+}
+
+function toolResults(tool) {
+  return gateway
+    .snapshot()
+    .records.filter(
+      (record) =>
+        record.kind === "inbound.tool.result" &&
+        record.payload?.tool === tool,
+    );
+}
+
+function percentile95(values) {
+  if (values.length === 0) return Number.NaN;
+  const sorted = [...values].sort((a, b) => a - b);
+  return sorted[Math.max(0, Math.ceil(sorted.length * 0.95) - 1)];
 }
 
 async function createBot(username) {
