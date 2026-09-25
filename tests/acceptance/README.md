@@ -23,9 +23,9 @@ The live harness uses:
 
 - the packaged JARVIS Adapter JAR;
 - a real Minecraft 1.21.8 dedicated server;
-- an authenticated loopback WebSocket test Brain gateway;
+- the production `BrainWebSocketServer` transport on loopback;
 - real offline-mode Minecraft protocol clients through Mineflayer;
-- deterministic BrainCore ModelPort logic so Minecraft behavior can be tested without provider cost.
+- deterministic BrainCore ModelPort logic so Minecraft/platform behavior can be tested without provider cost.
 
 Run one platform at a time:
 
@@ -37,7 +37,9 @@ npm run live:neoforge
 
 The harness creates isolated directories under `.t10/`, uses ports 25565 and 8181, and stops the server after the scenario.
 
-The test gateway is not the product Brain transport entrypoint. It exists under `tests/acceptance/**` because a production WebSocket Brain server has not yet been implemented. The verification report must keep that limitation explicit.
+The acceptance gateway is now only a thin test harness around the production `BrainWebSocketServer`. It supplies a deterministic ModelPort and in-memory audit observer, but does not duplicate WebSocket authentication, handshake, binding, reconnect, Tool correlation, or cancellation logic.
+
+Therefore live platform tests exercise the same production transport implementation used by `npm start`. External A09/A10 still require the real Jev and GPT-6 Luna providers and are recorded separately.
 
 ## External model evidence
 
