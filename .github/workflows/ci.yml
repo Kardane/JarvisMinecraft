@@ -44,10 +44,6 @@ jobs:
         working-directory: brain
         run: npm ci
 
-      - name: Typecheck and validate protocol fixtures
+      - name: Typecheck, validate protocol, build, and test Brain
         working-directory: brain
         run: npm run check
-
-      - name: Build Brain
-        working-directory: brain
-        run: npm run build

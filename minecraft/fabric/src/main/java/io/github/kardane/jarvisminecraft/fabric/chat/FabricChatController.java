@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.fabric.chat;
 
+import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.fabric.platform.FabricPlatformAccess;
 import io.github.kardane.jarvisminecraft.fabric.transport.FabricBrainConnection;

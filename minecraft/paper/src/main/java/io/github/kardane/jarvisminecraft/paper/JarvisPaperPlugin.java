@@ -4,7 +4,7 @@ import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 import io.github.kardane.jarvisminecraft.common.transport.JdkBrainWebSocketTransport;
-import io.github.kardane.jarvisminecraft.paper.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.paper.chat.PaperChatListener;
 import io.github.kardane.jarvisminecraft.paper.platform.BukkitPaperPlatformAccess;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperPlatformAccess;

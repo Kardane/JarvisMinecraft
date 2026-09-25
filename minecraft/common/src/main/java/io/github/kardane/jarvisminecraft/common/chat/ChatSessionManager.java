@@ -1,4 +1,4 @@
-package io.github.kardane.jarvisminecraft.fabric.chat;
+package io.github.kardane.jarvisminecraft.common.chat;
 
 import java.time.Clock;
 import java.time.Instant;
