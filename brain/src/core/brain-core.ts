@@ -1,3 +1,4 @@
+import { PROTOCOL_VERSION } from "../generated/contract-constants.js";
 import { RequestBudget } from "./budget.js";
 import {
   getToolDescriptor,
@@ -305,7 +306,7 @@ export class BrainCore {
       this.#time.nowMs() + 5_000,
     );
     const request: ToolRequestEnvelope = {
-      protocolVersion: "1.0",
+      protocolVersion: PROTOCOL_VERSION,
       type: "tool.request",
       messageId: randomId(),
       requestId: message.requestId,
@@ -444,7 +445,7 @@ export class BrainCore {
     result: ToolResultEnvelope,
   ): void {
     if (
-      result.protocolVersion !== "1.0" ||
+      result.protocolVersion !== PROTOCOL_VERSION ||
       result.type !== "tool.result" ||
       result.requestId !== request.requestId ||
       result.serverId !== request.serverId ||
@@ -462,28 +463,6 @@ export class BrainCore {
   }
 
   private validateChatMessage(message: ChatMessageEnvelope): void {
-    if (message.protocolVersion !== "1.0" || message.type !== "chat.message") {
-      throw new CoreError("UNSUPPORTED", "Unsupported Brain protocol message.");
-    }
-    if (
-      message.serverId.length < 1 ||
-      message.serverId.length > 64 ||
-      !isUuid(message.messageId) ||
-      !isUuid(message.requestId) ||
-      !isUuid(message.sessionId) ||
-      !isUuid(message.requesterUuid)
-    ) {
-      throw new CoreError("INVALID_ARGUMENT", "Chat message binding is invalid.");
-    }
-    if (
-      message.payload.requesterName.length < 1 ||
-      message.payload.requesterName.length > 16 ||
-      message.payload.text.length < 1 ||
-      message.payload.text.length > 4_096
-    ) {
-      throw new CoreError("INVALID_ARGUMENT", "Chat payload is outside protocol limits.");
-    }
-
     const sentAt = parseDate(message.sentAt, "sentAt");
     const deadlineAt = parseDate(message.deadlineAt, "deadlineAt");
     if (deadlineAt <= sentAt) {
@@ -574,7 +553,7 @@ export class BrainCore {
   ): ChatResponseEnvelope {
     const now = this.#time.nowMs();
     return {
-      protocolVersion: "1.0",
+      protocolVersion: PROTOCOL_VERSION,
       type: "chat.response",
       messageId: randomId(),
       requestId: message.requestId,

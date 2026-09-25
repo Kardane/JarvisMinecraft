@@ -376,6 +376,23 @@ Java와 TypeScript 모두 protocol/fixtures/manifest.json을 읽어 동일 fixtu
 
 T01에서 schema/fixture 구조 검증을 수행했으며, build/CI 자동화는 T02에서 연결한다.
 
+### Runtime validator와 generated contract
+
+현재 Brain production WebSocket 경계는 `protocol/schema/protocol.schema.json`에서 생성한
+TypeScript schema module을 AJV로 컴파일해 inbound/outbound wire message를 검증한다.
+field 길이, UUID/date-time 형식, enum, unknown field, Tool별 arguments/result shape 같은 구조 검증은
+이 schema에 둔다. 연결 순서, 인증된 `serverId` binding, deadline의 시간 순서, 현재 OP 여부,
+session/request binding 같은 의미 검증은 runtime 코드에 남긴다.
+
+protocol version과 capabilities의 고정 limit은 schema의 `const`에서 생성한다.
+세션 TTL과 request deadline처럼 wire 형식이 아닌 제품 정책은
+`config/v0.1-policy.json`을 기준으로 생성한다. 생성 결과는 TypeScript와 Java에 commit하며,
+Brain CI의 `npm run check:contract`가 원본과 생성물이 일치하는지 확인한다.
+원본 변경 후에는 `brain/`에서 `npm run generate:contract`를 실행한다.
+
+Java `ProtocolCodec`은 현재 단계에서 제거하지 않는다. Java는 동일 fixture suite와 생성된 protocol
+constants를 소비하고, Java-side 구조/의미 검증 단순화는 wire compatibility를 유지하며 점진적으로 진행한다.
+
 ## 19. T01 인계
 
 T03 Java common:

@@ -1,3 +1,5 @@
+import { PROTOCOL_LIMITS } from "../generated/contract-constants.js";
+import { assertProtocolMessage } from "../protocol/schema-validator.js";
 import type { AdapterPort } from "../core/ports.js";
 import type {
   ActorBinding,
@@ -192,10 +194,11 @@ export class RemoteAdapter implements AdapterPort {
     if (!this.#active || this.#socket.readyState !== WebSocket.OPEN) {
       throw new Error("Adapter WebSocket is not open.");
     }
+    assertProtocolMessage(message);
     const raw = JSON.stringify(message);
     const bytes = new TextEncoder().encode(raw).byteLength;
-    if (bytes > 65_536) {
-      throw new Error("Outbound protocol message exceeds 65,536 bytes.");
+    if (bytes > PROTOCOL_LIMITS.maxMessageBytes) {
+      throw new Error(`Outbound protocol message exceeds ${PROTOCOL_LIMITS.maxMessageBytes} bytes.`);
     }
 
     await new Promise<void>((resolve, reject) => {

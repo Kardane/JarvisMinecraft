@@ -12,5 +12,9 @@
     "maxTotalBytes": 104857600,
     "maxFileBytes": 8388608,
     "maxQueue": 512
+  },
+  "runtime": {
+    "sessionTtlMs": 120000,
+    "requestDeadlineMs": 30000
   }
 }

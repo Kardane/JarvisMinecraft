@@ -1,3 +1,5 @@
+import { PROTOCOL_VERSION } from "../generated/contract-constants.js";
+
 export type ErrorCode =
   | "UNAUTHORIZED"
   | "INVALID_ARGUMENT"
@@ -71,7 +73,7 @@ export interface ActorBinding {
 }
 
 export interface ChatMessageEnvelope {
-  readonly protocolVersion: "1.0";
+  readonly protocolVersion: typeof PROTOCOL_VERSION;
   readonly type: "chat.message";
   readonly messageId: string;
   readonly requestId: string;
@@ -88,7 +90,7 @@ export interface ChatMessageEnvelope {
 }
 
 export interface ChatResponseEnvelope {
-  readonly protocolVersion: "1.0";
+  readonly protocolVersion: typeof PROTOCOL_VERSION;
   readonly type: "chat.response";
   readonly messageId: string;
   readonly requestId: string;
@@ -105,7 +107,7 @@ export interface ChatResponseEnvelope {
 }
 
 export interface ToolRequestEnvelope {
-  readonly protocolVersion: "1.0";
+  readonly protocolVersion: typeof PROTOCOL_VERSION;
   readonly type: "tool.request";
   readonly messageId: string;
   readonly requestId: string;
@@ -132,7 +134,7 @@ export interface ToolResult {
 }
 
 export interface ToolResultEnvelope {
-  readonly protocolVersion: "1.0";
+  readonly protocolVersion: typeof PROTOCOL_VERSION;
   readonly type: "tool.result";
   readonly messageId: string;
   readonly requestId: string;
