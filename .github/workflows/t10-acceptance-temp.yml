@@ -1,0 +1,108 @@
+name: T10 Acceptance TEMP
+
+on:
+  push:
+    branches:
+      - codex/t10-acceptance
+
+permissions:
+  contents: read
+
+jobs:
+  deterministic:
+    name: Deterministic acceptance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: brain/package-lock.json
+
+      - name: Build Brain
+        working-directory: brain
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install acceptance dependencies
+        working-directory: tests/acceptance
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Run A01-A08 A11-A13 deterministic acceptance
+        working-directory: tests/acceptance
+        run: npm run test:core
+
+  live-platform:
+    name: Live ${{ matrix.platform }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [paper, fabric, neoforge]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: brain/package-lock.json
+
+      - name: Build Brain
+        working-directory: brain
+        run: |
+          npm ci
+          npm run build
+
+      - name: Build Adapter JAR
+        shell: bash
+        run: |
+          case "${{ matrix.platform }}" in
+            paper)
+              ./gradlew :minecraft:paper:jar --stacktrace
+              ;;
+            fabric)
+              ./gradlew :minecraft:fabric:remapJar --stacktrace
+              ;;
+            neoforge)
+              ./gradlew :minecraft:neoforge:jar --stacktrace
+              ;;
+          esac
+
+      - name: Install acceptance dependencies
+        working-directory: tests/acceptance
+        run: npm install --ignore-scripts --no-audit --no-fund
+
+      - name: Run live platform scenario
+        working-directory: tests/acceptance
+        run: npm run live:${{ matrix.platform }}
+
+      - name: Print evidence summary
+        if: always()
+        shell: bash
+        run: |
+          if [ -f "tests/acceptance/out/${{ matrix.platform }}.json" ]; then
+            jq '{platform, passed, checks, error, server: {ready: .server.ready, jarvisEnabled: .server.jarvisEnabled}, gateway: {productionTransport: .gateway.productionTransport, modelCalls: .gateway.modelCalls, auditEvents: (.gateway.auditEvents|length), activeServers: .gateway.activeServers}}' "tests/acceptance/out/${{ matrix.platform }}.json"
+          fi
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t10-${{ matrix.platform }}-production-transport-evidence
+          path: |
+            tests/acceptance/out
+            .t10/${{ matrix.platform }}/logs
+          if-no-files-found: ignore
