@@ -1,0 +1,51 @@
+{
+  "reportVersion": 1,
+  "date": "2026-09-25",
+  "overall": "PARTIAL",
+  "stableLiveRun": {
+    "workflow": "T10 Acceptance TEMP",
+    "runNumber": 3,
+    "runId": 35948489552,
+    "commit": "cae359ed5181636723ad40064188a6b0c66d65bb",
+    "platforms": {
+      "paper": {"passed": true, "checks": 22, "artifactId": 10786844612},
+      "fabric": {"passed": true, "checks": 22, "artifactId": 10787672426},
+      "neoforge": {"passed": true, "checks": 22, "artifactId": 10787279999}
+    }
+  },
+  "performanceRun": {
+    "runId": 36104584773,
+    "paper": {"baselineP95Ms": 6.41919357, "loadP95Ms": 6.42711293, "deltaMs": 0.00791936, "status": "PASS"},
+    "fabricFirstRun": {"baselineP95Ms": 50.37545776, "loadP95Ms": 92.35926056, "deltaMs": 41.9838028, "status": "FAIL"},
+    "neoforge": {"baselineP95Ms": 23.95127989, "loadP95Ms": 20.84996797, "deltaMs": -3.10131192, "status": "PASS"}
+  },
+  "modelLive": {
+    "runId": 36104376507,
+    "a09": "UNVERIFIED",
+    "a10": "UNVERIFIED",
+    "openaiConfigured": false,
+    "typesafeConfigured": false
+  },
+  "acceptance": {
+    "A01": "PASS",
+    "A02": "PASS",
+    "A03": "PASS",
+    "A04": "PASS",
+    "A05": "PASS",
+    "A06": "PASS",
+    "A07": "PASS",
+    "A08": "PASS",
+    "A09": "UNVERIFIED",
+    "A10": "UNVERIFIED",
+    "A11": "PARTIAL",
+    "A12": "PASS",
+    "A13": "PASS",
+    "A14": "N/A"
+  },
+  "knownGaps": [
+    "A09 live TypeSafe credentials unavailable",
+    "A10 live OpenAI and TypeSafe credentials unavailable",
+    "Fabric first live A11 performance measurement exceeded 5ms delta",
+    "Production Brain WebSocket server/daemon entrypoint is not implemented"
+  ]
+}
