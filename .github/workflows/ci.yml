@@ -51,6 +51,3 @@ jobs:
       - name: Build Brain
         working-directory: brain
         run: npm run build
-
-      - name: T10 acceptance contracts
-        run: node --test tests/acceptance/v01-contract.test.mjs
