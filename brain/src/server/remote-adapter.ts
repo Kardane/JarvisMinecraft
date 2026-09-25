@@ -200,7 +200,7 @@ export class RemoteAdapter implements AdapterPort {
 
     await new Promise<void>((resolve, reject) => {
       this.#socket.send(raw, (error) => {
-        if (error !== undefined) {
+        if (error != null) {
           reject(error);
         } else {
           resolve();
