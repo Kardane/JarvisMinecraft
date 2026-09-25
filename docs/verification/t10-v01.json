@@ -8,16 +8,51 @@
     "runId": 35948489552,
     "commit": "cae359ed5181636723ad40064188a6b0c66d65bb",
     "platforms": {
-      "paper": {"passed": true, "checks": 22, "artifactId": 10786844612},
-      "fabric": {"passed": true, "checks": 22, "artifactId": 10787672426},
-      "neoforge": {"passed": true, "checks": 22, "artifactId": 10787279999}
+      "paper": {
+        "passed": true,
+        "checks": 22,
+        "artifactId": 10786844612
+      },
+      "fabric": {
+        "passed": true,
+        "checks": 22,
+        "artifactId": 10787672426
+      },
+      "neoforge": {
+        "passed": true,
+        "checks": 22,
+        "artifactId": 10787279999
+      }
     }
   },
   "performanceRun": {
     "runId": 36104584773,
-    "paper": {"baselineP95Ms": 6.41919357, "loadP95Ms": 6.42711293, "deltaMs": 0.00791936, "status": "PASS"},
-    "fabricFirstRun": {"baselineP95Ms": 50.37545776, "loadP95Ms": 92.35926056, "deltaMs": 41.9838028, "status": "FAIL"},
-    "neoforge": {"baselineP95Ms": 23.95127989, "loadP95Ms": 20.84996797, "deltaMs": -3.10131192, "status": "PASS"}
+    "paper": {
+      "baselineP95Ms": 6.41919357,
+      "loadP95Ms": 6.42711293,
+      "deltaMs": 0.00791936,
+      "status": "PASS"
+    },
+    "fabricFirstRun": {
+      "baselineP95Ms": 50.37545776,
+      "loadP95Ms": 92.35926056,
+      "deltaMs": 41.9838028,
+      "status": "FAIL",
+      "jobId": 107974177099
+    },
+    "neoforge": {
+      "baselineP95Ms": 23.95127989,
+      "loadP95Ms": 20.84996797,
+      "deltaMs": -3.10131192,
+      "status": "PASS"
+    },
+    "fabricRetry": {
+      "baselineP95Ms": 13.903421401977539,
+      "loadP95Ms": 8.052215576171875,
+      "deltaMs": -5.851205825805664,
+      "status": "PASS",
+      "jobId": 107975254865
+    }
   },
   "modelLive": {
     "runId": 36104376507,
@@ -45,7 +80,7 @@
   "knownGaps": [
     "A09 live TypeSafe credentials unavailable",
     "A10 live OpenAI and TypeSafe credentials unavailable",
-    "Fabric first live A11 performance measurement exceeded 5ms delta",
+    "Fabric A11 is inconsistent on GitHub shared runners: first attempt failed, unchanged retry passed; dedicated-host confirmation required",
     "Production Brain WebSocket server/daemon entrypoint is not implemented"
   ]
 }
