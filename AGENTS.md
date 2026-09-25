@@ -6,7 +6,7 @@
 - 제품 범위와 완료 조건은 [`docs/Minecraft_JARVIS_WORK_SPEC.md`](docs/Minecraft_JARVIS_WORK_SPEC.md)를 기준으로 한다. 초기 아이디어인 [`docs/Minecraft_JARVIS_PLAN.md`](docs/Minecraft_JARVIS_PLAN.md)와 충돌하면 작업 명세서를 따른다.
 - 메시지 envelope와 연결 규칙은 [`docs/protocol.md`](docs/protocol.md), Tool 입력·결과·범위는 [`docs/tools.md`](docs/tools.md), 버전 및 빌드 기준은 [`docs/compatibility.md`](docs/compatibility.md)와 [`docs/build.md`](docs/build.md)를 따른다. 동일 계약을 이 문서에 복제하지 말고 해당 문서를 갱신한다.
 - 구현 전 현재 branch, worktree, 변경 파일을 확인한다. 이미 있는 staged, modified, untracked 파일은 보존하고 요청된 경로만 수정한다.
-- 2026-09-25 동기화 기준: GitHub `main`, 로컬 `main`, `origin/main`이 모두 `8df2b04` (T10 acceptance merge)를 가리키며 commit divergence는 없다. 이 checkout은 T03~T10 구현을 포함한다. 현재 로컬 검증 결과는 [`docs/architecture.md`](docs/architecture.md)와 `tests/acceptance/out/`에 기록했다. 전체 release gate는 `PARTIAL`이다. A09 holdout은 95% 목표 미달, A10 provider loop는 통과했고, A11 세 플랫폼 로컬 측정은 통과했지만 전용 fixed-load host 확인이 남았다. 원격 merge 당시 기준은 [T10 acceptance report](https://github.com/Kardane/JarvisMinecraft/blob/8df2b04/docs/verification/T10_V01_REPORT.md)을 참조한다.
+- `AGENTS.md`에는 현재 commit SHA, branch 진행률, release gate, 최근 테스트 결과처럼 빠르게 변하는 상태를 기록하지 않는다. 그런 증거는 `docs/verification/`의 날짜·작업별 snapshot에 남기고, architecture 문서는 현재 구조만 설명한다.
 - 로컬 snapshot과 원격 진행 상태가 다르면 오래된 tracking ref를 현재 원격 상태로 간주하지 않는다. 사용자가 의도한 최신 worktree/증거를 찾고, 기존 구현이나 테스트를 다시 만들거나 checkout을 임의 reset하지 않는다. 이 로컬 checkout에 없는 remote-only source를 수정할 때에는 현재 task의 checkout 범위부터 확인한다.
 
 ## 기술 및 모듈 경계

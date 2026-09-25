@@ -289,7 +289,7 @@ test("Brain Core refuses a state-changing Tool when durable pre-execution audit 
   let toolExecutions = 0;
   const responses = [];
   const adapter = {
-    async isCurrentOperator() {
+    async isRequestBindingActive() {
       return true;
     },
     async executeTool() {

@@ -142,7 +142,7 @@ export class BrainCore {
       this.validateChatMessage(message);
 
       const binding = bindingFrom(message);
-      if (!(await this.checkOperator(connection, binding))) {
+      if (!(await this.checkRequestBinding(connection, binding))) {
         this.#sessions.invalidateActor(message.serverId, message.requesterUuid);
         return { status: "REJECTED", code: "UNAUTHORIZED" };
       }
@@ -185,7 +185,7 @@ export class BrainCore {
     this.assertConnectionCurrent(connection);
     this.assertSessionActive(sessionKeyValue);
     const binding = bindingFrom(message);
-    await this.assertOperator(connection, binding);
+    await this.assertRequestBinding(connection, binding);
 
     const adapterDeadlineMs = parseDate(message.deadlineAt, "deadlineAt");
     const budget = new RequestBudget(adapterDeadlineMs, this.#time.nowMs());
@@ -205,7 +205,7 @@ export class BrainCore {
     while (true) {
       this.assertConnectionCurrent(connection);
       this.assertSessionActive(sessionKeyValue);
-      await this.assertOperator(connection, binding);
+      await this.assertRequestBinding(connection, binding);
       budget.consumeModelRound(this.#time.nowMs());
 
       const step = await this.withDeadline(
@@ -228,7 +228,7 @@ export class BrainCore {
         this.validateFinalStep(step);
         this.assertConnectionCurrent(connection);
         this.assertSessionActive(sessionKeyValue);
-        await this.assertOperator(connection, binding);
+        await this.assertRequestBinding(connection, binding);
 
         const response = this.createResponse(message, step.text, step.sessionState);
         await this.withDeadline(
@@ -296,7 +296,7 @@ export class BrainCore {
       );
     }
 
-    await this.assertOperator(connection, binding);
+    await this.assertRequestBinding(connection, binding);
     budget.assertLive(this.#time.nowMs());
 
     const toolCallId = randomId();
@@ -352,7 +352,7 @@ export class BrainCore {
 
     this.assertConnectionCurrent(connection);
     this.assertSessionActive(sessionKeyValue);
-    await this.assertOperator(connection, binding);
+    await this.assertRequestBinding(connection, binding);
 
     const startedAt = this.#time.nowMs();
     const result = await this.withDeadline(
@@ -522,26 +522,26 @@ export class BrainCore {
     }
   }
 
-  private async checkOperator(
+  private async checkRequestBinding(
     connection: ConnectionState,
     binding: ActorBinding,
   ): Promise<boolean> {
     try {
-      return await connection.adapter.isCurrentOperator(binding);
+      return await connection.adapter.isRequestBindingActive(binding);
     } catch {
       return false;
     }
   }
 
-  private async assertOperator(
+  private async assertRequestBinding(
     connection: ConnectionState,
     binding: ActorBinding,
   ): Promise<void> {
-    if (!(await this.checkOperator(connection, binding))) {
+    if (!(await this.checkRequestBinding(connection, binding))) {
       this.#sessions.invalidateActor(binding.serverId, binding.requesterUuid);
       throw new CoreError(
         "UNAUTHORIZED",
-        "Requester is not a current online operator.",
+        "Requester/request/session binding is no longer active.",
       );
     }
   }
@@ -583,7 +583,7 @@ export class BrainCore {
     try {
       this.assertConnectionCurrent(connection);
       this.assertSessionActive(sessionKeyValue);
-      if (!(await this.checkOperator(connection, bindingFrom(message)))) {
+      if (!(await this.checkRequestBinding(connection, bindingFrom(message)))) {
         this.#sessions.invalidateActor(message.serverId, message.requesterUuid);
         return null;
       }

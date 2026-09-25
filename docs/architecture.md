@@ -1,14 +1,14 @@
 # Minecraft JARVIS 아키텍처
 
-작성일: 2026-09-25
-범위: Paper, Fabric, NeoForge 서버 Adapter와 TypeScript Brain 사이의 v0.1 구조, Paper v0.1.1 Provider 확장, T14 CMI 선택 Tool.
+갱신일: 2026-09-26
+범위: Paper, Fabric, NeoForge Adapter, 공통 Java runtime, TypeScript Brain, protocol contract와 optional Paper Provider의 현재 구조.
 규범 문서: [`Minecraft_JARVIS_WORK_SPEC.md`](Minecraft_JARVIS_WORK_SPEC.md), [`protocol.md`](protocol.md), [`tools.md`](tools.md).
 
-## 진행 상태와 읽는 방법
+## 문서 역할
 
-2026-09-25 동기화 기준 GitHub `main`, 로컬 `main`, `origin/main`은 모두 `8df2b04` (T10 acceptance merge)이며 commit divergence는 없다. 이 checkout에는 원격 T03~T10 구현과 acceptance assets가 있고, 작업 트리에는 T11~T14 Paper 확장이 추가되어 있다. T14는 사용자가 Zrips의 명시적 사용 허가를 받았다고 확인한 뒤 착수했다. CMI-API 9.8.6.4를 compileOnly로 사용하고, CMI 9.8.9.6 + CMILib 1.5.9.9의 실제 서버 smoke는 아직 남아 있다. 로컬 contract 검증과 third-party plugin runtime smoke는 서로 다른 증거다. 원격 merge 시점의 release gate는 [T10 acceptance report](https://github.com/Kardane/JarvisMinecraft/blob/8df2b04/docs/verification/T10_V01_REPORT.md)에 `PARTIAL`로 기록돼 있다.
+이 문서는 **현재 소스 구조와 책임 경계**만 설명한다. 특정 commit SHA, worktree 진행률, release gate, 일회성 테스트 결과는 기록하지 않는다. 그런 시점별 증거는 `docs/verification/`에 보존한다.
 
-`AGENTS.md`는 저장소 작업 지침이다. 이 문서는 원격 T10 구조와 현재 작업 트리의 T11~T14 상태를 분리해 기록한다. 현재 checkout 소스와 검증 결과는 아래 표를 기준으로 한다.
+규범적 제품 범위는 `Minecraft_JARVIS_WORK_SPEC.md`, wire contract는 `protocol.md`와 `protocol/schema/protocol.schema.json`, Tool 계약은 `tools.md`, 장기 설계 결정은 `docs/decisions/`을 따른다. Jev + Luna 이중 모델과 권한 경계는 [ADR-0005](decisions/0005-jev-luna-routing-authority-boundary.md)에 고정한다.
 
 ## 목적과 구성 요소
 
@@ -32,11 +32,11 @@ flowchart LR
 | Paper Adapter | `minecraft/paper`: plugin entrypoint/config, chat session/listener, scheduler/platform access, Tool service, Brain connection, optional Provider assembly | `IntegrationRegistry`가 CoreProtect와 WorldGuard를 enabled 상태 및 WorldEdit 의존성에 따라 선택 로딩한다. Provider Tool은 성공적으로 초기화된 경우에만 원자적으로 등록하며, 외부 API 연결 실패 시 미노출한다. |
 | Fabric Adapter | `minecraft/fabric`: server mod entrypoint/config, chat session/controller, scheduler/platform access, tick sampler, Tool service, Brain connection | Fabric server API에 한정한다. 클라이언트 전용 API에 의존하지 않는다. |
 | NeoForge Adapter | `minecraft/neoforge`: dedicated server mod entrypoint/config, chat session/controller, scheduler/platform access, tick sampler, Tool service, Brain connection | NeoForge dedicated server API를 사용한다. |
-| Common Java | `minecraft/common`: protocol DTO/codec, connection runtime, deadline, deduplication ledger, requester authority, Tool registry, scheduler SPI, shared-secret WebSocket transport | Minecraft 플랫폼 API를 import하지 않는다. |
+| Common Java | `minecraft/common`: protocol DTO/codec, shared chat/request binding state, `AdapterBrainConnection`, standard Tool orchestration, deadline, deduplication ledger, requester authority, Tool registry, scheduler SPI, shared-secret WebSocket transport | Minecraft 플랫폼 API를 import하지 않는다. |
 | Brain core | `brain/src/core`: actor/session binding, capabilities, serial request scheduler, budgets, Tool allowlist, model/audit ports | serverId/request/session identity를 분리해 관리한다. |
 | AI routing | `brain/src/ai`: TypeSafe Jev classifier, deterministic route policy, GPT-6 Luna Responses Tool loop, strict Tool schemas | 모델 출력은 Tool 요청 제안이다. 최종 검사와 실행은 Adapter 경계에서 한다. |
-| Brain operations/server | `brain/src/ops`, `brain/src/server`: config, secret masking, rotating JSONL audit, health, daemon composition, authenticated WebSocket server | Node 24 프로세스로 실행하고 v0.1 listener는 loopback에만 bind한다. |
-| Protocol contract | `protocol/schema`, `protocol/fixtures`: message schema, capability와 Tool 인자·결과, 오류, valid/invalid examples | JSON Schema와 fixture manifest가 언어 간 계약 기준이다. |
+| Brain operations/server | `brain/src/ops`, `brain/src/server`: config, secret masking, rotating JSONL audit, health, daemon composition, authenticated WebSocket server | Node 24 프로세스로 실행하고 listener는 loopback에만 bind한다. inbound/outbound wire message는 canonical JSON Schema 기반 AJV validator를 통과한다. |
+| Protocol contract | `protocol/schema`, `protocol/fixtures`: message schema, capability와 Tool 인자·결과, 오류, valid/invalid examples | JSON Schema가 wire 구조의 기준이며 TypeScript runtime schema와 TS/Java contract constants는 generator로 파생한다. |
 
 ## 연결 및 요청 흐름
 
@@ -83,65 +83,24 @@ v0.1 Tool catalog는 아래 조회와 저위험 변경으로 제한한다.
 - 조회 요청만 제한적으로 retry한다. SDK와 앱의 중첩 retry로 요청량을 증폭하지 않는다.
 - 상태 변경의 ACK가 유실되거나 timeout으로 결과가 불명확하면 `OUTCOME_UNKNOWN`을 반환한다. 이 결과를 성공/실패로 바꾸거나 자동 재실행하지 않는다.
 
-## 구현 범위와 검증 증거
+## 현재 구현 경계와 검증 문서
 
-| 원격 `main` 구현 단계 | 포함 내용 |
-|---|---|
-| T03 | Java 공통 protocol codec/runtime, WebSocket transport, 인증, deadline·중복 방지 및 가짜 scheduler 검증 |
-| T04 | Brain 세션/요청 정책, capability allowlist, 예산, 직렬화 scheduler, 상태 전이 테스트 |
-| T05 | Jev 분류·route policy, Luna Responses Tool loop, 한국어 200-case dataset/evaluator 및 live-provider 스크립트 |
-| T06–T08 | Paper plugin, Fabric server mod, NeoForge server mod의 채팅·OP·scheduler·Tool·transport Adapter |
-| T09 | 설정 검증, 비밀 마스킹, 회전 JSONL audit, health 및 fail-closed 테스트 |
-| T10 | deterministic acceptance suite와 세 플랫폼 dedicated server/protocol-client 시나리오. production Brain transport를 사용한다. |
+현재 구현은 세 플랫폼 Adapter, 공통 Java runtime, TypeScript Brain, Jev + Luna routing, authenticated loopback WebSocket, 표준 Minecraft Tool과 Paper optional Provider를 포함한다. 플랫폼 공통 chat session/request binding/connection/standard Tool orchestration은 `minecraft/common`에 있고, 실제 Minecraft API와 scheduler 진입은 각 플랫폼 모듈에 남는다.
 
-현재 작업 트리의 Paper 후속 작업은 다음과 같다. 이들은 `8df2b04` 원격 `main`에 포함된 것으로 간주하지 않는다.
+Brain의 `AdapterPort.isRequestBindingActive`는 현재 WebSocket 연결의 requester/request/session binding이 살아 있는지만 확인한다. 이 값은 Minecraft OP 권한의 증거가 아니다. 현재 online + OP 여부와 실제 Tool 실행 허가는 Adapter/CommonRuntime이 서버 API를 기준으로 재검사한다.
 
-| 작업 | 포함 내용과 현재 상태 |
-|---|---|
-| T11 | CoreProtect API v12 read-only history Provider. Paging, query bounds, timeout/partial results 및 lifecycle 검증을 소유한다. |
-| T12 | WorldGuard region/flags/build permission Provider. WorldEdit 의존성과 bypass 판정을 다룬다. 현재 compile target은 WorldGuard 7.0.14 + WorldEdit 7.3.16이다. |
-| T13 | `IntegrationRegistry`가 plugin 조합을 검사하고 optional module을 선택적으로 연결한다. 모듈별 Tool 등록은 staging 후 원자 반영하며 활성 Tool/capability와 Provider 버전을 Paper가 광고한다. 실제 plugin 조합 smoke는 남아 있다. |
-| T14 | 사용자 허가 확인 뒤 온라인 CMI nickname/AFK Tool과 strict protocol 계약을 추가했다. Provider·protocol·Brain contract 검증은 통과했고, CMI runtime smoke는 남아 있다. |
+wire 구조와 고정 protocol limit은 `protocol/schema/protocol.schema.json`을 source of truth로 삼는다. Brain production WebSocket은 여기서 생성된 schema module을 AJV로 검증하고, TypeScript/Java의 공유 contract constants도 generator로 파생한다. 세션 TTL과 request deadline 같은 제품 정책은 `config/v0.1-policy.json`에서 생성한다.
 
-T10 merge 시점 보고서의 요약. 아래 A09/A10/A11 상태는 해당 원격 보고서가 작성될 당시의 기준이다.
+검증 결과는 architecture에 복제하지 않는다.
 
-| 게이트 | 보고된 결과 | 증거 경계 |
-|---|---|---|
-| Production Brain WebSocket transport | 6/6 PASS | 인증, hello/capabilities, Tool round trip, reconnect replacement, cancellation, serverId binding |
-| Deterministic acceptance | 10/10 PASS | 실제 provider credential을 쓰지 않는 정책/state-machine 검사 |
-| Paper 1.21.8 | 23/23 PASS | 실제 dedicated server와 packaged Adapter, Mineflayer protocol clients |
-| Fabric 1.21.8 | 23/23 PASS | 실제 dedicated server와 packaged Adapter, Mineflayer protocol clients |
-| NeoForge 21.8.52 / MC 1.21.8 | 23/23 PASS | 실제 dedicated server와 packaged Adapter, Mineflayer protocol clients |
-| A09 Jev real-provider evaluation | UNVERIFIED | `TYPESAFE_API_KEY`가 없어 live 평가 미실행 |
-| A10 Jev + GPT-6 Luna live call | UNVERIFIED | OpenAI/TypeSafe 키가 없어 live 모델 증거 없음 |
-| A11 queue/performance | PARTIAL | queue bound 및 최신 세 플랫폼 run PASS. 과거 Fabric shared-runner outlier가 있어 dedicated fixed-load host 확인이 남음 |
-
-T10 E2E에서 사용한 Minecraft protocol clients는 GUI client가 아니다. 따라서 보고서는 채팅·위치·자기 텔레포트·권한·재연결 등 protocol/runtime 동작을 증명하지만 graphical-client visual QA를 주장하지 않는다. 전체 release gate는 `PARTIAL`이며, T10 작업 병합을 v0.1 release readiness로 확대 해석하지 않는다.
-
-### 2026-09-25 로컬 검증 결과
-
-| 검증 | 결과 | 현재 checkout에서 확인한 증거 |
-|---|---|---|
-| Brain `check` + AI routing | PASS | Node 24.19.0; typecheck, protocol fixtures 33/33 valid·10/10 invalid, server tests 6/6, CMI AI routing test 11/11 |
-| Gradle 전체 `build` | PASS | Java 21; common/Paper/Fabric/NeoForge 빌드와 T03, T06–T08, T11–T14 verification 통과. 현재 그래프에 없는 NeoForge Netty lock 항목을 lockfile에서 정리 |
-| A09 Jev live evaluation | FAIL | 200건 실행. dev route accuracy 138/144 (95.83%); holdout 51/56 (91.07%), 목표 95% 미달. 종료 코드 2 |
-| A10 Jev + GPT-6 Luna live loop | PASS | Jev `SERVER_QUERY`, Luna `get_server_status` 호출, fixture TPS 19.95를 사용한 후속 응답 확인. 실제 Minecraft 조회 결과는 아님 |
-| A11 Paper 1.21.8 | PASS | 23/23 live checks; MSPT p95 변화 −1.90ms |
-| A11 Fabric 1.21.8 | PASS | 23/23 live checks; MSPT p95 변화 −4.00ms |
-| A11 NeoForge 21.8.52 / MC 1.21.8 | PASS | 23/23 live checks; MSPT p95 변화 −2.88ms |
-| Paper `check` + JAR | PASS | Java 21; T06, T11, T12, T13, T14 verification 통과. 빌드 JAR에 CMI integration adapter는 들어 있고 CMI API classes는 포함되지 않음 |
-| T14 CMI runtime smoke | PENDING | Paper 1.21.8 + CMI 9.8.9.6 + CMILib 1.5.9.9 server 조합의 실제 조회 미실행 |
-
-A11 측정은 이 Windows 데스크톱에서 수행했다. 세 플랫폼 측정은 로컬 시나리오에서 통과했지만, 원격 T10 보고서가 요구한 전용 fixed-load host 확인은 아직 없어 성능 release gate는 계속 `PARTIAL`이다. NeoForge 로컬 실행을 위해 acceptance runner는 Windows에서 installer가 생성한 `run.bat`을 선택하도록 보완했다. Linux에서는 기존 `run.sh` 경로를 유지한다.
-
-로컬 증거 파일: [A09 report](../tests/acceptance/out/a09-jev-report.json), [A10 report](../tests/acceptance/out/a10-live-models-report.json), [Paper](../tests/acceptance/out/paper.json), [Fabric](../tests/acceptance/out/fabric.json), [NeoForge](../tests/acceptance/out/neoforge.json). 실제 protocol-client E2E는 GUI client visual QA를 증명하지 않는다. 현재 종합 release gate는 A09 holdout 목표와 A11 전용 host 조건 때문에 `PARTIAL`이다.
-
-T13 registry matrix 실행 명령은 `.\gradlew.bat :minecraft:paper:t13Verification`이고, T14 contract 검증은 `.\gradlew.bat :minecraft:paper:t14Verification`이다. 선택 플러그인의 실제 조회를 증명하려면 Paper 1.21.8에서 CoreProtect, WorldGuard, WorldEdit 조회를 smoke하고, CMI 9.8.9.6 + CMILib 1.5.9.9에서는 온라인 nickname/AFK와 offline UUID 거부를 smoke해야 한다. 로컬 build와 contract 검증은 이 runtime 증거를 대체하지 않는다.
+- T10 v0.1 acceptance snapshot: [`verification/T10_V01_REPORT.md`](verification/T10_V01_REPORT.md)
+- 2026-09-25 로컬 검증 snapshot: [`verification/2026-09-25_LOCAL_VALIDATION.md`](verification/2026-09-25_LOCAL_VALIDATION.md)
+- 새 검증은 기존 snapshot을 수정해 현재 상태처럼 만들지 말고, 날짜·작업 범위가 드러나는 새 문서로 추가한다.
 
 ## 빌드와 운영
 
 Minecraft 모듈은 `minecraft/common`, `minecraft/paper`, `minecraft/fabric`, `minecraft/neoforge`; Brain은 `brain` TypeScript/Node package다. 기준은 Minecraft 1.21.8/Java 21, Node 24이며 구체 SDK와 plugin pin은 version catalog, lockfile, [`build.md`](build.md), ADR 문서를 확인한다.
 
-원격 운영 문서의 Brain 실행 흐름은 `OpsRuntime -> TypeSafeJevClassifier -> OpenAiLunaPort -> JarvisAiModel -> BrainCore -> BrainWebSocketServer`다. 기본 endpoint는 `ws://127.0.0.1:8181/ws`; Adapter가 `X-Jarvis-Secret`으로 접속한다. `OPENAI_API_KEY`, `TYPESAFE_API_KEY`, `JARVIS_SHARED_SECRET`은 Brain 환경에서 주입한다. JSONL audit의 선행 기록이 불가능한 상태 변경은 실행하지 않는다.
+Brain 실행 흐름은 `OpsRuntime -> TypeSafeJevClassifier -> OpenAiLunaPort -> JarvisAiModel -> BrainCore -> BrainWebSocketServer`다. 기본 endpoint는 `ws://127.0.0.1:8181/ws`; Adapter가 `X-Jarvis-Secret`으로 접속한다. `OPENAI_API_KEY`, `TYPESAFE_API_KEY`, `JARVIS_SHARED_SECRET`은 Brain 환경에서 주입한다. JSONL audit의 선행 기록이 불가능한 상태 변경은 실행하지 않는다.
 
-구체적인 재현 명령과 운영·장애 절차는 [원격 operations guide](https://github.com/Kardane/JarvisMinecraft/blob/8df2b04/docs/operations.md), protocol/tool 의미는 [`protocol.md`](protocol.md)와 [`tools.md`](tools.md), acceptance matrix와 artifact ID는 [T10 acceptance report](https://github.com/Kardane/JarvisMinecraft/blob/8df2b04/docs/verification/T10_V01_REPORT.md)를 따른다. Build, deterministic test, dedicated server boot, protocol client, GUI client, live model call은 서로 다른 증거 층위로 기록한다.
+구체적인 재현 명령과 운영·장애 절차는 [`operations.md`](operations.md), protocol/tool 의미는 [`protocol.md`](protocol.md)와 [`tools.md`](tools.md), 과거 acceptance 증거는 [`verification/`](verification/) snapshot을 따른다. Build, deterministic test, dedicated server boot, protocol client, GUI client, live model call은 서로 다른 증거 층위로 기록한다.

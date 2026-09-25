@@ -41,6 +41,8 @@ Jev는 분류만 담당한다.
 - Luna 오류: 고정 장애 응답. 수치나 성공 결과를 추측하지 않는다.
 - SDK retry와 애플리케이션 retry를 중첩하지 않는다.
 
+Jev와 Luna의 동시 사용 이유, route/권한 책임 분리, Brain request binding과 Minecraft OP authority의 차이는 [ADR-0005](0005-jev-luna-routing-authority-boundary.md)에서 별도로 고정한다.
+
 ## 결과
 
 장점:

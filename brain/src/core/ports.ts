@@ -16,7 +16,7 @@ export interface ModelPort {
 }
 
 export interface AdapterPort {
-  isCurrentOperator(binding: ActorBinding): Promise<boolean>;
+  isRequestBindingActive(binding: ActorBinding): Promise<boolean>;
   executeTool(request: ToolRequestEnvelope): Promise<ToolResultEnvelope>;
   deliverResponse(response: ChatResponseEnvelope): Promise<void>;
 }
