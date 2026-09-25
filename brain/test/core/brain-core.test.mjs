@@ -41,14 +41,14 @@ class FakeAdapter {
   constructor(time) {
     this.time = time;
     this.operators = new Set();
-    this.operatorChecks = [];
+    this.bindingChecks = [];
     this.toolRequests = [];
     this.responses = [];
     this.onTool = null;
   }
 
-  async isCurrentOperator(binding) {
-    this.operatorChecks.push(binding);
+  async isRequestBindingActive(binding) {
+    this.bindingChecks.push(binding);
     return this.operators.has(binding.requesterUuid);
   }
 
@@ -308,7 +308,7 @@ test("state-changing Tool requires durable pre-execution audit and gets an actio
     assert.equal(adapter.toolRequests[0].payload.tool, "teleport_staff");
     assert.equal(audit.events[0].outcome, "PRE_EXECUTION");
     assert.equal(audit.events[1].outcome, "OK");
-    assert.ok(adapter.operatorChecks.length >= 4);
+    assert.ok(adapter.bindingChecks.length >= 4);
   }
 });
 

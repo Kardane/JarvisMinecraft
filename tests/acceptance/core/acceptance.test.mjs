@@ -378,7 +378,7 @@ class FakeAdapter {
     this.responses = [];
     this.onTool = null;
   }
-  async isCurrentOperator(binding) {
+  async isRequestBindingActive(binding) {
     return this.operators.has(binding.requesterUuid);
   }
   async executeTool(request) {

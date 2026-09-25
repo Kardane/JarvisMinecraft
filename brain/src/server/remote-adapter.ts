@@ -74,7 +74,7 @@ export class RemoteAdapter implements AdapterPort {
     }
   }
 
-  async isCurrentOperator(binding: ActorBinding): Promise<boolean> {
+  async isRequestBindingActive(binding: ActorBinding): Promise<boolean> {
     if (!this.#active || this.#socket.readyState !== WebSocket.OPEN) {
       return false;
     }
@@ -93,7 +93,7 @@ export class RemoteAdapter implements AdapterPort {
     if (!this.#active || this.#socket.readyState !== WebSocket.OPEN) {
       throw new Error("Adapter connection is not active.");
     }
-    if (!(await this.isCurrentOperator({
+    if (!(await this.isRequestBindingActive({
       serverId: request.serverId,
       requesterUuid: request.requesterUuid,
       sessionId: request.sessionId,
@@ -138,7 +138,7 @@ export class RemoteAdapter implements AdapterPort {
     if (!this.#active || this.#socket.readyState !== WebSocket.OPEN) {
       throw new Error("Adapter connection is not active.");
     }
-    if (!(await this.isCurrentOperator({
+    if (!(await this.isRequestBindingActive({
       serverId: response.serverId,
       requesterUuid: response.requesterUuid,
       sessionId: response.sessionId,
