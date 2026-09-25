@@ -59,7 +59,7 @@ test("activates only after hello + capabilities and returns requester-bound resp
   const fixture = await createFixture(new FakeModel(async () => finalStep("pong")));
   const client = await openSocket(fixture.url, SECRET);
   try {
-    const wire = createWire(client, fixture.server);
+    const wire = createWire(client, fixture.server, fixture.events);
     await activate(wire, "server-a");
 
     assert.deepEqual(fixture.server.health().activeServers, ["server-a"]);
@@ -101,7 +101,7 @@ test("bridges Tool request/result through the real WebSocket transport", async (
   const fixture = await createFixture(model);
   const client = await openSocket(fixture.url, SECRET);
   try {
-    const wire = createWire(client, fixture.server);
+    const wire = createWire(client, fixture.server, fixture.events);
     await activate(wire, "server-tools");
 
     const requestId = uuid(603);
@@ -164,12 +164,12 @@ test("same server reconnect replaces old socket and leaves only the new connecti
   const first = await openSocket(fixture.url, SECRET);
   const second = await openSocket(fixture.url, SECRET);
   try {
-    const firstWire = createWire(first, fixture.server);
+    const firstWire = createWire(first, fixture.server, fixture.events);
     await activate(firstWire, "same-server");
     assert.deepEqual(fixture.server.health().activeServers, ["same-server"]);
 
     const firstClosed = waitForClose(first);
-    const secondWire = createWire(second, fixture.server);
+    const secondWire = createWire(second, fixture.server, fixture.events);
     await activate(secondWire, "same-server");
     const close = await firstClosed;
 
@@ -189,7 +189,7 @@ test("OP_REVOKED cancel during model wait prevents a later state-changing Tool r
   const fixture = await createFixture(model);
   const client = await openSocket(fixture.url, SECRET);
   try {
-    const wire = createWire(client, fixture.server);
+    const wire = createWire(client, fixture.server, fixture.events);
     await activate(wire, "server-cancel");
 
     const requestId = uuid(606);
@@ -245,7 +245,7 @@ test("serverId mismatch after authentication closes the connection", async () =>
   const fixture = await createFixture(new FakeModel(async () => finalStep("ok")));
   const client = await openSocket(fixture.url, SECRET);
   try {
-    const wire = createWire(client, fixture.server);
+    const wire = createWire(client, fixture.server, fixture.events);
     await activate(wire, "bound-server");
 
     const closed = waitForClose(client);
@@ -269,6 +269,7 @@ async function createFixture(model) {
     model,
     audit: new FakeAudit(),
   });
+  const events = [];
   const server = new BrainWebSocketServer({
     core,
     host: "127.0.0.1",
@@ -276,10 +277,16 @@ async function createFixture(model) {
     sharedSecret: SECRET,
     handshakeTimeoutMs: 2_000,
     brainVersion: "server-test",
+    observer: {
+      onEvent(event) {
+        events.push(event);
+      },
+    },
   });
   await server.start();
   return {
     server,
+    events,
     url: "ws://127.0.0.1:" + port + "/ws",
     async close() {
       await server.stop();
@@ -336,10 +343,30 @@ async function activate(wire, serverId) {
       },
     },
   });
-  await waitUntil(
-    () => wire.serverHealth().activeServers.includes(serverId),
-    500,
-  );
+  try {
+    await waitUntil(
+      () =>
+        wire.serverHealth().activeServers.includes(serverId) ||
+        wire.closes.length > 0,
+      500,
+    );
+  } catch (error) {
+    throw new Error(
+      "Adapter activation timed out; events=" +
+        JSON.stringify(wire.serverEvents()) +
+        "; closes=" +
+        JSON.stringify(wire.closes),
+      { cause: error },
+    );
+  }
+  if (!wire.serverHealth().activeServers.includes(serverId)) {
+    throw new Error(
+      "Adapter activation failed; events=" +
+        JSON.stringify(wire.serverEvents()) +
+        "; closes=" +
+        JSON.stringify(wire.closes),
+    );
+  }
 }
 
 function chat({ serverId, requestId, sessionId, text }) {
@@ -361,8 +388,12 @@ function chat({ serverId, requestId, sessionId, text }) {
   };
 }
 
-function createWire(socket, server) {
+function createWire(socket, server, events) {
   const received = [];
+  const closes = [];
+  socket.on("close", (code, raw) => {
+    closes.push({ code, reason: raw.toString("utf8") });
+  });
   const waiters = [];
   socket.on("message", (raw, isBinary) => {
     if (isBinary) return;
@@ -382,6 +413,10 @@ function createWire(socket, server) {
     serverHealth() {
       return server.health();
     },
+    serverEvents() {
+      return [...events];
+    },
+    closes,
     send(message) {
       socket.send(JSON.stringify(message));
     },
