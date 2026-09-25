@@ -1,0 +1,2754 @@
+{
+  "generatedAt": "2026-09-25T09:52:47.067Z",
+  "model": "jev-1.13.0",
+  "datasetCases": 200,
+  "thresholdSource": "dev-calibrated",
+  "confidenceThreshold": 0.95,
+  "dev": {
+    "total": 144,
+    "correct": 138,
+    "routeAccuracy": 0.9583333333333334,
+    "confidenceThreshold": 0.95,
+    "abstained": 53,
+    "abstentionRate": 0.3680555555555556,
+    "coverage": 0.6319444444444444,
+    "selectiveAccuracy": 1,
+    "perClass": {
+      "SERVER_QUERY": {
+        "total": 18,
+        "correct": 18,
+        "accuracy": 1
+      },
+      "PLAYER_QUERY": {
+        "total": 18,
+        "correct": 18,
+        "accuracy": 1
+      },
+      "WORLD_QUERY": {
+        "total": 18,
+        "correct": 17,
+        "accuracy": 0.9444444444444444
+      },
+      "HISTORY_QUERY": {
+        "total": 18,
+        "correct": 17,
+        "accuracy": 0.9444444444444444
+      },
+      "REGION_QUERY": {
+        "total": 18,
+        "correct": 17,
+        "accuracy": 0.9444444444444444
+      },
+      "ACTION_REQUEST": {
+        "total": 18,
+        "correct": 17,
+        "accuracy": 0.9444444444444444
+      },
+      "GENERAL": {
+        "total": 18,
+        "correct": 18,
+        "accuracy": 1
+      },
+      "UNCERTAIN": {
+        "total": 18,
+        "correct": 16,
+        "accuracy": 0.8888888888888888
+      }
+    },
+    "confusionMatrix": {
+      "SERVER_QUERY": {
+        "SERVER_QUERY": 18,
+        "PLAYER_QUERY": 0,
+        "WORLD_QUERY": 0,
+        "HISTORY_QUERY": 0,
+        "REGION_QUERY": 0,
+        "ACTION_REQUEST": 0,
+        "GENERAL": 0,
+        "UNCERTAIN": 0
+      },
+      "PLAYER_QUERY": {
+        "SERVER_QUERY": 0,
+        "PLAYER_QUERY": 18,
+        "WORLD_QUERY": 0,
+        "HISTORY_QUERY": 0,
+        "REGION_QUERY": 0,
+        "ACTION_REQUEST": 0,
+        "GENERAL": 0,
+        "UNCERTAIN": 0
+      },
+      "WORLD_QUERY": {
+        "SERVER_QUERY": 0,
+        "PLAYER_QUERY": 0,
+        "WORLD_QUERY": 17,
+        "HISTORY_QUERY": 0,
+        "REGION_QUERY": 0,
+        "ACTION_REQUEST": 0,
+        "GENERAL": 1,
+        "UNCERTAIN": 0
+      },
+      "HISTORY_QUERY": {
+        "SERVER_QUERY": 0,
+        "PLAYER_QUERY": 1,
+        "WORLD_QUERY": 0,
+        "HISTORY_QUERY": 17,
+        "REGION_QUERY": 0,
+        "ACTION_REQUEST": 0,
+        "GENERAL": 0,
+        "UNCERTAIN": 0
+      },
+      "REGION_QUERY": {
+        "SERVER_QUERY": 0,
+        "PLAYER_QUERY": 0,
+        "WORLD_QUERY": 0,
+        "HISTORY_QUERY": 0,
+        "REGION_QUERY": 17,
+        "ACTION_REQUEST": 1,
+        "GENERAL": 0,
+        "UNCERTAIN": 0
+      },
+      "ACTION_REQUEST": {
+        "SERVER_QUERY": 0,
+        "PLAYER_QUERY": 0,
+        "WORLD_QUERY": 0,
+        "HISTORY_QUERY": 0,
+        "REGION_QUERY": 0,
+        "ACTION_REQUEST": 17,
+        "GENERAL": 1,
+        "UNCERTAIN": 0
+      },
+      "GENERAL": {
+        "SERVER_QUERY": 0,
+        "PLAYER_QUERY": 0,
+        "WORLD_QUERY": 0,
+        "HISTORY_QUERY": 0,
+        "REGION_QUERY": 0,
+        "ACTION_REQUEST": 0,
+        "GENERAL": 18,
+        "UNCERTAIN": 0
+      },
+      "UNCERTAIN": {
+        "SERVER_QUERY": 0,
+        "PLAYER_QUERY": 1,
+        "WORLD_QUERY": 0,
+        "HISTORY_QUERY": 0,
+        "REGION_QUERY": 0,
+        "ACTION_REQUEST": 1,
+        "GENERAL": 0,
+        "UNCERTAIN": 16
+      }
+    }
+  },
+  "holdout": {
+    "total": 56,
+    "correct": 51,
+    "routeAccuracy": 0.9107142857142857,
+    "confidenceThreshold": 0.95,
+    "abstained": 21,
+    "abstentionRate": 0.375,
+    "coverage": 0.625,
+    "selectiveAccuracy": 0.9714285714285714,
+    "perClass": {
+      "SERVER_QUERY": {
+        "total": 7,
+        "correct": 7,
+        "accuracy": 1
+      },
+      "PLAYER_QUERY": {
+        "total": 7,
+        "correct": 7,
+        "accuracy": 1
+      },
+      "WORLD_QUERY": {
+        "total": 7,
+        "correct": 5,
+        "accuracy": 0.7142857142857143
+      },
+      "HISTORY_QUERY": {
+        "total": 7,
+        "correct": 7,
+        "accuracy": 1
+      },
+      "REGION_QUERY": {
+        "total": 7,
+        "correct": 6,
+        "accuracy": 0.8571428571428571
+      },
+      "ACTION_REQUEST": {
+        "total": 7,
+        "correct": 6,
+        "accuracy": 0.8571428571428571
+      },
+      "GENERAL": {
+        "total": 7,
+        "correct": 7,
+        "accuracy": 1
+      },
+      "UNCERTAIN": {
+        "total": 7,
+        "correct": 6,
+        "accuracy": 0.8571428571428571
+      }
+    },
+    "confusionMatrix": {
+      "SERVER_QUERY": {
+        "SERVER_QUERY": 7,
+        "PLAYER_QUERY": 0,
+        "WORLD_QUERY": 0,
+        "HISTORY_QUERY": 0,
+        "REGION_QUERY": 0,
+        "ACTION_REQUEST": 0,
+        "GENERAL": 0,
+        "UNCERTAIN": 0
+      },
+      "PLAYER_QUERY": {
+        "SERVER_QUERY": 0,
+        "PLAYER_QUERY": 7,
+        "WORLD_QUERY": 0,
+        "HISTORY_QUERY": 0,
+        "REGION_QUERY": 0,
+        "ACTION_REQUEST": 0,
+        "GENERAL": 0,
+        "UNCERTAIN": 0
+      },
+      "WORLD_QUERY": {
+        "SERVER_QUERY": 2,
+        "PLAYER_QUERY": 0,
+        "WORLD_QUERY": 5,
+        "HISTORY_QUERY": 0,
+        "REGION_QUERY": 0,
+        "ACTION_REQUEST": 0,
+        "GENERAL": 0,
+        "UNCERTAIN": 0
+      },
+      "HISTORY_QUERY": {
+        "SERVER_QUERY": 0,
+        "PLAYER_QUERY": 0,
+        "WORLD_QUERY": 0,
+        "HISTORY_QUERY": 7,
+        "REGION_QUERY": 0,
+        "ACTION_REQUEST": 0,
+        "GENERAL": 0,
+        "UNCERTAIN": 0
+      },
+      "REGION_QUERY": {
+        "SERVER_QUERY": 0,
+        "PLAYER_QUERY": 0,
+        "WORLD_QUERY": 1,
+        "HISTORY_QUERY": 0,
+        "REGION_QUERY": 6,
+        "ACTION_REQUEST": 0,
+        "GENERAL": 0,
+        "UNCERTAIN": 0
+      },
+      "ACTION_REQUEST": {
+        "SERVER_QUERY": 0,
+        "PLAYER_QUERY": 0,
+        "WORLD_QUERY": 0,
+        "HISTORY_QUERY": 0,
+        "REGION_QUERY": 0,
+        "ACTION_REQUEST": 6,
+        "GENERAL": 0,
+        "UNCERTAIN": 1
+      },
+      "GENERAL": {
+        "SERVER_QUERY": 0,
+        "PLAYER_QUERY": 0,
+        "WORLD_QUERY": 0,
+        "HISTORY_QUERY": 0,
+        "REGION_QUERY": 0,
+        "ACTION_REQUEST": 0,
+        "GENERAL": 7,
+        "UNCERTAIN": 0
+      },
+      "UNCERTAIN": {
+        "SERVER_QUERY": 1,
+        "PLAYER_QUERY": 0,
+        "WORLD_QUERY": 0,
+        "HISTORY_QUERY": 0,
+        "REGION_QUERY": 0,
+        "ACTION_REQUEST": 0,
+        "GENERAL": 0,
+        "UNCERTAIN": 6
+      }
+    }
+  },
+  "holdoutTarget": {
+    "routeAccuracy": 0.95,
+    "passed": false
+  },
+  "evidence": [
+    {
+      "id": "ko-001",
+      "split": "holdout",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faa7b4727a8bba18e2d5410794",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-002",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faa98d74b69fcfbcb02b5f6db6",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-003",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faaa7e7eac842b2c6c4f9f12d9",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-004",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faab527e95aad2e835b150b4ce",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-005",
+      "split": "holdout",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faac437570ae1d784f54a6b77f",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-006",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faacef774793ae2fc98eb186ef",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-007",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faade77bdea78bb03a5a6a2b26",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-008",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faaed97f49a49c8b8640100530",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-009",
+      "split": "holdout",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faafa473ab97ca0867a8f04aa6",
+      "tags": [
+        "부정문",
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-010",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fab0687add9e109a5d200c85bb",
+      "tags": [
+        "복합요청",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-011",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fab12f730795c2e21c696caf70",
+      "tags": [
+        "반말",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-012",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fab21970cc90e29a348d515a8e",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-013",
+      "split": "holdout",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fab2e57ab38df090282b848f53",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-014",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fab3a87baaa97c745bdf75decc",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-015",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fab49171d98a71c1a631f99fd5",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-016",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fab5557fe1a6bacd099da278e9",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-017",
+      "split": "holdout",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fab61f7416b70a387bb1365e67",
+      "tags": [
+        "존댓말",
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-018",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fab6e5725dafe96e23021a7977",
+      "tags": [
+        "오타",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-019",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fab7b07cb0893fbecda80ce85e",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-020",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 0.74,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fab8917f1f82e9dc59656a6fa8",
+      "tags": [
+        "복합요청",
+        "공격문자열"
+      ]
+    },
+    {
+      "id": "ko-021",
+      "split": "holdout",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fab9897de1872ad50714bf7840",
+      "tags": [
+        "반말",
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-022",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faba4e79cf96da526cb0f29567",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-023",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fabb237871bdb8001ed5482d2c",
+      "tags": [
+        "오타",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-024",
+      "split": "dev",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fabbde7e6c892d92bc7e3ef529",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-025",
+      "split": "holdout",
+      "expected": "SERVER_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fabcb37d288f3d31f40705505d",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-026",
+      "split": "holdout",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fabd7c7a88be71a6fc94d24f09",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-027",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fabe4d7e12a894de90418290a1",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-028",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fabf2a783abf769f273afc421d",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-029",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.97,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fabff673dfba40f0e876e1424a",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-030",
+      "split": "holdout",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fac0ab7c9b9043b0defd18c755",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-031",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fac1a37be3a148e548ad9e00ff",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-032",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fac28778309a5b43bd4d3a5b43",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-033",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fac362743b9b954c2a91b321a5",
+      "tags": [
+        "오타",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-034",
+      "split": "holdout",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.79,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fac4347deeaf47636e6d549ae6",
+      "tags": [
+        "부정문",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-035",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fac51d7a35b5fd1278e7eeb4c2",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-036",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fac5d1705cb3dc22bd44c56dd8",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-037",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fac69d7c7b89ad93d63ddf2865",
+      "tags": [
+        "존댓말",
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-038",
+      "split": "holdout",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.87,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fac763739ea4a1f0e34f52b894",
+      "tags": [
+        "오타",
+        "지시대명사",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-039",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fac8447f94b04e4d5a6b12d50e",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-040",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fac91d78b399d6d9295330f549",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-041",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fac9f97fde8f2f2d225946a2b1",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-042",
+      "split": "holdout",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7facac17495b2bdb24309ed3202",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-043",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7facba877debba0669f7c7ec7b1",
+      "tags": [
+        "오타",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-044",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7facc9871178941af4fc667db4f",
+      "tags": [
+        "부정문",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-045",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.48,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7facd647487906005f0b76ff9ac",
+      "tags": [
+        "복합요청",
+        "공격문자열"
+      ]
+    },
+    {
+      "id": "ko-046",
+      "split": "holdout",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7face1c7e8082758a0204adb7d2",
+      "tags": [
+        "반말",
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-047",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.72,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faceff753dbadbfff2cfec87ec",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-048",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.89,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7facfbb7e74a36ce7cc0c957498",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-049",
+      "split": "dev",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fad0877919b4a68d8078dcc0d8",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-050",
+      "split": "holdout",
+      "expected": "PLAYER_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fad14d7299a29036e88c17f0c1",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-051",
+      "split": "holdout",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.97,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fad21671439cb11fbe4de7ee02",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-052",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.9,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fad2dc7de3a2553d3c36f6919d",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-053",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.75,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fad3c87ccf95433c983040bbb7",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-054",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fad479713cbd5b9cc786453fe0",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-055",
+      "split": "holdout",
+      "expected": "WORLD_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 0.95,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fad53f73babb43c2f2dfb2a3f8",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-056",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fad5fd7af7b5266b8062a0c1eb",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-057",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fad6d8749193673d98625de7e0",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-058",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fad7b078b8a6afb473f5ad4ce1",
+      "tags": [
+        "오타",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-059",
+      "split": "holdout",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fad87b7f9f979c10d77ef38fa9",
+      "tags": [
+        "부정문",
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-060",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.94,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fad95b7b058af40fad1827f0e1",
+      "tags": [
+        "복합요청",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-061",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fada34712f80d8b2f5324fb3f0",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-062",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fadb19760fa04ad903f7b892d6",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-063",
+      "split": "holdout",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.96,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fadbe57bb497e2e7f6f57469d3",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-064",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.61,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fadcba7181942e567bda3111e2",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-065",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.74,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fadd9079f8980af92d982e1609",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-066",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.81,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fade7578eea0641b4aaa53b8bf",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-067",
+      "split": "holdout",
+      "expected": "WORLD_QUERY",
+      "predicted": "SERVER_QUERY",
+      "confidence": 0.5,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fadf407ac4af212eb49e20400b",
+      "tags": [
+        "존댓말",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-068",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fae02376a9829e86742430b16a",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-069",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fae0ee7e4b9ea1d9381ed72735",
+      "tags": [
+        "부정문",
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-070",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.82,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fae1ac71f682357ab9ff912d7a",
+      "tags": [
+        "복합요청",
+        "공격문자열"
+      ]
+    },
+    {
+      "id": "ko-071",
+      "split": "holdout",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fae29b764a8a47128f785ab990",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-072",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fae36f7f33842b9acb2b51ff3f",
+      "tags": [
+        "존댓말",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-073",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.61,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fae44f7dd6b776dea3e1d00f84",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-074",
+      "split": "dev",
+      "expected": "WORLD_QUERY",
+      "predicted": "GENERAL",
+      "confidence": 0.43,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fae55977efb55f0a5ff2c01a17",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-075",
+      "split": "holdout",
+      "expected": "WORLD_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.93,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fae68473db95fd5e50e2ea95c8",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-076",
+      "split": "holdout",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.43,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fae74a7868a973af34088df1f2",
+      "tags": [
+        "반말",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-077",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fae8427a158c5d6c51a3720cf8",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-078",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fae9087cc4aeece148f0daa3a9",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-079",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.93,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fae9d47733815352287f72099f",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-080",
+      "split": "holdout",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.94,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faeab776f48f2369a97179d0ad",
+      "tags": [
+        "복합요청",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-081",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.65,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faebb17769bc5d4ad7ed8882fa",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-082",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faec717c7aaff3453f7407de24",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-083",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.93,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faed5e786898fadad54b051e66",
+      "tags": [
+        "오타",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-084",
+      "split": "holdout",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.89,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faee2272d693351291975c6df1",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-085",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faef20789e8061cfdd2812359f",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-086",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faefe27eae9949e9c020e5bd00",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-087",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faf0cc712c9e3c52af212f0561",
+      "tags": [
+        "존댓말",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-088",
+      "split": "holdout",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faf1b07d34875001b9fd11a4c7",
+      "tags": [
+        "오타",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-089",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faf28b7fec8629eeb9fb87a349",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-090",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faf34f7b3fa3b156a156801e97",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-091",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.66,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faf47677d2a109d9a4c1aaf7c1",
+      "tags": [
+        "반말",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-092",
+      "split": "holdout",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faf5367fda87f56cdf02c560f3",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-093",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faf6227c5c9ec3d6dca0e3cef4",
+      "tags": [
+        "오타",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-094",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.95,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faf7327333a369fe6bbcdda3f8",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-095",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.8,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faf82e7dfe916e326bb0979838",
+      "tags": [
+        "복합요청",
+        "공격문자열"
+      ]
+    },
+    {
+      "id": "ko-096",
+      "split": "holdout",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faf8f57ba29f93c743a71d9a2a",
+      "tags": [
+        "반말",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-097",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faf9de778f988afa3bfedb3faf",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-098",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fafaa070e1b6d6401250f7605b",
+      "tags": [
+        "오타",
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-099",
+      "split": "dev",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.93,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fafb6a7096840a17fdd33b8378",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-100",
+      "split": "holdout",
+      "expected": "HISTORY_QUERY",
+      "predicted": "HISTORY_QUERY",
+      "confidence": 0.97,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fafc337b788fb7898871458f0d",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-101",
+      "split": "holdout",
+      "expected": "REGION_QUERY",
+      "predicted": "WORLD_QUERY",
+      "confidence": 0.41,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fafd0f78489ccc75ab9a621d4e",
+      "tags": [
+        "반말",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-102",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fafdf1719fa8e5fa43d7b9119f",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-103",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.97,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fafecb72e384ff1beca1428d58",
+      "tags": [
+        "오타",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-104",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.88,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7faffad763da453e0de095b8fff",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-105",
+      "split": "holdout",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb00797734bc1735506c401ecd",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-106",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.52,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb012a7f5fa9a745ca7d7b1b2a",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-107",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.94,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb021c75e5a637adf6adb5aaa3",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-108",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.81,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb02d0703eba7adc5e2b4ce934",
+      "tags": [
+        "오타",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-109",
+      "split": "holdout",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb03b0756b90dddc4cd3b8a3bb",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-110",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.95,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb045e7217b3edcf966aafb52c",
+      "tags": [
+        "복합요청",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-111",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.96,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb0577704f8adcd5aa0e3b17f7",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-112",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.4,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb063070e0948fc9ecd73af5f0",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-113",
+      "split": "holdout",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.93,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb070878828092f9e9774c2d40",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-114",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.89,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb07ec7bfc86c1f530e2bc63d5",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-115",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb08e670398b6e704dfca8781e",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-116",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.78,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb099d7470bb8badcf638bfa74",
+      "tags": [
+        "반말",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-117",
+      "split": "holdout",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.91,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb0a677aafba3ec859d518a5bb",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-118",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb0b46737f9b03fe0c3842cdd3",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-119",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb0c2476438b6061c73845c662",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-120",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.93,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb0cf67b7b89d91c344a89452b",
+      "tags": [
+        "복합요청",
+        "공격문자열",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-121",
+      "split": "holdout",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb0ddf74c48aea34519a28eb31",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-122",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.83,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb0ea57beab43e50674e85705d",
+      "tags": [
+        "존댓말",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-123",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb0f8f7e7d98d2d1fbeb04eea5",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-124",
+      "split": "dev",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb104a70dfb634a7b47947da3b",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-125",
+      "split": "holdout",
+      "expected": "REGION_QUERY",
+      "predicted": "REGION_QUERY",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb114a73f2b4d047b9ab9cc69b",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-126",
+      "split": "holdout",
+      "expected": "ACTION_REQUEST",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.34,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb123f71f783412415e3d0cedb",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-127",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb13107071b27f7fb6df29a733",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-128",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb13cd70fe84541584e97df32d",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-129",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb14a971f7a678b98dc506b7d6",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-130",
+      "split": "holdout",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.82,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb156476128b35e8f881079e7b",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-131",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.9,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb162a7ce1b2a4b34935e67d02",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-132",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.95,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb16dc71b28375a2b1c42ebc9d",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-133",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb17b8719b83bc4def0cb9f9dc",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-134",
+      "split": "holdout",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.96,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb18717f08b02ca0fcfcead597",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-135",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb195d76c2a35a177917ca2f10",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-136",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.94,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb1a377f0898146aebedc567b9",
+      "tags": [
+        "반말",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-137",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb1b1f72eebf3b19e70802b481",
+      "tags": [
+        "존댓말",
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-138",
+      "split": "holdout",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb1c5a7673a3096c80d559ac89",
+      "tags": [
+        "오타",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-139",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb1da27ebfaee34394062074a1",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-140",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.95,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb1e6678829dc5c71e94ee2e86",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-141",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "GENERAL",
+      "confidence": 0.46,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb1f4076fe97cbe9d9182eec4e",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-142",
+      "split": "holdout",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb1ff0731982936806b62c334b",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-143",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb20bf742c96f9c85efe3b8395",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-144",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.97,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb21757d759aaf581e6ed1a9f8",
+      "tags": [
+        "부정문",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-145",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.98,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb22607ce3a93e409696376395",
+      "tags": [
+        "복합요청",
+        "공격문자열"
+      ]
+    },
+    {
+      "id": "ko-146",
+      "split": "holdout",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.83,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb233270f586813f66280e1acd",
+      "tags": [
+        "반말",
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-147",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.89,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb242c7b268a69215992e252fc",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-148",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb24de7eda93ee3fdc3482f81e",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-149",
+      "split": "dev",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.96,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb25a973ac9e0f778817ccd0bf",
+      "tags": [
+        "부정문",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-150",
+      "split": "holdout",
+      "expected": "ACTION_REQUEST",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb266f757abd83c3672f00a9c3",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-151",
+      "split": "holdout",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb27587e93977f42761480e754",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-152",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb2801748390f5e89fd3108998",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-153",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb28d57bd4ad806f9ec0b3dd1f",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-154",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb29ba7b06865949929ecbb893",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-155",
+      "split": "holdout",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb2a95725f9563d765f649b82f",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-156",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 0.92,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb2b887dae8317650b7fcab09f",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-157",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb2c657b07aa5eafbd22a43f62",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-158",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb2d277761a4ed1ea8f3954353",
+      "tags": [
+        "오타",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-159",
+      "split": "holdout",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb2e1279afaef6b2ede8cdb52f",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-160",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb2ece721da3789bc3be60d809",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-161",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 0.93,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb2fad75658fbbd7cc756df669",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-162",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb30677f98a484f9621bf0c970",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-163",
+      "split": "holdout",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb313f7138a542d3f9ba3e8d61",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-164",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb31f47fd3bb26fbe7fc0351e5",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-165",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb32d47260bb0dc07235480ede",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-166",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb33b479219c65a2f8533e302a",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-167",
+      "split": "holdout",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb34977d9098eaec0909082729",
+      "tags": [
+        "존댓말",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-168",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb35707466a760936b5e035043",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-169",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb362d79a9867c829bcc429d81",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-170",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 0.69,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb36fe7435a04e1ffa3d19d51c",
+      "tags": [
+        "복합요청",
+        "공격문자열"
+      ]
+    },
+    {
+      "id": "ko-171",
+      "split": "holdout",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 0.91,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb37f67d2f80760a63866d2720",
+      "tags": [
+        "반말",
+        "공격문자열"
+      ]
+    },
+    {
+      "id": "ko-172",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 0.99,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb38c978b1a7df13869491a1f4",
+      "tags": [
+        "존댓말",
+        "공격문자열",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-173",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb39c3799084a7225d252ecd37",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-174",
+      "split": "dev",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb3ad07282b9e77ca3d010f41e",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-175",
+      "split": "holdout",
+      "expected": "GENERAL",
+      "predicted": "GENERAL",
+      "confidence": 1,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb3bab79b4bb620beb66b7061c",
+      "tags": [
+        "복합요청"
+      ]
+    },
+    {
+      "id": "ko-176",
+      "split": "holdout",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.91,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb3c6d71beb83150ded8ba0cd5",
+      "tags": [
+        "반말",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-177",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.91,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb3d59778c921dce6df0d221f3",
+      "tags": [
+        "존댓말",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-178",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.58,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb3e3f7212885723a30fe214f9",
+      "tags": [
+        "오타",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-179",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.64,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb3f277641a850ef3c4e5a5311",
+      "tags": [
+        "부정문",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-180",
+      "split": "holdout",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.74,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb3fff7a029c676ff7e08a589c",
+      "tags": [
+        "복합요청",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-181",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.83,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb4116717fbf17aae635f8ca0f",
+      "tags": [
+        "반말",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-182",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.81,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb41de70f99860b9b454c72ff3",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-183",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.54,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb42f17c68b855cf8da7f9c00b",
+      "tags": [
+        "오타",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-184",
+      "split": "holdout",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.88,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb43da75d180b2d5bf2735e341",
+      "tags": [
+        "부정문",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-185",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.72,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb44ad77ee851efccd58cf33a7",
+      "tags": [
+        "복합요청",
+        "지시대명사",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-186",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "ACTION_REQUEST",
+      "confidence": 0.58,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb45907afeaef14d21ab8911ea",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-187",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "PLAYER_QUERY",
+      "confidence": 0.27,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb465b7d009e0e73c5a340870b",
+      "tags": [
+        "존댓말",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-188",
+      "split": "holdout",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.56,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb472070e7b86b2ef4cbe1e6d6",
+      "tags": [
+        "오타"
+      ]
+    },
+    {
+      "id": "ko-189",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.5,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb47f97644be944684e4567f5e",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-190",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.64,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb48d876dc9e26914452bf86d6",
+      "tags": [
+        "복합요청",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-191",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.67,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb49a8765998d84d181252f484",
+      "tags": [
+        "반말"
+      ]
+    },
+    {
+      "id": "ko-192",
+      "split": "holdout",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.56,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb4a6e7957b64a0f3c03794f37",
+      "tags": [
+        "존댓말",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-193",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.58,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb4b487516b8bf5a6d9e2693b0",
+      "tags": [
+        "오타",
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-194",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.5,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb4c3e72fdbed24876c384a6d2",
+      "tags": [
+        "부정문",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-195",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.47,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb4d0c7e8faceb41a9a4d5bbda",
+      "tags": [
+        "복합요청",
+        "공격문자열"
+      ]
+    },
+    {
+      "id": "ko-196",
+      "split": "holdout",
+      "expected": "UNCERTAIN",
+      "predicted": "SERVER_QUERY",
+      "confidence": 0.49,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb4de67276932ff6b3c0727110",
+      "tags": [
+        "반말",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-197",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.4,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb4eb4793c9cc005aaa989a3b0",
+      "tags": [
+        "존댓말"
+      ]
+    },
+    {
+      "id": "ko-198",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.7,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb4f8875a0bd7ad76c638db0cc",
+      "tags": [
+        "오타",
+        "지시대명사"
+      ]
+    },
+    {
+      "id": "ko-199",
+      "split": "dev",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.5,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb506171a58730ccfb8cfe5f7c",
+      "tags": [
+        "부정문"
+      ]
+    },
+    {
+      "id": "ko-200",
+      "split": "holdout",
+      "expected": "UNCERTAIN",
+      "predicted": "UNCERTAIN",
+      "confidence": 0.89,
+      "model": "jev-1.13.0",
+      "requestId": "req_01a0d7fb513f70a28081f0c9bb1252a8",
+      "tags": [
+        "복합요청"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "verifiedAt": "2026-09-25T09:59:48.132Z",
+  "requestId": "0de104c1-cd4d-467f-95ac-c7a01419e9f5",
+  "jev": {
+    "model": "jev-1.13.0",
+    "category": "SERVER_QUERY",
+    "confidence": 1,
+    "requestId": "req_01a0d801acbf7439a2f8003231a83559"
+  },
+  "luna": {
+    "responseId": "resp_04b8bbf7b6373e80016ab64612854487d0914e9f5da4033357",
+    "model": "gpt-6-luna",
+    "toolCalls": 0
+  },
+  "firstToolCalls": [
+    "get_server_status"
+  ],
+  "finalText": "현재 서버 TPS는 **19.95**입니다. 최근 60초 기준 실제 서버 데이터이며, 관측 시각은 **2026-09-25 09:59:46 UTC**입니다.",
+  "simulatedAdapterResult": true,
+  "note": "This script validates both live model SDKs and the Luna Tool-call/result loop. Actual Minecraft Adapter E2E remains T10."
+}

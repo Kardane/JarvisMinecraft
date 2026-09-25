@@ -164,7 +164,8 @@ performRollback()은 API v12 문서에서 async 호출을 요구한다. v0.1.1�
 
 | 항목 | 판정 |
 |---|---|
-| T00 기준 | WorldGuard 7.0.18 |
+| T00 사용자 서버 예시 | WorldGuard 7.0.18 |
+| 검증 compile target | WorldGuard 7.0.14 + WorldEdit 7.3.16, Java 21 / Minecraft 1.21.8 |
 | API major | 7.x |
 | 필수 companion | WorldEdit |
 | 라이선스 | LGPL-3.0-or-later |
@@ -172,7 +173,7 @@ performRollback()은 API v12 문서에서 async 호출을 요구한다. v0.1.1�
 | v0.1.1 | region/flags/build protection 조회 |
 | 변경 작업 | 미지원 |
 
-현재 사용자 서버 예시가 WorldGuard 7.0.18이므로 JARVIS의 첫 runtime target도 7.0.18로 맞춘다. EngineHub는 7.x 안에서 API 안정성을 높게 유지한다고 문서화한다.
+EngineHub는 7.x 안에서 API 안정성을 높게 유지한다고 문서화한다. 이 checkout에서는 WorldGuard 7.0.14와 WorldEdit 7.3.16을 Java 21/Minecraft 1.21.8 기준으로 compileOnly 검증했다. 기존 사용자 서버 예시인 WorldGuard 7.0.18은 이 빌드 기준과 아직 맞지 않으므로, 해당 버전의 runtime 호환성은 Paper smoke test 전까지 확인되지 않은 상태로 둔다.
 
 보호 판정은 직접 owner/priority/flag를 재구현하지 않고 RegionQuery.testState를 사용한다. WorldGuard 문서는 **RegionQuery가 bypass permission을 자동 확인하지 않는다**고 경고하므로 요청자의 bypass가 의미 있는 질문에서는 SessionManager.hasBypass를 별도로 확인해야 한다.
 
@@ -189,20 +190,24 @@ WorldGuard API 자료구조가 thread-safe하더라도 Bukkit Player/World adapt
 |---|---|
 | 사용자 서버 예시 | CMI 9.8.9.6 + CMILib 1.5.9.9 |
 | 공개 CMI-API 문서 버전 | 9.8.6.4 |
-| dependency 방식 | JitPack + provided |
-| 라이선스 | **미확인 / BLOCKED** |
-| v0.1/v0.1.1 | 미사용 |
-| v0.2 T14 | 선택 확장, smoke test 후 capability 활성화 |
+| dependency 방식 | JitPack + provided (공식 API guide) |
+| 라이선스 | API license는 타 플러그인 코드 사용에 Zrips의 구체적 허가를 요구; 사용자가 해당 허가를 받았다고 확인 |
+| dependency | `com.github.Zrips:CMI-API:9.8.6.4` compileOnly; JARVIS 배포 JAR에 포함하지 않음 |
+| v0.1/v0.1.1 | 기본 capability 없음; CMI가 있을 때만 선택 Tool 활성화 |
+| T14 | 온라인 nickname/AFK Tool 구현; runtime smoke 대기 |
 
 CMI 공식 API 페이지는 CMI-API 9.8.6.4를 provided dependency로 안내한다. 그러나 사용자가 보유한 CMI runtime은 9.8.9.6이며, **공개 API artifact와 해당 runtime 조합의 호환을 공식 문서만으로 증명하지 못했다.**
 
-또한 CMI-API GitHub 저장소에서 명시적 LICENSE 파일/표기를 T00에서 확인하지 못했다. 따라서 CMI/CMI-API binary를 JARVIS artifact에 재배포하지 않는다. T14 전에 라이선스/재배포 조건을 확인하고, compileOnly/provided 방식만 고려한다.
+공식 CMI-API 9.8.6.4의 [`resources/LICENSE`](https://github.com/Zrips/CMI-API/blob/9.8.6.4/resources/LICENSE)는 Zrips가 유지하는 플러그인이 아닌 곳에서의 코드 사용에 Zrips의 구체적인 허가를 요구한다. 사용자는 Zrips의 명시적 허가를 받았다고 확인했다. 이 checkout에는 허가 증빙 사본이 저장되어 있지 않으며, 구현은 공식 API만 compileOnly로 참조하고 API binary를 JARVIS에 포함하지 않는다.
 
-CMI 문서는 offline player 정보 로드가 대량 실행 시 서버에 부담을 줄 수 있다고 경고한다. JARVIS는 bulk offline scan을 하지 않는다. API의 일반 thread-safety 계약도 명시되지 않았으므로 Bukkit/CMI 객체 접근은 서버 스레드로 제한한다.
+CMI 문서는 offline player 정보 로드가 대량 실행 시 서버에 부담을 줄 수 있다고 경고한다. T14는 현재 온라인 플레이어 조회만 제공하며 offline lookup, play time, warning은 제외한다. API의 일반 thread-safety 계약도 명시되지 않았으므로 Bukkit/CMI 객체 접근은 서버 스레드로 제한한다. nickname 색상 코드와 제어 문자를 제거하고 64 UTF-16 단위로 제한한다.
+
+T14 상태, 사용자 허가 확인 경계, runtime smoke 절차는 [`T14_HANDOFF.md`](../minecraft/paper/src/main/java/io/github/kardane/jarvisminecraft/paper/integrations/cmi/T14_HANDOFF.md)에 기록했다. capability는 CMI와 CMILib가 활성화되고 API probe가 성공할 때만 광고한다. 대상 서버의 binary compatibility는 smoke test로 확인해야 한다.
 
 공식 근거:
 - https://www.zrips.net/cmi/api/
-- https://github.com/Zrips/CMI-API
+- https://github.com/Zrips/CMI-API/releases/tag/9.8.6.4
+- https://github.com/Zrips/CMI-API/blob/9.8.6.4/resources/LICENSE
 
 ## 5. 라이선스·재배포 정책
 
@@ -218,7 +223,7 @@ CMI 문서는 offline player 정보 로드가 대량 실행 시 서버에 부담
 | TypeSafe JS SDK | MIT | Brain npm dependency |
 | CoreProtect | Artistic-2.0 | provided/compileOnly, plugin 미번들 |
 | WorldGuard | LGPL-3.0-or-later | compileOnly, plugin 미번들 |
-| CMI / CMI-API | CMI는 상용 plugin, CMI-API 저장소 라이선스 T00 미확인 | **미번들**, T14 전 조건 확인 |
+| CMI / CMI-API | CMI-API license가 타 플러그인의 코드 사용에 Zrips의 구체적 허가 요구; 사용자가 허가를 받았다고 확인 | CMI-API는 compileOnly, CMI/CMILib는 미번들; runtime smoke 대기 |
 
 이 표는 법률 자문이 아니라 빌드/배포 경계 결정이다. JARVIS release artifact에 타사 서버/plugin/mod binary를 shade하지 않는 것을 기본값으로 한다.
 
@@ -247,7 +252,7 @@ T01은 아래를 계약 전제로 사용할 수 있다.
 - OP authority: Paper isOp(), Fabric PlayerManager.isOperator(GameProfile), NeoForge vanilla operator list.
 - 외부 모델/Brain이 보내는 isOp 값은 권한 근거가 아니다.
 - Provider가 없거나 version/API check가 실패하면 capability/tool 자체를 노출하지 않는다.
-- CMI는 T14 전까지 Tool catalog에 넣지 않는다.
+- CMI capability는 활성 Provider와 runtime API probe가 성공할 때만 노출한다. 실제 server version 호환성은 별도 smoke evidence로 기록한다.
 
 T02는 다음 고정값으로 build skeleton을 시도한다.
 
@@ -270,8 +275,8 @@ T02에서 실제 dependency resolution/compile이 실패하면 **가장 작은 �
 4. 세 플랫폼에서 deop/logout race가 실행 직전 재검사로 차단되는지.
 5. Gradle 8.14.5 + Loom 1.12.2 + ModDevGradle 2.0.147 멀티프로젝트 동시 build.
 6. CoreProtect 24.1 runtime에서 API v12 lookup paging/timeout과 실제 DB executor 동작.
-7. WorldGuard 7.0.18 + 실제 WorldEdit/FAWE 조합에서 RegionQuery와 bypass 결과.
-8. CMI 9.8.9.6 + CMI-API 9.8.6.4의 실제 binary/runtime 호환 및 라이선스/재배포 조건.
+7. WorldGuard 사용자 예시 7.0.18 + 실제 WorldEdit/FAWE 조합에서 RegionQuery와 bypass 결과; 현재 compile target 7.0.14 / WorldEdit 7.3.16.
+8. CMI 9.8.9.6 + CMILib 1.5.9.9 + compileOnly CMI-API 9.8.6.4 조합의 실제 binary/runtime smoke. 사용자가 Zrips 허가를 확인한 사실은 T14 handoff 문서에 기록했다.
 9. 실제 OpenAI 계정에서 gpt-6-luna Responses Tool call/result.
 10. 실제 TypeSafe 계정에서 jev-1.13.0 모델 ID/분류 응답/request ID.
 11. 한국어 Jev A09 평가 200건 이상. confidence threshold는 그 전까지 정책 권한으로 사용하지 않음.

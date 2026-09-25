@@ -632,6 +632,9 @@ async function startServer() {
   } else if (PLATFORM === "fabric") {
     command = "java";
     args = ["-Xms512M", "-Xmx1024M", "-jar", "fabric-server.jar", "nogui"];
+  } else if (process.platform === "win32") {
+    command = process.env.ComSpec ?? "cmd.exe";
+    args = ["/d", "/c", "run.bat nogui"];
   } else {
     command = "bash";
     args = ["run.sh", "nogui"];

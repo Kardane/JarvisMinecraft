@@ -10,6 +10,7 @@
     "hello-brain.json",
     "ping.json",
     "pong.json",
+    "tool-request-cmi-player-info.json",
     "tool-request-history.json",
     "tool-request-location.json",
     "tool-request-nearby.json",
@@ -23,6 +24,7 @@
     "tool-request-teleport.json",
     "tool-request-world-info.json",
     "tool-result-build-permission.json",
+    "tool-result-cmi-player-info.json",
     "tool-result-history-empty.json",
     "tool-result-location.json",
     "tool-result-nearby.json",
@@ -71,6 +73,10 @@
     {
       "file": "unknown-tool-argument.json",
       "reason": "Tool arguments are strict; unknown fields are rejected."
+    },
+    {
+      "file": "cmi-player-info-missing-player-uuid.json",
+      "reason": "CMI player profile lookup requires one explicit player UUID."
     }
   ]
 }

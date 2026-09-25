@@ -72,8 +72,8 @@ public final class T03VerificationMain {
             invalidCount++;
         }
 
-        require(validCount == 31, "Expected 31 valid protocol fixtures.");
-        require(invalidCount == 9, "Expected 9 invalid protocol fixtures.");
+        require(validCount == 33, "Expected 33 valid protocol fixtures.");
+        require(invalidCount == 10, "Expected 10 invalid protocol fixtures.");
     }
 
     private static void platformIsolation(Path repoRoot) throws IOException {

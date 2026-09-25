@@ -25,7 +25,7 @@ public final class ToolModels {
     public sealed interface ToolData permits
         ServerStatusData, OnlinePlayersData, PlayerData, PlayerLocationData,
         NearbyPlayersData, WorldInfoData, TeleportData, HistoryData,
-        RegionsAtLocationData, RegionInfoData, BuildPermissionData {
+        RegionsAtLocationData, RegionInfoData, BuildPermissionData, CmiPlayerInfoData {
     }
 
     public record NoArguments() implements ToolArguments {
@@ -121,6 +121,9 @@ public final class ToolModels {
     }
 
     public record PlayerLocationData(PlayerRef player, Location location) implements ToolData {
+    }
+
+    public record CmiPlayerInfoData(PlayerRef player, String nickname, boolean afk) implements ToolData {
     }
 
     public record NearbyPlayer(PlayerRef player, double distance) {

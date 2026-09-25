@@ -44,6 +44,8 @@ public final class PaperBrainConnection {
     private final String minecraftVersion;
     private final String adapterVersion;
     private final String platformVersion;
+    private final Set<ToolName> activeTools;
+    private final List<ProtocolMessage.Capability> capabilities;
     private final Clock clock;
     private final CommonRuntime commonRuntime;
     private final ServerScheduler serverScheduler;
@@ -68,6 +70,8 @@ public final class PaperBrainConnection {
         String minecraftVersion,
         String adapterVersion,
         String platformVersion,
+        Set<ToolName> activeTools,
+        List<ProtocolMessage.Capability> capabilities,
         Clock clock,
         CommonRuntime commonRuntime,
         ServerScheduler serverScheduler,
@@ -81,6 +85,8 @@ public final class PaperBrainConnection {
         this.minecraftVersion = minecraftVersion;
         this.adapterVersion = adapterVersion;
         this.platformVersion = platformVersion;
+        this.activeTools = Set.copyOf(activeTools);
+        this.capabilities = List.copyOf(capabilities);
         this.clock = clock;
         this.commonRuntime = commonRuntime;
         this.serverScheduler = serverScheduler;
@@ -204,7 +210,7 @@ public final class PaperBrainConnection {
         connectionRuntime = commonRuntime.openConnection(
             connectionId,
             serverId,
-            V01_TOOLS
+            activeTools
         );
         state = State.WAITING_BRAIN_HELLO;
 
@@ -292,16 +298,6 @@ public final class PaperBrainConnection {
     }
 
     private void sendCapabilities(BrainTransport source) {
-        List<ProtocolMessage.Capability> capabilities = List.of(
-            capability("server.status"),
-            capability("player.list"),
-            capability("player.lookup"),
-            capability("player.location"),
-            capability("player.nearby"),
-            capability("world.info"),
-            capability("staff.self_teleport")
-        );
-
         ProtocolMessage message = new ProtocolMessage(
             Protocol.VERSION,
             MessageType.CAPABILITIES,
@@ -314,7 +310,7 @@ public final class PaperBrainConnection {
             null,
             new ProtocolMessage.Capabilities(
                 capabilities,
-                List.copyOf(V01_TOOLS),
+                activeTools.stream().sorted(java.util.Comparator.comparing(ToolName::wireName)).toList(),
                 new ProtocolMessage.Limits(Protocol.MAX_MESSAGE_BYTES, 8, 4)
             ),
             null,
@@ -328,10 +324,6 @@ public final class PaperBrainConnection {
                 state = State.ACTIVE;
             }
         });
-    }
-
-    private ProtocolMessage.Capability capability(String name) {
-        return new ProtocolMessage.Capability(name, "Paper", minecraftVersion);
     }
 
     private void handleToolRequest(BrainTransport source, ProtocolMessage message) {

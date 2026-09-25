@@ -8,6 +8,7 @@ import {
   JEV_MODEL,
   translateFunctionCall,
 } from "../../dist/ai/index.js";
+import { resolveActiveTools } from "../../dist/core/catalog.js";
 
 const REQUEST = "00000000-0000-4000-8000-000000000101";
 const SESSION = "00000000-0000-4000-8000-000000000102";
@@ -256,6 +257,56 @@ test("strict Luna schema splits get_player into exact-name and UUID functions", 
       tool: "get_player",
       arguments: { exactName: "Steve" },
     },
+  );
+});
+
+test("CMI profile is optional and exposes a strict UUID-only Luna function", () => {
+  const active = resolveActiveTools({
+    capabilities: [
+      { name: "player.cmi_profile", source: "CMI", version: "9.8.9.6" },
+    ],
+    tools: ["get_cmi_player_info"],
+    limits: {
+      maxMessageBytes: 65_536,
+      maxToolCallsPerRequest: 8,
+      maxModelRoundTripsPerRequest: 4,
+    },
+  });
+  assert.deepEqual(active, [tool("get_cmi_player_info", "player.cmi_profile", false)]);
+
+  const [definition] = buildFunctionTools(active);
+  assert.equal(definition.name, "get_cmi_player_info");
+  assert.equal(definition.strict, true);
+  assert.equal(definition.parameters.additionalProperties, false);
+  assert.deepEqual(definition.parameters.required, ["playerUuid"]);
+  assert.deepEqual(
+    translateFunctionCall(
+      "get_cmi_player_info",
+      JSON.stringify({ playerUuid: TARGET }),
+      new Set(["get_cmi_player_info"]),
+    ),
+    {
+      tool: "get_cmi_player_info",
+      arguments: { playerUuid: TARGET },
+    },
+  );
+  assert.throws(() =>
+    resolveActiveTools({
+      capabilities: [],
+      tools: ["get_cmi_player_info"],
+      limits: {
+        maxMessageBytes: 65_536,
+        maxToolCallsPerRequest: 8,
+        maxModelRoundTripsPerRequest: 4,
+      },
+    }),
+  );
+  assert.throws(() =>
+    translateFunctionCall(
+      "get_cmi_player_info",
+      JSON.stringify({ playerUuid: TARGET, includeOffline: true }),
+      new Set(["get_cmi_player_info"]),
+    ),
   );
 });
 

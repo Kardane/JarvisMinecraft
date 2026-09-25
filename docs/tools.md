@@ -44,8 +44,11 @@ Brain이 임의 Tool 이름을 생성해도 Adapter는 실행하지 않는다.
 | get_regions_at_location | region.lookup | WorldGuard | 읽기 |
 | get_region_info | region.lookup | WorldGuard | 읽기 |
 | check_build_permission | region.protection | WorldGuard | 읽기 |
+| get_cmi_player_info | player.cmi_profile | CMI | 읽기 |
 
-CMI Tool은 T14에서 공개 API/라이선스/runtime 조합을 검증하기 전 catalog에 추가하지 않는다.
+`get_cmi_player_info`는 T14 선택형 Paper Tool이다. UUID로 현재 접속 중인 플레이어 한 명만 조회하고, CMI nickname과 AFK 상태를 반환한다. nickname 색상 코드와 제어 문자를 제거하고 최대 64 UTF-16 단위로 제한하며, 값이 없으면 Minecraft 이름을 쓴다. 오프라인 사용자 데이터, play time, CMI warning은 조회하지 않는다. CMI API가 없거나 호출에 실패하면 `PROVIDER_UNAVAILABLE`로 닫는다.
+
+CMI capability와 Tool은 CMI와 CMILib가 모두 활성화되고 공개 API 계약을 사용할 수 있을 때만 Paper가 광고한다. 사용자는 Zrips의 명시적 허가를 받았다고 확인했다. CMI 9.8.9.6 + CMILib 1.5.9.9 runtime smoke는 실제 서버 환경에서 별도로 확인한다.
 
 ## 3. 공통 결과
 

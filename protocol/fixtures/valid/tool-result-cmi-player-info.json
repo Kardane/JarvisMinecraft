@@ -1,0 +1,31 @@
+{
+  "protocolVersion": "1.0",
+  "type": "tool.result",
+  "messageId": "00000000-0000-4000-8000-000000001407",
+  "requestId": "00000000-0000-4000-8000-000000001402",
+  "serverId": "main",
+  "sessionId": "00000000-0000-4000-8000-000000001403",
+  "requesterUuid": "00000000-0000-4000-8000-000000001404",
+  "sentAt": "2026-09-25T00:00:01Z",
+  "deadlineAt": "2026-09-25T00:00:30Z",
+  "payload": {
+    "tool": "get_cmi_player_info",
+    "result": {
+      "status": "OK",
+      "data": {
+        "player": {
+          "uuid": "00000000-0000-4000-8000-000000001405",
+          "name": "Alex"
+        },
+        "nickname": "Builder Alex",
+        "afk": true
+      },
+      "error": null,
+      "observedAt": "2026-09-25T00:00:00Z",
+      "source": "CMI",
+      "truncated": false
+    }
+  },
+  "toolCallId": "00000000-0000-4000-8000-000000001406",
+  "actionId": null
+}

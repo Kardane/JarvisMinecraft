@@ -282,6 +282,125 @@
         }
       }
     },
+    "cmiPlayerInfoData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "player",
+        "nickname",
+        "afk"
+      ],
+      "properties": {
+        "player": {
+          "$ref": "#/$defs/playerRef"
+        },
+        "nickname": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "afk": {
+          "type": "boolean"
+        }
+      }
+    },
+    "cmiPlayerInfoResult": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status",
+        "data",
+        "error",
+        "observedAt",
+        "source",
+        "truncated"
+      ],
+      "properties": {
+        "status": {
+          "enum": [
+            "OK",
+            "EMPTY",
+            "ERROR",
+            "UNSUPPORTED"
+          ]
+        },
+        "data": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/cmiPlayerInfoData"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "error": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/errorObject"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "observedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "truncated": {
+          "type": "boolean"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "ERROR",
+                  "UNSUPPORTED"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "data": {
+                "type": "null"
+              },
+              "error": {
+                "$ref": "#/$defs/errorObject"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "OK",
+                  "EMPTY"
+                ]
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "error": {
+                "type": "null"
+              }
+            }
+          }
+        }
+      ]
+    },
     "nearbyPlayer": {
       "type": "object",
       "additionalProperties": false,
@@ -964,6 +1083,22 @@
           ],
           "properties": {
             "tool": {
+              "const": "get_cmi_player_info"
+            },
+            "arguments": {
+              "$ref": "#/$defs/playerUuidArguments"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tool",
+            "arguments"
+          ],
+          "properties": {
+            "tool": {
               "const": "get_nearby_players"
             },
             "arguments": {
@@ -1524,6 +1659,22 @@
                   }
                 }
               ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tool",
+            "result"
+          ],
+          "properties": {
+            "tool": {
+              "const": "get_cmi_player_info"
+            },
+            "result": {
+              "$ref": "#/$defs/cmiPlayerInfoResult"
             }
           }
         },
@@ -2641,7 +2792,8 @@
                           "staff.self_teleport",
                           "history.lookup",
                           "region.lookup",
-                          "region.protection"
+                          "region.protection",
+                          "player.cmi_profile"
                         ]
                       },
                       "source": {
@@ -2676,7 +2828,8 @@
                       "lookup_player_history",
                       "get_regions_at_location",
                       "get_region_info",
-                      "check_build_permission"
+                      "check_build_permission",
+                      "get_cmi_player_info"
                     ]
                   }
                 },

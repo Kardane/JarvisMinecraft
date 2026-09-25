@@ -44,6 +44,11 @@
         "name": "region.lookup",
         "source": "WorldGuard",
         "version": "7.0.18"
+      },
+      {
+        "name": "player.cmi_profile",
+        "source": "CMI",
+        "version": "9.8.9.6"
       }
     ],
     "tools": [
@@ -55,7 +60,8 @@
       "lookup_area_history",
       "lookup_player_history",
       "get_regions_at_location",
-      "get_region_info"
+      "get_region_info",
+      "get_cmi_player_info"
     ],
     "limits": {
       "maxMessageBytes": 65536,

@@ -337,6 +337,10 @@ public final class ProtocolCodec {
                 exactFields(args, Set.of("playerUuid"));
                 yield new PlayerUuidArguments(uuid(args, "playerUuid", false));
             }
+            case GET_CMI_PLAYER_INFO -> {
+                exactFields(args, Set.of("playerUuid"));
+                yield new PlayerUuidArguments(uuid(args, "playerUuid", false));
+            }
             case GET_NEARBY_PLAYERS -> {
                 exactFields(args, Set.of("center", "radius", "limit"));
                 double radius = number(args, "radius");
@@ -459,6 +463,7 @@ public final class ProtocolCodec {
             case GET_ONLINE_PLAYERS -> parseOnlinePlayers(data);
             case GET_PLAYER -> parsePlayerData(data);
             case GET_PLAYER_LOCATION -> parsePlayerLocationData(data);
+            case GET_CMI_PLAYER_INFO -> parseCmiPlayerInfoData(data);
             case GET_NEARBY_PLAYERS -> parseNearbyPlayers(data);
             case GET_WORLD_INFO -> parseWorldInfo(data);
             case TELEPORT_STAFF -> parseTeleportData(data);
@@ -528,6 +533,15 @@ public final class ProtocolCodec {
         return new PlayerLocationData(
             parsePlayerRef(object(data, "player")),
             parseLocation(object(data, "location"))
+        );
+    }
+
+    private CmiPlayerInfoData parseCmiPlayerInfoData(JsonObject data) {
+        exactFields(data, Set.of("player", "nickname", "afk"));
+        return new CmiPlayerInfoData(
+            parsePlayerRef(object(data, "player")),
+            string(data, "nickname", 1, 64),
+            bool(data, "afk")
         );
     }
 

@@ -23,7 +23,8 @@ export type ToolName =
   | "lookup_player_history"
   | "get_regions_at_location"
   | "get_region_info"
-  | "check_build_permission";
+  | "check_build_permission"
+  | "get_cmi_player_info";
 
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue =

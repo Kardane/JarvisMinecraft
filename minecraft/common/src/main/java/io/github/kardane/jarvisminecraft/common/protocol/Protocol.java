@@ -95,7 +95,9 @@ public final class Protocol {
         @SerializedName("get_region_info")
         GET_REGION_INFO("get_region_info", "region.lookup", false, Risk.READ_ONLY),
         @SerializedName("check_build_permission")
-        CHECK_BUILD_PERMISSION("check_build_permission", "region.protection", false, Risk.READ_ONLY);
+        CHECK_BUILD_PERMISSION("check_build_permission", "region.protection", false, Risk.READ_ONLY),
+        @SerializedName("get_cmi_player_info")
+        GET_CMI_PLAYER_INFO("get_cmi_player_info", "player.cmi_profile", false, Risk.READ_ONLY);
 
         private final String wireName;
         private final String capability;

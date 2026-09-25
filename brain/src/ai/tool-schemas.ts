@@ -126,6 +126,8 @@ function definitionsFor(tool: ToolName): readonly AiToolDefinition[] {
       ];
     case "get_player_location":
       return [uuidTool(tool, "Read the current location of one online player.")];
+    case "get_cmi_player_info":
+      return [uuidTool(tool, "Read an online player's CMI nickname and AFK state.")];
     case "get_nearby_players":
       return [
         define(tool, tool, "List online players near a known server location.", {
@@ -265,6 +267,7 @@ function definitionByAiName(name: string): AiToolDefinition {
     "get_regions_at_location",
     "get_region_info",
     "check_build_permission",
+    "get_cmi_player_info",
   ];
   for (const tool of candidates) {
     for (const definition of definitionsFor(tool)) {
@@ -308,6 +311,10 @@ function validateArguments(name: string, value: JsonObject): JsonObject {
       boundedString(value.exactName, "exactName", 1, 16);
       return value;
     case "get_player_location":
+      exactKeys(value, ["playerUuid"]);
+      uuid(value.playerUuid, "playerUuid");
+      return value;
+    case "get_cmi_player_info":
       exactKeys(value, ["playerUuid"]);
       uuid(value.playerUuid, "playerUuid");
       return value;

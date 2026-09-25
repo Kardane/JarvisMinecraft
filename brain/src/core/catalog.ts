@@ -80,6 +80,12 @@ const CATALOG: Record<ToolName, ToolDescriptor> = {
     stateChanging: false,
     risk: "READ_ONLY",
   },
+  get_cmi_player_info: {
+    name: "get_cmi_player_info",
+    capability: "player.cmi_profile",
+    stateChanging: false,
+    risk: "READ_ONLY",
+  },
 };
 
 export function getToolDescriptor(name: string): ToolDescriptor {

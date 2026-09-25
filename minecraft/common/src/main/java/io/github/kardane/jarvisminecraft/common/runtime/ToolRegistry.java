@@ -33,6 +33,22 @@ public final class ToolRegistry {
         return entries.containsKey(tool);
     }
 
+    /**
+     * Adds every Tool from a staged registry, or adds none if any Tool conflicts.
+     */
+    public void registerAll(ToolRegistry stagedRegistry) {
+        Objects.requireNonNull(stagedRegistry, "stagedRegistry");
+        if (stagedRegistry == this) {
+            throw new IllegalArgumentException("A registry cannot be merged into itself.");
+        }
+        for (ToolName tool : stagedRegistry.entries.keySet()) {
+            if (entries.containsKey(tool)) {
+                throw new IllegalStateException("Tool already registered: " + tool.wireName());
+            }
+        }
+        entries.putAll(stagedRegistry.entries);
+    }
+
     public Set<ToolName> tools() {
         return Set.copyOf(entries.keySet());
     }

@@ -9,7 +9,7 @@ import io.github.kardane.jarvisminecraft.paper.chat.PaperChatListener;
 import io.github.kardane.jarvisminecraft.paper.platform.BukkitPaperPlatformAccess;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperPlatformAccess;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperServerScheduler;
-import io.github.kardane.jarvisminecraft.paper.tools.PaperToolService;
+import io.github.kardane.jarvisminecraft.paper.integrations.IntegrationRegistry;
 import io.github.kardane.jarvisminecraft.paper.transport.PaperBrainConnection;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -27,6 +27,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
     private PaperBrainConnection brain;
     private ChatSessionManager sessions;
     private PaperPlatformAccess platform;
+    private IntegrationRegistry integrations;
 
     @Override
     public void onEnable() {
@@ -64,8 +65,8 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         platform = new BukkitPaperPlatformAccess(getServer());
         ServerScheduler serverScheduler = new PaperServerScheduler(this);
 
-        ToolRegistry registry = new ToolRegistry();
-        new PaperToolService(platform, clock).register(registry);
+        integrations = IntegrationRegistry.create(getServer(), platform, clock, getLogger());
+        ToolRegistry registry = integrations.toolRegistry();
 
         CommonRuntime commonRuntime = new CommonRuntime(
             registry,
@@ -80,6 +81,8 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             Bukkit.getMinecraftVersion(),
             ADAPTER_VERSION,
             Bukkit.getBukkitVersion(),
+            registry.tools(),
+            integrations.capabilities(Bukkit.getMinecraftVersion()),
             clock,
             commonRuntime,
             serverScheduler,
@@ -117,6 +120,10 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         if (brain != null) {
             brain.stop();
             brain = null;
+        }
+        if (integrations != null) {
+            integrations.close();
+            integrations = null;
         }
     }
 
