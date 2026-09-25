@@ -291,11 +291,15 @@ public final class CoreProtectHistoryProvider implements AutoCloseable {
         CompletableFuture<ToolResult> result = new CompletableFuture<>();
         AtomicReference<Future<?>> taskReference = new AtomicReference<>();
         ScheduledFuture<?> timeout = timeoutScheduler.schedule(() -> {
-            Future<?> task = taskReference.get();
-            if (task != null) {
-                task.cancel(true);
+            boolean timedOut = result.complete(
+                error(ErrorCode.TIMEOUT, "CoreProtect history query timed out.", true)
+            );
+            if (timedOut) {
+                Future<?> task = taskReference.get();
+                if (task != null) {
+                    task.cancel(true);
+                }
             }
-            result.complete(error(ErrorCode.TIMEOUT, "CoreProtect history query timed out.", true));
         }, timeoutMillis, TimeUnit.MILLISECONDS);
 
         try {
