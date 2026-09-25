@@ -1,3 +1,4 @@
+import { PROTOCOL_LIMITS } from "../generated/contract-constants.js";
 import { CoreError } from "./errors.js";
 import type {
   CapabilitySnapshot,
@@ -99,9 +100,9 @@ export function resolveActiveTools(
   snapshot: CapabilitySnapshot,
 ): readonly ToolDescriptor[] {
   if (
-    snapshot.limits.maxMessageBytes !== 65_536 ||
-    snapshot.limits.maxToolCallsPerRequest !== 8 ||
-    snapshot.limits.maxModelRoundTripsPerRequest !== 4
+    snapshot.limits.maxMessageBytes !== PROTOCOL_LIMITS.maxMessageBytes ||
+    snapshot.limits.maxToolCallsPerRequest !== PROTOCOL_LIMITS.maxToolCallsPerRequest ||
+    snapshot.limits.maxModelRoundTripsPerRequest !== PROTOCOL_LIMITS.maxModelRoundTripsPerRequest
   ) {
     throw new CoreError("INVALID_ARGUMENT", "Adapter capability limits do not match protocol 1.0.");
   }

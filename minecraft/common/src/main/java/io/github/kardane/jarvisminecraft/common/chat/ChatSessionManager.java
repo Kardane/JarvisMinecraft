@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.common.chat;
 
+import io.github.kardane.jarvisminecraft.common.generated.GeneratedContractConstants;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -12,7 +13,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public final class ChatSessionManager {
-    public static final long TTL_MILLIS = 120_000L;
+    public static final long TTL_MILLIS = GeneratedContractConstants.SESSION_TTL_MILLIS;
 
     private static final Pattern INVOCATION = Pattern.compile(
         "^(?:(?i:jarvis)|자비스|재비스)(?=$|[\\s,:;.!?。！？])"

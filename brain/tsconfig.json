@@ -10,7 +10,8 @@
     "exactOptionalPropertyTypes": true,
     "declaration": true,
     "sourceMap": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "esModuleInterop": true
   },
   "include": [
     "src/**/*.ts"

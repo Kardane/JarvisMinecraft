@@ -55,6 +55,41 @@ test("rejects WebSocket upgrade without the configured shared secret", async () 
   }
 });
 
+test("canonical schema rejects unknown protocol fields before activation", async () => {
+  const fixture = await createFixture(new FakeModel(async () => finalStep("ok")));
+  const client = await openSocket(fixture.url, SECRET);
+  try {
+    const closed = waitForClose(client);
+    client.send(JSON.stringify({
+      protocolVersion: "1.0",
+      type: "hello",
+      messageId: uuid(nextId()),
+      requestId: null,
+      serverId: "schema-reject",
+      sessionId: null,
+      requesterUuid: null,
+      sentAt: nowIso(),
+      deadlineAt: null,
+      payload: {
+        side: "adapter",
+        adapterInstanceId: uuid(nextId()),
+        platform: "paper",
+        minecraftVersion: "1.21.8",
+        adapterVersion: "test",
+        platformVersion: "test",
+      },
+      unexpected: true,
+    }));
+
+    const result = await closed;
+    assert.equal(result.code, 1008);
+    assert.deepEqual(fixture.server.health().activeServers, []);
+  } finally {
+    try { client.close(); } catch {}
+    await fixture.close();
+  }
+});
+
 test("activates only after hello + capabilities and returns requester-bound response", async () => {
   const fixture = await createFixture(new FakeModel(async () => finalStep("pong")));
   const client = await openSocket(fixture.url, SECRET);
@@ -133,12 +168,12 @@ test("bridges Tool request/result through the real WebSocket transport", async (
         result: {
           status: "OK",
           data: {
-            tps: {
-              value: 19.9,
-              unit: "tps",
-              observedAt: nowIso(),
-              source: "TestAdapter",
-            },
+            tps: metric(19.9, "tps", 60_000),
+            mspt: metric(50.0, "ms"),
+            onlinePlayers: metric(2, "players"),
+            loadedChunks: metric(42, "chunks"),
+            memoryUsedBytes: metric(256_000_000, "bytes"),
+            memoryMaxBytes: metric(1_024_000_000, "bytes"),
           },
           error: null,
           observedAt: nowIso(),
@@ -534,6 +569,16 @@ function nowIso() {
 
 function finalStep(text) {
   return { kind: "final", text, sessionState: "CONTINUE" };
+}
+
+function metric(value, unit, windowMs = null) {
+  return {
+    value,
+    unit,
+    windowMs,
+    observedAt: nowIso(),
+    source: "TestAdapter",
+  };
 }
 
 function sleep(ms) {

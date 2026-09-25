@@ -1,9 +1,10 @@
+import { PROTOCOL_LIMITS, RUNTIME_POLICY } from "../generated/contract-constants.js";
 import { CoreError } from "./errors.js";
 
 export class RequestBudget {
-  static readonly MAX_TOOL_CALLS = 8;
-  static readonly MAX_MODEL_ROUNDS = 4;
-  static readonly MAX_REQUEST_MS = 30_000;
+  static readonly MAX_TOOL_CALLS = PROTOCOL_LIMITS.maxToolCallsPerRequest;
+  static readonly MAX_MODEL_ROUNDS = PROTOCOL_LIMITS.maxModelRoundTripsPerRequest;
+  static readonly MAX_REQUEST_MS = RUNTIME_POLICY.requestDeadlineMs;
 
   readonly deadlineMs: number;
   #toolCalls = 0;

@@ -1,3 +1,4 @@
+import { RUNTIME_POLICY } from "../generated/contract-constants.js";
 import { CoreError } from "./errors.js";
 import type {
   ActorBinding,
@@ -21,13 +22,13 @@ export interface AcceptedSession {
 }
 
 export class SessionStore {
-  static readonly DEFAULT_TTL_MS = 120_000;
+  static readonly DEFAULT_TTL_MS = RUNTIME_POLICY.sessionTtlMs;
   static readonly MAX_HISTORY_ENTRIES = 32;
 
   readonly #ttlMs: number;
   readonly #sessions = new Map<string, SessionRecord>();
 
-  constructor(ttlMs = SessionStore.DEFAULT_TTL_MS) {
+  constructor(ttlMs: number = SessionStore.DEFAULT_TTL_MS) {
     if (!Number.isFinite(ttlMs) || ttlMs < 1) {
       throw new Error("Session TTL must be positive.");
     }

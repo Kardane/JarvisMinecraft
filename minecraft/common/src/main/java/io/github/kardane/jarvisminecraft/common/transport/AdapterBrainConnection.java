@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.common.transport;
 
+import io.github.kardane.jarvisminecraft.common.generated.GeneratedContractConstants;
 import io.github.kardane.jarvisminecraft.common.protocol.Protocol;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolCodec;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
@@ -134,7 +135,7 @@ public final class AdapterBrainConnection {
         }
 
         Instant sentAt = clock.instant();
-        Instant deadlineAt = sentAt.plusSeconds(30);
+        Instant deadlineAt = sentAt.plusMillis(GeneratedContractConstants.REQUEST_DEADLINE_MILLIS);
         UUID requestId = UUID.randomUUID();
         ProtocolMessage message = new ProtocolMessage(
             Protocol.VERSION,
@@ -305,7 +306,11 @@ public final class AdapterBrainConnection {
             new ProtocolMessage.Capabilities(
                 capabilities,
                 activeTools.stream().sorted(java.util.Comparator.comparing(ToolName::wireName)).toList(),
-                new ProtocolMessage.Limits(Protocol.MAX_MESSAGE_BYTES, 8, 4)
+                new ProtocolMessage.Limits(
+                    Protocol.MAX_MESSAGE_BYTES,
+                    Protocol.MAX_TOOL_CALLS_PER_REQUEST,
+                    Protocol.MAX_MODEL_ROUND_TRIPS_PER_REQUEST
+                )
             ),
             null,
             null

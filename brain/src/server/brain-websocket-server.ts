@@ -7,6 +7,8 @@ import {
 } from "ws";
 
 import type { BrainCore } from "../core/brain-core.js";
+import { PROTOCOL_LIMITS, PROTOCOL_VERSION } from "../generated/contract-constants.js";
+import { assertProtocolMessage } from "../protocol/schema-validator.js";
 import type {
   CapabilitySnapshot,
   ChatMessageEnvelope,
@@ -21,11 +23,6 @@ import type {
   BrainServerObserver,
   BrainWebSocketServerOptions,
 } from "./types.js";
-
-const MAX_MESSAGE_BYTES = 65_536;
-const SERVER_ID = /^[A-Za-z0-9._-]{1,64}$/;
-const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 interface ConnectionState {
   readonly socket: WebSocket;
@@ -98,7 +95,7 @@ export class BrainWebSocketServer {
           host: this.#host,
           port: this.#port,
           path: this.#path,
-          maxPayload: MAX_MESSAGE_BYTES,
+          maxPayload: PROTOCOL_LIMITS.maxMessageBytes,
           perMessageDeflate: false,
           verifyClient: (info, done) => this.#authenticate(info, done),
         });
@@ -208,7 +205,7 @@ export class BrainWebSocketServer {
         return;
       }
       const text = rawToText(raw);
-      if (new TextEncoder().encode(text).byteLength > MAX_MESSAGE_BYTES) {
+      if (new TextEncoder().encode(text).byteLength > PROTOCOL_LIMITS.maxMessageBytes) {
         this.#closeConnection(state, 1009, "message too large");
         return;
       }
@@ -253,15 +250,15 @@ export class BrainWebSocketServer {
     if (state.closed) {
       return;
     }
-    const message = requireObject(raw, "protocol message");
-    validateCommonEnvelope(message);
+    assertProtocolMessage(raw);
+    const message = raw;
 
     if (state.serverId === null) {
       await this.#handleHello(state, message);
       return;
     }
 
-    const serverId = requireString(message, "serverId", 1, 64);
+    const serverId = message.serverId as string;
     if (serverId !== state.serverId) {
       throw new Error("serverId does not match authenticated connection.");
     }
@@ -271,7 +268,7 @@ export class BrainWebSocketServer {
       return;
     }
 
-    const type = requireString(message, "type", 1, 64);
+    const type = message.type;
     switch (type) {
       case "chat.message":
         await this.#handleChat(state, parseChatMessage(message));
@@ -298,33 +295,18 @@ export class BrainWebSocketServer {
     state: ConnectionState,
     message: JsonObject,
   ): Promise<void> {
-    if (requireString(message, "type", 1, 64) !== "hello") {
+    if (message.type !== "hello") {
       throw new Error("Adapter hello must be the first protocol message.");
     }
-    const serverId = requireString(message, "serverId", 1, 64);
-    if (!SERVER_ID.test(serverId)) {
-      throw new Error("Adapter serverId is invalid.");
-    }
-
-    requireNull(message, "requestId");
-    requireNull(message, "sessionId");
-    requireNull(message, "requesterUuid");
-    requireNullOrMissing(message, "deadlineAt");
-
-    const payload = requireObject(message.payload, "hello payload");
-    if (requireString(payload, "side", 1, 16) !== "adapter") {
+    const serverId = message.serverId as string;
+    const payload = message.payload as JsonObject;
+    if (payload.side !== "adapter") {
       throw new Error("Hello side must be adapter.");
     }
-    const platform = requireString(payload, "platform", 1, 32);
-    if (!["paper", "fabric", "neoforge"].includes(platform)) {
-      throw new Error("Adapter platform is unsupported.");
-    }
-    if (requireString(payload, "minecraftVersion", 1, 32) !== "1.21.8") {
+    const platform = payload.platform as string;
+    if (payload.minecraftVersion !== "1.21.8") {
       throw new Error("Adapter Minecraft version is unsupported.");
     }
-    requireUuid(payload, "adapterInstanceId");
-    requireString(payload, "adapterVersion", 1, 128);
-    requireString(payload, "platformVersion", 1, 128);
 
     state.serverId = serverId;
     state.adapter = new RemoteAdapter(
@@ -335,7 +317,7 @@ export class BrainWebSocketServer {
     );
 
     await state.adapter.send({
-      protocolVersion: "1.0",
+      protocolVersion: PROTOCOL_VERSION,
       type: "hello",
       messageId: randomUUID(),
       requestId: null,
@@ -360,15 +342,11 @@ export class BrainWebSocketServer {
     state: ConnectionState,
     message: JsonObject,
   ): Promise<void> {
-    if (requireString(message, "type", 1, 64) !== "capabilities") {
+    if (message.type !== "capabilities") {
       throw new Error("Capabilities must follow the Brain hello.");
     }
-    requireNull(message, "requestId");
-    requireNull(message, "sessionId");
-    requireNull(message, "requesterUuid");
-    requireNullOrMissing(message, "deadlineAt");
 
-    const snapshot = parseCapabilities(requireObject(message.payload, "capabilities payload"));
+    const snapshot = parseCapabilities(message.payload as JsonObject);
     const serverId = state.serverId;
     const adapter = state.adapter;
     if (serverId === null || adapter === null) {
@@ -429,25 +407,14 @@ export class BrainWebSocketServer {
     state: ConnectionState,
     message: JsonObject,
   ): void {
-    const payload = requireObject(message.payload, "cancel payload");
-    const targetRequestId = requireUuid(payload, "targetRequestId");
-    const reason = requireString(payload, "reason", 1, 64);
-    if (
-      ![
-        "CLIENT_DISCONNECTED",
-        "SESSION_ENDED",
-        "DEADLINE_EXCEEDED",
-        "OP_REVOKED",
-        "SHUTDOWN",
-      ].includes(reason)
-    ) {
-      throw new Error("Cancel reason is invalid.");
-    }
+    const payload = message.payload as JsonObject;
+    const targetRequestId = payload.targetRequestId as string;
+    const reason = payload.reason as string;
 
     const adapter = state.adapter;
     adapter?.cancelRequest(targetRequestId);
 
-    const requesterUuid = nullableString(message.requesterUuid);
+    const requesterUuid = typeof message.requesterUuid === "string" ? message.requesterUuid : null;
     if (
       requesterUuid !== null &&
       (reason === "CLIENT_DISCONNECTED" ||
@@ -469,14 +436,14 @@ export class BrainWebSocketServer {
     state: ConnectionState,
     message: JsonObject,
   ): Promise<void> {
-    const payload = requireObject(message.payload, "ping payload");
-    const nonce = requireString(payload, "nonce", 1, 128);
+    const payload = message.payload as JsonObject;
+    const nonce = payload.nonce as string;
     const adapter = state.adapter;
     if (adapter === null || state.serverId === null) {
       throw new Error("Ping arrived before Adapter activation.");
     }
     await adapter.send({
-      protocolVersion: "1.0",
+      protocolVersion: PROTOCOL_VERSION,
       type: "pong",
       messageId: randomUUID(),
       requestId: null,
@@ -550,237 +517,32 @@ export class BrainWebSocketServer {
 }
 
 function parseCapabilities(payload: JsonObject): CapabilitySnapshot {
-  const rawCapabilities = requireArray(payload, "capabilities", 64);
-  const capabilities = rawCapabilities.map((entry) => {
-    const item = requireObject(entry, "capability");
-    return {
-      name: requireString(item, "name", 1, 128),
-      source: requireString(item, "source", 1, 128),
-      version: nullableString(item.version),
-    };
-  });
-
-  const rawTools = requireArray(payload, "tools", 32);
-  const tools = rawTools.map((tool) => {
-    if (typeof tool !== "string" || tool.length < 1 || tool.length > 128) {
-      throw new Error("Capability Tool name is invalid.");
-    }
-    return tool;
-  });
-
-  const limits = requireObject(payload.limits, "capability limits");
+  const capabilities = (payload.capabilities as readonly JsonObject[]).map(
+    (item) => ({
+      name: item.name as string,
+      source: item.source as string,
+      version: typeof item.version === "string" ? item.version : null,
+    }),
+  );
+  const limits = payload.limits as JsonObject;
   return {
     capabilities,
-    tools,
+    tools: payload.tools as readonly string[],
     limits: {
-      maxMessageBytes: requireInteger(limits, "maxMessageBytes", 1, MAX_MESSAGE_BYTES),
-      maxToolCallsPerRequest: requireInteger(limits, "maxToolCallsPerRequest", 1, 64),
-      maxModelRoundTripsPerRequest: requireInteger(limits, "maxModelRoundTripsPerRequest", 1, 32),
+      maxMessageBytes: limits.maxMessageBytes as number,
+      maxToolCallsPerRequest: limits.maxToolCallsPerRequest as number,
+      maxModelRoundTripsPerRequest:
+        limits.maxModelRoundTripsPerRequest as number,
     },
   };
 }
 
 function parseChatMessage(message: JsonObject): ChatMessageEnvelope {
-  if (requireString(message, "type", 1, 64) !== "chat.message") {
-    throw new Error("Expected chat.message.");
-  }
-  const payload = requireObject(message.payload, "chat payload");
-  const mode = requireString(payload, "mode", 1, 32);
-  if (mode !== "DIRECT" && mode !== "FOLLOW_UP") {
-    throw new Error("Chat mode is invalid.");
-  }
-
-  return {
-    protocolVersion: "1.0",
-    type: "chat.message",
-    messageId: requireUuid(message, "messageId"),
-    requestId: requireUuid(message, "requestId"),
-    serverId: requireString(message, "serverId", 1, 64),
-    sessionId: requireUuid(message, "sessionId"),
-    requesterUuid: requireUuid(message, "requesterUuid"),
-    sentAt: requireDate(message, "sentAt"),
-    deadlineAt: requireDate(message, "deadlineAt"),
-    payload: {
-      requesterName: requireString(payload, "requesterName", 1, 16),
-      text: requireString(payload, "text", 1, 4_096),
-      mode,
-    },
-  };
+  return message as unknown as ChatMessageEnvelope;
 }
 
 function parseToolResult(message: JsonObject): ToolResultEnvelope {
-  if (requireString(message, "type", 1, 64) !== "tool.result") {
-    throw new Error("Expected tool.result.");
-  }
-  const payload = requireObject(message.payload, "tool result payload");
-  const result = requireObject(payload.result, "tool result");
-  const status = requireString(result, "status", 1, 32);
-  if (!["OK", "EMPTY", "ERROR", "UNSUPPORTED"].includes(status)) {
-    throw new Error("Tool result status is invalid.");
-  }
-  const truncated = result.truncated;
-  if (typeof truncated !== "boolean") {
-    throw new Error("Tool result truncated must be boolean.");
-  }
-  if (!isJsonValue(result.data) || !isJsonValue(result.error)) {
-    throw new Error("Tool result contains a non-JSON value.");
-  }
-
-  const actionId = nullableUuid(message.actionId, "actionId");
-  return {
-    protocolVersion: "1.0",
-    type: "tool.result",
-    messageId: requireUuid(message, "messageId"),
-    requestId: requireUuid(message, "requestId"),
-    serverId: requireString(message, "serverId", 1, 64),
-    sessionId: requireUuid(message, "sessionId"),
-    requesterUuid: requireUuid(message, "requesterUuid"),
-    sentAt: requireDate(message, "sentAt"),
-    deadlineAt: requireDate(message, "deadlineAt"),
-    payload: {
-      tool: requireString(payload, "tool", 1, 128) as ToolResultEnvelope["payload"]["tool"],
-      result: {
-        status: status as ToolResultEnvelope["payload"]["result"]["status"],
-        data: result.data as JsonValue | null,
-        error: result.error as ToolResultEnvelope["payload"]["result"]["error"],
-        observedAt: requireDate(result, "observedAt"),
-        source: requireString(result, "source", 1, 128),
-        truncated,
-      },
-    },
-    toolCallId: requireUuid(message, "toolCallId"),
-    actionId,
-  };
-}
-
-function validateCommonEnvelope(message: JsonObject): void {
-  if (message.protocolVersion !== "1.0") {
-    throw new Error("Unsupported protocol version.");
-  }
-  requireString(message, "type", 1, 64);
-  requireUuid(message, "messageId");
-  const serverId = requireString(message, "serverId", 1, 64);
-  if (!SERVER_ID.test(serverId)) {
-    throw new Error("Protocol serverId is invalid.");
-  }
-  requireDate(message, "sentAt");
-}
-
-function requireObject(value: unknown, field: string): JsonObject {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(field + " must be an object.");
-  }
-  if (!isJsonValue(value)) {
-    throw new Error(field + " must contain JSON values only.");
-  }
-  return value as JsonObject;
-}
-
-function requireArray(
-  object: JsonObject,
-  field: string,
-  max: number,
-): readonly JsonValue[] {
-  const value = object[field];
-  if (!Array.isArray(value) || value.length > max) {
-    throw new Error(field + " must be a bounded array.");
-  }
-  return value;
-}
-
-function requireString(
-  object: JsonObject,
-  field: string,
-  min: number,
-  max: number,
-): string {
-  const value = object[field];
-  if (typeof value !== "string" || value.length < min || value.length > max) {
-    throw new Error(field + " must be a bounded string.");
-  }
-  return value;
-}
-
-function requireInteger(
-  object: JsonObject,
-  field: string,
-  min: number,
-  max: number,
-): number {
-  const value = object[field];
-  if (!Number.isSafeInteger(value) || typeof value !== "number" || value < min || value > max) {
-    throw new Error(field + " must be a bounded integer.");
-  }
-  return value;
-}
-
-function requireUuid(object: JsonObject, field: string): string {
-  const value = requireString(object, field, 36, 36);
-  if (!UUID.test(value)) {
-    throw new Error(field + " must be a UUID.");
-  }
-  return value;
-}
-
-function nullableUuid(value: JsonValue | undefined, field: string): string | null {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  if (typeof value !== "string" || !UUID.test(value)) {
-    throw new Error(field + " must be UUID or null.");
-  }
-  return value;
-}
-
-function requireDate(object: JsonObject, field: string): string {
-  const value = requireString(object, field, 1, 64);
-  if (!Number.isFinite(Date.parse(value))) {
-    throw new Error(field + " must be a date-time.");
-  }
-  return value;
-}
-
-function requireNull(object: JsonObject, field: string): void {
-  if (object[field] !== null) {
-    throw new Error(field + " must be null.");
-  }
-}
-
-function requireNullOrMissing(object: JsonObject, field: string): void {
-  const value = object[field];
-  if (value !== null && value !== undefined) {
-    throw new Error(field + " must be null.");
-  }
-}
-
-function nullableString(value: JsonValue | undefined): string | null {
-  return typeof value === "string" ? value : null;
-}
-
-function isJsonValue(value: unknown, depth = 0): value is JsonValue {
-  if (depth > 12) {
-    return false;
-  }
-  if (
-    value === null ||
-    typeof value === "string" ||
-    typeof value === "boolean"
-  ) {
-    return true;
-  }
-  if (typeof value === "number") {
-    return Number.isFinite(value);
-  }
-  if (Array.isArray(value)) {
-    return value.length <= 1_000 && value.every((item) => isJsonValue(item, depth + 1));
-  }
-  if (typeof value === "object") {
-    const entries = Object.entries(value);
-    return entries.length <= 1_000 && entries.every(
-      ([key, item]) => key.length <= 256 && isJsonValue(item, depth + 1),
-    );
-  }
-  return false;
+  return message as unknown as ToolResultEnvelope;
 }
 
 function rawToText(raw: RawData): string {
