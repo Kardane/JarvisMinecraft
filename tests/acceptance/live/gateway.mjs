@@ -1,7 +1,5 @@
-import { timingSafeEqual, randomUUID } from "node:crypto";
-import { WebSocketServer } from "ws";
-
 import { BrainCore } from "../../../brain/dist/core/index.js";
+import { BrainWebSocketServer } from "../../../brain/dist/server/index.js";
 
 export class AcceptanceGateway {
   constructor({
@@ -10,8 +8,6 @@ export class AcceptanceGateway {
   } = {}) {
     this.port = port;
     this.secret = secret;
-    this.server = null;
-    this.connections = new Map();
     this.records = [];
     this.audit = new MemoryAudit(this.records);
     this.model = new DeterministicModel(this.records);
@@ -19,54 +15,25 @@ export class AcceptanceGateway {
       model: this.model,
       audit: this.audit,
     });
+    this.server = new BrainWebSocketServer({
+      core: this.core,
+      host: "127.0.0.1",
+      port: this.port,
+      path: "/ws",
+      sharedSecret: this.secret,
+      brainVersion: "t10-production-transport",
+      observer: {
+        onEvent: (event) => this.#acceptEvent(event),
+      },
+    });
   }
 
   async start() {
-    if (this.server !== null) return;
-    await new Promise((resolve, reject) => {
-      const server = new WebSocketServer({
-        port: this.port,
-        host: "127.0.0.1",
-        maxPayload: 65_536,
-        perMessageDeflate: false,
-        verifyClient: ({ req }, done) => {
-          const raw = req.headers["x-jarvis-secret"];
-          const supplied = Array.isArray(raw) ? raw[0] : raw;
-          done(safeSecretEquals(this.secret, supplied ?? ""));
-        },
-      });
-      const onError = (error) => {
-        server.off("listening", onListening);
-        reject(error);
-      };
-      const onListening = () => {
-        server.off("error", onError);
-        this.server = server;
-        resolve();
-      };
-      server.once("error", onError);
-      server.once("listening", onListening);
-      server.on("connection", (socket) => this.#accept(socket));
-    });
-    this.#record("gateway.started", { port: this.port });
+    await this.server.start();
   }
 
   async stop() {
-    const server = this.server;
-    if (server === null) return;
-
-    for (const state of [...this.connections.values()]) {
-      state.adapter.failPending(new Error("gateway shutdown"));
-      try {
-        state.socket.close(1001, "gateway shutdown");
-      } catch {}
-      this.core.unregisterConnection(state.connectionId);
-    }
-    this.connections.clear();
-
-    await new Promise((resolve) => server.close(() => resolve()));
-    this.server = null;
-    this.#record("gateway.stopped", {});
+    await this.server.stop();
   }
 
   async restart() {
@@ -78,8 +45,9 @@ export class AcceptanceGateway {
   async waitForActive(serverId, timeoutMs = 20_000) {
     const deadline = Date.now() + timeoutMs;
     while (Date.now() < deadline) {
-      const state = this.connections.get(serverId);
-      if (state?.active === true) return state;
+      if (this.server.health().activeServers.includes(serverId)) {
+        return;
+      }
       await sleep(100);
     }
     throw new Error("Timed out waiting for Adapter capabilities: " + serverId);
@@ -91,9 +59,8 @@ export class AcceptanceGateway {
       records: structuredClone(this.records),
       auditEvents: structuredClone(this.audit.events),
       modelCalls: this.model.calls,
-      activeServers: [...this.connections.entries()]
-        .filter(([, value]) => value.active)
-        .map(([serverId]) => serverId),
+      activeServers: [...this.server.health().activeServers],
+      productionTransport: true,
     };
   }
 
@@ -105,305 +72,39 @@ export class AcceptanceGateway {
     );
   }
 
-  #accept(socket) {
-    const state = {
-      socket,
-      connectionId: randomUUID(),
-      serverId: null,
-      active: false,
-      adapter: null,
-    };
-
-    socket.on("message", (raw, binary) => {
-      if (binary) {
-        socket.close(1003, "text only");
-        return;
-      }
-      const text = raw.toString("utf8");
-      if (Buffer.byteLength(text, "utf8") > 65_536) {
-        socket.close(1009, "message too large");
-        return;
-      }
-
-      let message;
-      try {
-        message = JSON.parse(text);
-      } catch {
-        socket.close(1007, "invalid json");
-        return;
-      }
-      void this.#onMessage(state, message);
-    });
-
-    socket.on("close", () => {
-      if (state.serverId !== null) {
-        const current = this.connections.get(state.serverId);
-        if (current === state) {
-          this.connections.delete(state.serverId);
-        }
-      }
-      state.adapter?.failPending(new Error("adapter disconnected"));
-      this.core.unregisterConnection(state.connectionId);
-      this.#record("adapter.disconnected", {
-        serverId: state.serverId,
-        connectionId: state.connectionId,
-      });
-    });
-
-    socket.on("error", (error) => {
-      this.#record("adapter.socket_error", {
-        serverId: state.serverId,
-        message: safeError(error),
-      });
-    });
-  }
-
-  async #onMessage(state, message) {
-    this.#record("inbound." + String(message.type), {
-      serverId: message.serverId ?? state.serverId,
-      requesterUuid: message.requesterUuid ?? null,
-      requestId: message.requestId ?? null,
-      sessionId: message.sessionId ?? null,
-      payload: safePayload(message),
-    });
-
-    if (state.serverId === null) {
-      if (
-        message.protocolVersion !== "1.0" ||
-        message.type !== "hello" ||
-        message.payload?.side !== "adapter" ||
-        typeof message.serverId !== "string"
-      ) {
-        state.socket.close(1008, "expected adapter hello");
-        return;
-      }
-
-      state.serverId = message.serverId;
-      state.adapter = new RemoteAdapter(this, state);
-      const old = this.connections.get(state.serverId);
-      if (old !== undefined) {
-        try {
-          old.socket.close(1000, "replaced");
-        } catch {}
-      }
-      this.connections.set(state.serverId, state);
-
-      await state.adapter.send({
-        protocolVersion: "1.0",
-        type: "hello",
-        messageId: randomUUID(),
-        requestId: null,
-        serverId: state.serverId,
-        sessionId: null,
-        requesterUuid: null,
-        sentAt: new Date().toISOString(),
-        deadlineAt: null,
-        payload: {
-          side: "brain",
-          brainInstanceId: randomUUID(),
-          brainVersion: "t10-acceptance",
-          accepted: true,
-        },
-      });
-      return;
-    }
-
-    if (message.serverId !== state.serverId) {
-      state.socket.close(1008, "serverId mismatch");
-      return;
-    }
-
-    if (!state.active) {
-      if (message.type !== "capabilities") {
-        state.socket.close(1008, "expected capabilities");
-        return;
-      }
-      const snapshot = capabilitySnapshot(message.payload);
-      this.core.registerConnection({
-        connectionId: state.connectionId,
-        serverId: state.serverId,
-        adapter: state.adapter,
-        capabilities: snapshot,
-      });
-      state.active = true;
-      this.#record("adapter.active", {
-        serverId: state.serverId,
-        tools: snapshot.tools,
-      });
-      return;
-    }
-
-    switch (message.type) {
-      case "chat.message": {
-        state.adapter.markActor(message.requesterUuid);
-        void this.core
-          .handleChat(state.connectionId, message)
-          .then((outcome) => {
-            this.#record("core.outcome", {
-              serverId: state.serverId,
-              requesterUuid: message.requesterUuid,
-              requestId: message.requestId,
-              outcome,
-            });
-          })
-          .catch((error) => {
-            this.#record("core.failure", {
-              serverId: state.serverId,
-              requestId: message.requestId,
-              message: safeError(error),
-            });
-          });
-        break;
-      }
-      case "tool.result":
-        state.adapter.acceptToolResult(message);
-        break;
-      case "cancel":
-        if (
-          message.payload?.reason === "OP_REVOKED" ||
-          message.payload?.reason === "CLIENT_DISCONNECTED" ||
-          message.payload?.reason === "SESSION_ENDED"
-        ) {
-          state.adapter.invalidateActor(message.requesterUuid);
-          if (message.requesterUuid) {
-            this.core.invalidateActor(
-              state.serverId,
-              message.requesterUuid,
-            );
-          }
-        }
-        break;
-      case "ping":
-        await state.adapter.send({
-          protocolVersion: "1.0",
-          type: "pong",
-          messageId: randomUUID(),
-          requestId: null,
-          serverId: state.serverId,
-          sessionId: null,
-          requesterUuid: null,
-          sentAt: new Date().toISOString(),
-          deadlineAt: null,
-          payload: { nonce: message.payload?.nonce ?? "invalid" },
-        });
-        break;
-      case "error":
-      case "pong":
-        break;
-      default:
-        state.socket.close(1008, "unexpected message");
-    }
-  }
-
-  #record(kind, data) {
-    this.records.push({
-      at: new Date().toISOString(),
+  #acceptEvent(event) {
+    const kind = normalizeEventKind(event.kind);
+    const details = structuredClone(event.details ?? {});
+    const record = {
+      at: event.at,
       kind,
-      ...data,
-    });
+      serverId: event.serverId,
+      connectionId: event.connectionId,
+      requestId: event.requestId,
+      ...details,
+    };
+    if (event.kind === "chat.message") {
+      record.payload = {
+        requesterUuid: details.requesterUuid ?? null,
+        mode: details.mode ?? null,
+      };
+    }
+    this.records.push(record);
   }
 }
 
-class RemoteAdapter {
-  constructor(gateway, state) {
-    this.gateway = gateway;
-    this.state = state;
-    this.actors = new Set();
-    this.pending = new Map();
-  }
-
-  markActor(uuid) {
-    if (typeof uuid === "string") this.actors.add(uuid);
-  }
-
-  invalidateActor(uuid) {
-    if (typeof uuid === "string") this.actors.delete(uuid);
-  }
-
-  async isCurrentOperator(binding) {
-    return (
-      this.state.active &&
-      this.state.serverId === binding.serverId &&
-      this.actors.has(binding.requesterUuid)
-    );
-  }
-
-  async executeTool(request) {
-    if (!this.state.active) throw new Error("adapter not active");
-    const key = request.toolCallId;
-    if (this.pending.has(key)) throw new Error("duplicate toolCallId");
-
-    const deadline = Date.parse(request.deadlineAt);
-    const timeoutMs = Math.max(1, deadline - Date.now());
-    const result = new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(key);
-        reject(new Error("tool result timeout"));
-      }, timeoutMs);
-      this.pending.set(key, {
-        resolve: (message) => {
-          clearTimeout(timer);
-          resolve(message);
-        },
-        reject: (error) => {
-          clearTimeout(timer);
-          reject(error);
-        },
-      });
-    });
-
-    this.gateway.records.push({
-      at: new Date().toISOString(),
-      kind: "outbound.tool.request",
-      serverId: request.serverId,
-      requesterUuid: request.requesterUuid,
-      requestId: request.requestId,
-      tool: request.payload.tool,
-      toolCallId: request.toolCallId,
-      actionId: request.actionId,
-      arguments: structuredClone(request.payload.arguments),
-    });
-    await this.send(request);
-    return await result;
-  }
-
-  async deliverResponse(response) {
-    this.gateway.records.push({
-      at: new Date().toISOString(),
-      kind: "outbound.chat.response",
-      serverId: response.serverId,
-      requesterUuid: response.requesterUuid,
-      requestId: response.requestId,
-      text: response.payload.text,
-    });
-    await this.send(response);
-  }
-
-  acceptToolResult(message) {
-    const pending = this.pending.get(message.toolCallId);
-    if (pending === undefined) return;
-    this.pending.delete(message.toolCallId);
-    pending.resolve(message);
-  }
-
-  failPending(error) {
-    for (const pending of this.pending.values()) {
-      pending.reject(error);
-    }
-    this.pending.clear();
-  }
-
-  async send(message) {
-    if (this.state.socket.readyState !== 1) {
-      throw new Error("adapter WebSocket is not open");
-    }
-    const raw = JSON.stringify(message);
-    await new Promise((resolve, reject) => {
-      this.state.socket.send(raw, (error) => {
-        if (error) reject(error);
-        else resolve();
-      });
-    });
+function normalizeEventKind(kind) {
+  switch (kind) {
+    case "chat.message":
+      return "inbound.chat.message";
+    case "tool.request":
+      return "outbound.tool.request";
+    case "tool.result":
+      return "inbound.tool.result";
+    case "chat.response":
+      return "outbound.chat.response";
+    default:
+      return kind;
   }
 }
 
@@ -589,86 +290,12 @@ class DeterministicModel {
   }
 }
 
-function capabilitySnapshot(payload) {
-  if (
-    payload === null ||
-    typeof payload !== "object" ||
-    !Array.isArray(payload.capabilities) ||
-    !Array.isArray(payload.tools)
-  ) {
-    throw new Error("Invalid capabilities payload");
-  }
-  return {
-    capabilities: payload.capabilities.map((item) => ({
-      name: String(item.name),
-      source: String(item.source),
-      version: item.version === null ? null : String(item.version),
-    })),
-    tools: payload.tools.map(String),
-    limits: {
-      maxMessageBytes: Number(payload.limits?.maxMessageBytes),
-      maxToolCallsPerRequest: Number(payload.limits?.maxToolCallsPerRequest),
-      maxModelRoundTripsPerRequest: Number(payload.limits?.maxModelRoundTripsPerRequest),
-    },
-  };
-}
-
-function safeSecretEquals(expected, supplied) {
-  const left = Buffer.from(expected, "utf8");
-  const right = Buffer.from(supplied, "utf8");
-  if (left.length !== right.length) return false;
-  return timingSafeEqual(left, right);
-}
-
-function safePayload(message) {
-  if (message.type === "hello") {
-    return {
-      side: message.payload?.side ?? null,
-      platform: message.payload?.platform ?? null,
-      minecraftVersion: message.payload?.minecraftVersion ?? null,
-    };
-  }
-  if (message.type === "capabilities") {
-    return {
-      tools: Array.isArray(message.payload?.tools)
-        ? [...message.payload.tools]
-        : [],
-    };
-  }
-  if (message.type === "chat.message") {
-    return {
-      requesterName: message.payload?.requesterName ?? null,
-      text: message.payload?.text ?? null,
-      mode: message.payload?.mode ?? null,
-    };
-  }
-  if (message.type === "tool.result") {
-    return {
-      tool: message.payload?.tool ?? null,
-      status: message.payload?.result?.status ?? null,
-      source: message.payload?.result?.source ?? null,
-      observedAt: message.payload?.result?.observedAt ?? null,
-      truncated: message.payload?.result?.truncated ?? null,
-      data: message.payload?.result?.data ?? null,
-    };
-  }
-  if (message.type === "cancel") {
-    return {
-      reason: message.payload?.reason ?? null,
-      targetRequestId: message.payload?.targetRequestId ?? null,
-    };
-  }
-  return {};
-}
 
 function extractTarget(text) {
   const direct = text.match(/([A-Za-z0-9_]{1,16})(?:한테|에게|\s+어디|\s+위치|\s+좌표)/);
   return direct?.[1] ?? null;
 }
 
-function safeError(error) {
-  return error instanceof Error ? error.message.slice(0, 200) : "unknown";
-}
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
