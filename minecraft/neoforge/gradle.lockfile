@@ -45,6 +45,7 @@ io.netty:netty-common:4.1.118.Final=compileClasspath,neoFormRuntimeDependenciesC
 io.netty:netty-handler:4.1.118.Final=compileClasspath,neoFormRuntimeDependenciesCompileClasspath,neoFormRuntimeDependenciesRuntimeClasspath
 io.netty:netty-resolver:4.1.118.Final=compileClasspath,neoFormRuntimeDependenciesCompileClasspath,neoFormRuntimeDependenciesRuntimeClasspath
 io.netty:netty-transport-classes-epoll:4.1.118.Final=compileClasspath,neoFormRuntimeDependenciesCompileClasspath,neoFormRuntimeDependenciesRuntimeClasspath
+io.netty:netty-transport-native-epoll:4.1.118.Final=neoFormRuntimeDependenciesRuntimeClasspath
 io.netty:netty-transport-native-unix-common:4.1.118.Final=compileClasspath,neoFormRuntimeDependenciesCompileClasspath,neoFormRuntimeDependenciesRuntimeClasspath
 io.netty:netty-transport:4.1.118.Final=compileClasspath,neoFormRuntimeDependenciesCompileClasspath,neoFormRuntimeDependenciesRuntimeClasspath
 it.unimi.dsi:fastutil:8.3.1=neoFormRuntimeExternalTools
