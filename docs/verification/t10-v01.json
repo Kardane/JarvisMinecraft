@@ -1,0 +1,112 @@
+{
+  "reportVersion": 1,
+  "date": "2026-09-25",
+  "overall": "PARTIAL",
+  "stableLiveRun": {
+    "workflow": "T10 Acceptance TEMP",
+    "runNumber": 10,
+    "runId": 36110556203,
+    "commit": "457a4fbca6c56671340f4a1ad8861c4f69ce2224",
+    "productionTransport": true,
+    "deterministic": {
+      "passed": true,
+      "tests": 10
+    },
+    "platforms": {
+      "paper": {
+        "passed": true,
+        "checks": 23,
+        "artifactId": 10852703286,
+        "chats": 41,
+        "tools": 42
+      },
+      "fabric": {
+        "passed": true,
+        "checks": 23,
+        "artifactId": 10853410459,
+        "chats": 41,
+        "tools": 42
+      },
+      "neoforge": {
+        "passed": true,
+        "checks": 23,
+        "artifactId": 10852673920,
+        "chats": 41,
+        "tools": 42
+      }
+    }
+  },
+  "performanceRun": {
+    "runId": 36110556203,
+    "productionTransport": true,
+    "paper": {
+      "baselineP95Ms": 7.46647313,
+      "loadP95Ms": 4.752270349999999,
+      "deltaMs": -2.714202780000001,
+      "status": "PASS"
+    },
+    "fabric": {
+      "baselineP95Ms": 17.887876510620117,
+      "loadP95Ms": 4.897065162658691,
+      "deltaMs": -12.990811347961426,
+      "status": "PASS"
+    },
+    "neoforge": {
+      "baselineP95Ms": 16.15185816,
+      "loadP95Ms": 11.098462180000002,
+      "deltaMs": -5.053395979999998,
+      "status": "PASS"
+    },
+    "historicalFabric": [
+      {
+        "baselineP95Ms": 50.37545776,
+        "loadP95Ms": 92.35926056,
+        "deltaMs": 41.9838028,
+        "status": "FAIL",
+        "jobId": 107974177099
+      },
+      {
+        "baselineP95Ms": 13.903421401977539,
+        "loadP95Ms": 8.052215576171875,
+        "deltaMs": -5.851205825805664,
+        "status": "PASS",
+        "jobId": 107975254865
+      }
+    ],
+    "gate": "PARTIAL_DEDICATED_HOST_REQUIRED"
+  },
+  "modelLive": {
+    "runId": 36104376507,
+    "a09": "UNVERIFIED",
+    "a10": "UNVERIFIED",
+    "openaiConfigured": false,
+    "typesafeConfigured": false
+  },
+  "acceptance": {
+    "A01": "PASS",
+    "A02": "PASS",
+    "A03": "PASS",
+    "A04": "PASS",
+    "A05": "PASS",
+    "A06": "PASS",
+    "A07": "PASS",
+    "A08": "PASS",
+    "A09": "UNVERIFIED",
+    "A10": "UNVERIFIED",
+    "A11": "PARTIAL",
+    "A12": "PASS",
+    "A13": "PASS",
+    "A14": "N/A"
+  },
+  "knownGaps": [
+    "A09 live TypeSafe credential unavailable",
+    "A10 live OpenAI and TypeSafe credentials unavailable",
+    "A11 latest three-platform production-transport run passes, but historical Fabric shared-runner outlier requires dedicated fixed-load host confirmation"
+  ],
+  "productionBrain": {
+    "status": "MERGED",
+    "pullRequest": 12,
+    "mergeCommit": "5aebf3bb5cbba4624088e455af6cc9913657f087",
+    "endpoint": "ws://127.0.0.1:8181/ws"
+  }
+}
