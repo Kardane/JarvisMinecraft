@@ -23,7 +23,7 @@ declare module "ws" {
     static readonly OPEN: number;
     readonly readyState: number;
 
-    send(data: string, callback?: (error?: Error) => void): void;
+    send(data: string, callback?: (error?: Error | null) => void): void;
     close(code?: number, reason?: string): void;
     terminate(): void;
 
@@ -58,6 +58,6 @@ declare module "ws" {
     once(event: "error", listener: (error: Error) => void): this;
     off(event: "listening", listener: () => void): this;
     off(event: "error", listener: (error: Error) => void): this;
-    close(callback: (error?: Error) => void): void;
+    close(callback: (error?: Error | null) => void): void;
   }
 }
