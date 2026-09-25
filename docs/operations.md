@@ -94,21 +94,44 @@ Queue saturation is surfaced as `AUDIT_QUEUE_FULL`. It is never silently dropped
 
 ## Startup
 
-1. Validate provider keys and the Adapter shared secret.
-2. Validate loopback bind host/port.
-3. Construct `OpsRuntime`.
-4. Inject `ops.audit` into `BrainCore`.
-5. Start the Brain transport only after configuration succeeds.
+The production Brain process is now part of the repository. It composes:
 
-Example TypeScript wiring:
+`OpsRuntime -> TypeSafeJevClassifier -> OpenAiLunaPort -> JarvisAiModel -> BrainCore -> BrainWebSocketServer`
 
-```ts
-const ops = OpsRuntime.fromEnvironment(process.env);
-const core = new BrainCore({
-  model,
-  audit: ops.audit,
-});
+Build and start it from the `brain` directory:
+
+```bash
+npm ci
+npm run build
+npm start
 ```
+
+Required environment:
+
+- `OPENAI_API_KEY`
+- `TYPESAFE_API_KEY`
+- `JARVIS_SHARED_SECRET`
+
+Optional listener settings:
+
+- `JARVIS_BRAIN_HOST` — default `127.0.0.1`, loopback only
+- `JARVIS_BRAIN_PORT` — default `8181`
+
+The production Adapter endpoint is:
+
+`ws://<loopback-host>:<port>/ws`
+
+Startup order:
+
+1. validate provider keys and the Adapter shared secret;
+2. validate loopback bind host/port;
+3. construct the rotating audit runtime;
+4. construct the pinned Jev and GPT-6 Luna clients;
+5. construct `BrainCore`;
+6. bind the authenticated WebSocket server;
+7. accept Adapter hello/capabilities handshakes.
+
+If configuration, audit construction, or socket binding fails, startup fails instead of running with a weakened policy.
 
 Do not log the raw configuration object because it contains provider credentials.
 
@@ -154,3 +177,9 @@ By default JARVIS does not send IP addresses, provider secrets, Adapter shared s
 T09 tests cover configuration rejection, secret masking, JSONL rotation/retention/total-cap behavior, queue saturation, disk failure, health, close/drain, and Brain Core fail-closed behavior for a state-changing Tool.
 
 T10 records platform/client/model live evidence separately; passing T09 mock/contract tests is not reported as external-model or Minecraft-client E2E.
+
+### WebSocket authentication
+
+Adapters connect outward to the Brain using the `X-Jarvis-Secret` header. The listener rejects an incorrect or missing secret before protocol activation. Only loopback bind hosts are allowed in v0.1.
+
+The first application message must be Adapter `hello`, followed by `capabilities`. A reconnect for the same `serverId` replaces the previous connection and invalidates its Brain session state. Binary messages, oversized payloads, protocol-version mismatches, serverId mismatches, and directionally invalid messages are closed as protocol violations.
