@@ -15,7 +15,7 @@ import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WorldInfoArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WorldInfoData;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
-import io.github.kardane.jarvisminecraft.neoforge.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAccess;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAccess.LocationSnapshot;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAccess.NearbyPlayerSnapshot;
@@ -25,7 +25,7 @@ import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAcces
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAccess.WorldSnapshot;
 import io.github.kardane.jarvisminecraft.neoforge.tools.NeoForgeToolService;
 import io.github.kardane.jarvisminecraft.neoforge.transport.NeoForgeBrainConnection;
-import io.github.kardane.jarvisminecraft.neoforge.transport.RequestBindingRegistry;
+import io.github.kardane.jarvisminecraft.common.runtime.RequestBindingRegistry;
 
 import java.net.URI;
 import java.time.Clock;

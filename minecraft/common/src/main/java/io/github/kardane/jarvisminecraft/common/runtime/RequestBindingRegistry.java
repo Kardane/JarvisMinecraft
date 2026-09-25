@@ -1,4 +1,4 @@
-package io.github.kardane.jarvisminecraft.paper.transport;
+package io.github.kardane.jarvisminecraft.common.runtime;
 
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
 

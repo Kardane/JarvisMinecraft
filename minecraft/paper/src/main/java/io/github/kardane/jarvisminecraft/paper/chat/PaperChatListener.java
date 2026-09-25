@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.paper.chat;
 
+import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperPlatformAccess;
 import io.github.kardane.jarvisminecraft.paper.transport.PaperBrainConnection;

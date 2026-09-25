@@ -5,6 +5,7 @@ import io.github.kardane.jarvisminecraft.common.protocol.ProtocolCodec;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
+import io.github.kardane.jarvisminecraft.common.runtime.RequestBindingRegistry;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.transport.BrainTransport;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperPlatformAccess;

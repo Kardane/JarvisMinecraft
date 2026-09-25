@@ -15,7 +15,7 @@ import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WorldInfoArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WorldInfoData;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
-import io.github.kardane.jarvisminecraft.fabric.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.fabric.platform.FabricPlatformAccess;
 import io.github.kardane.jarvisminecraft.fabric.platform.FabricPlatformAccess.LocationSnapshot;
 import io.github.kardane.jarvisminecraft.fabric.platform.FabricPlatformAccess.NearbyPlayerSnapshot;
@@ -25,7 +25,7 @@ import io.github.kardane.jarvisminecraft.fabric.platform.FabricPlatformAccess.Te
 import io.github.kardane.jarvisminecraft.fabric.platform.FabricPlatformAccess.WorldSnapshot;
 import io.github.kardane.jarvisminecraft.fabric.tools.FabricToolService;
 import io.github.kardane.jarvisminecraft.fabric.transport.FabricBrainConnection;
-import io.github.kardane.jarvisminecraft.fabric.transport.RequestBindingRegistry;
+import io.github.kardane.jarvisminecraft.common.runtime.RequestBindingRegistry;
 
 import java.net.URI;
 import java.time.Clock;

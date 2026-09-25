@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.neoforge.chat;
 
+import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAccess;
 import io.github.kardane.jarvisminecraft.neoforge.transport.NeoForgeBrainConnection;
