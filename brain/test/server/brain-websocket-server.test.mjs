@@ -60,7 +60,7 @@ test("activates only after hello + capabilities and returns requester-bound resp
   const client = await openSocket(fixture.url, SECRET);
   try {
     const wire = createWire(client, fixture.server, fixture.events);
-    await activate(wire, "server-a");
+    await activate(wire, "server-a", fixture.server);
 
     assert.deepEqual(fixture.server.health().activeServers, ["server-a"]);
     const requestId = uuid(601);
@@ -102,7 +102,7 @@ test("bridges Tool request/result through the real WebSocket transport", async (
   const client = await openSocket(fixture.url, SECRET);
   try {
     const wire = createWire(client, fixture.server, fixture.events);
-    await activate(wire, "server-tools");
+    await activate(wire, "server-tools", fixture.server);
 
     const requestId = uuid(603);
     const sessionId = uuid(604);
@@ -165,12 +165,12 @@ test("same server reconnect replaces old socket and leaves only the new connecti
   const second = await openSocket(fixture.url, SECRET);
   try {
     const firstWire = createWire(first, fixture.server, fixture.events);
-    await activate(firstWire, "same-server");
+    await activate(firstWire, "same-server", fixture.server);
     assert.deepEqual(fixture.server.health().activeServers, ["same-server"]);
 
     const firstClosed = waitForClose(first);
     const secondWire = createWire(second, fixture.server, fixture.events);
-    await activate(secondWire, "same-server");
+    await activate(secondWire, "same-server", fixture.server);
     const close = await firstClosed;
 
     assert.equal(close.code, 1000);
@@ -190,7 +190,7 @@ test("OP_REVOKED cancel during model wait prevents a later state-changing Tool r
   const client = await openSocket(fixture.url, SECRET);
   try {
     const wire = createWire(client, fixture.server, fixture.events);
-    await activate(wire, "server-cancel");
+    await activate(wire, "server-cancel", fixture.server);
 
     const requestId = uuid(606);
     const sessionId = uuid(607);
@@ -246,7 +246,7 @@ test("serverId mismatch after authentication closes the connection", async () =>
   const client = await openSocket(fixture.url, SECRET);
   try {
     const wire = createWire(client, fixture.server, fixture.events);
-    await activate(wire, "bound-server");
+    await activate(wire, "bound-server", fixture.server);
 
     const closed = waitForClose(client);
     wire.send(chat({
@@ -294,7 +294,7 @@ async function createFixture(model) {
   };
 }
 
-async function activate(wire, serverId) {
+async function activate(wire, serverId, server) {
   wire.send({
     protocolVersion: "1.0",
     type: "hello",
