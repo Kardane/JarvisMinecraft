@@ -8,7 +8,7 @@
 
 이 문서는 **현재 소스 구조와 책임 경계**만 설명한다. 특정 commit SHA, worktree 진행률, release gate, 일회성 테스트 결과는 기록하지 않는다. 그런 시점별 증거는 `docs/verification/`에 보존한다.
 
-규범적 제품 범위는 `Minecraft_JARVIS_WORK_SPEC.md`, wire contract는 `protocol.md`와 `protocol/schema/protocol.schema.json`, Tool 계약은 `tools.md`, 장기 설계 결정은 `docs/decisions/`을 따른다. Jev + Luna 이중 모델과 권한 경계는 [ADR-0005](decisions/0005-jev-luna-routing-authority-boundary.md)에 고정한다.
+규범적 제품 범위는 `Minecraft_JARVIS_WORK_SPEC.md`, wire contract는 `protocol.md`와 `protocol/schema/protocol.schema.json`, Tool 계약은 `tools.md`, 장기 설계 결정은 `docs/decisions/`을 따른다. Jev + Luna 이중 모델과 권한 경계는 [ADR-0005](decisions/0005-jev-luna-routing-authority-boundary.md), optional Provider 공통화 임계값은 [ADR-0006](decisions/0006-provider-abstraction-threshold.md)에 고정한다.
 
 ## 목적과 구성 요소
 
@@ -29,7 +29,7 @@ flowchart LR
 
 | 구성 요소 | 책임 | 의존 경계 |
 |---|---|---|
-| Paper Adapter | `minecraft/paper`: plugin entrypoint/config, chat session/listener, scheduler/platform access, Tool service, Brain connection, optional Provider assembly | `IntegrationRegistry`가 CoreProtect와 WorldGuard를 enabled 상태 및 WorldEdit 의존성에 따라 선택 로딩한다. Provider Tool은 성공적으로 초기화된 경우에만 원자적으로 등록하며, 외부 API 연결 실패 시 미노출한다. |
+| Paper Adapter | `minecraft/paper`: plugin entrypoint/config, chat session/listener, scheduler/platform access, Tool service, Brain connection, optional Provider assembly | `IntegrationRegistry`가 CoreProtect, WorldGuard/WorldEdit, CMI/CMILib 조합을 검사해 선택 로딩한다. Provider Tool은 staged registry에서 성공적으로 초기화된 경우에만 원자적으로 등록하며, 외부 API 연결 실패 시 미노출한다. |
 | Fabric Adapter | `minecraft/fabric`: server mod entrypoint/config, chat session/controller, scheduler/platform access, tick sampler, Tool service, Brain connection | Fabric server API에 한정한다. 클라이언트 전용 API에 의존하지 않는다. |
 | NeoForge Adapter | `minecraft/neoforge`: dedicated server mod entrypoint/config, chat session/controller, scheduler/platform access, tick sampler, Tool service, Brain connection | NeoForge dedicated server API를 사용한다. |
 | Common Java | `minecraft/common`: protocol DTO/codec, shared chat/request binding state, `AdapterBrainConnection`, standard Tool orchestration, deadline, deduplication ledger, requester authority, Tool registry, scheduler SPI, shared-secret WebSocket transport | Minecraft 플랫폼 API를 import하지 않는다. |
@@ -96,6 +96,17 @@ wire 구조와 고정 protocol limit은 `protocol/schema/protocol.schema.json`�
 - T10 v0.1 acceptance snapshot: [`verification/T10_V01_REPORT.md`](verification/T10_V01_REPORT.md)
 - 2026-09-25 로컬 검증 snapshot: [`verification/2026-09-25_LOCAL_VALIDATION.md`](verification/2026-09-25_LOCAL_VALIDATION.md)
 - 새 검증은 기존 snapshot을 수정해 현재 상태처럼 만들지 말고, 날짜·작업 범위가 드러나는 새 문서로 추가한다.
+
+## Optional Provider 실행 모델
+
+Paper optional Provider는 공통 Tool registry에 연결되지만 실행 모델까지 하나로 통합하지 않는다.
+
+- **CoreProtect**: blocking history API를 bounded worker/queue에서 실행하며 timeout과 requester/session/query에 binding된 cursor snapshot을 소유한다.
+- **WorldGuard**: Paper가 보장하는 server execution context에서 synchronous read-only query를 수행하고 bounded DTO로 변환한다.
+- **CMI**: 온라인 플레이어의 제한된 profile 정보를 synchronous read-only API로 조회한다.
+- **IntegrationRegistry**: optional API linkage를 격리하기 위해 module entrypoint를 reflectively load한다. 각 module은 staged ToolRegistry에 먼저 등록되고 전체 초기화가 성공한 경우에만 main registry에 반영된다.
+
+따라서 현재는 Provider 공통 `BoundedAsyncExecutor`나 cursor store를 두지 않는다. 두 번째 Provider가 동일한 blocking/timeout/queue 또는 requester-bound snapshot semantics를 실제로 요구할 때만 공통 인프라를 추출한다. 구체적인 추출 조건과 reflection 유지 근거는 [ADR-0006](decisions/0006-provider-abstraction-threshold.md)을 따른다.
 
 ## 빌드와 운영
 
