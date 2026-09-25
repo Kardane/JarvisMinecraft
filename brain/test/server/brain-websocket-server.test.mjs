@@ -59,7 +59,7 @@ test("activates only after hello + capabilities and returns requester-bound resp
   const fixture = await createFixture(new FakeModel(async () => finalStep("pong")));
   const client = await openSocket(fixture.url, SECRET);
   try {
-    const wire = createWire(client);
+    const wire = createWire(client, fixture.server);
     await activate(wire, "server-a");
 
     assert.deepEqual(fixture.server.health().activeServers, ["server-a"]);
@@ -101,7 +101,7 @@ test("bridges Tool request/result through the real WebSocket transport", async (
   const fixture = await createFixture(model);
   const client = await openSocket(fixture.url, SECRET);
   try {
-    const wire = createWire(client);
+    const wire = createWire(client, fixture.server);
     await activate(wire, "server-tools");
 
     const requestId = uuid(603);
@@ -164,12 +164,12 @@ test("same server reconnect replaces old socket and leaves only the new connecti
   const first = await openSocket(fixture.url, SECRET);
   const second = await openSocket(fixture.url, SECRET);
   try {
-    const firstWire = createWire(first);
+    const firstWire = createWire(first, fixture.server);
     await activate(firstWire, "same-server");
     assert.deepEqual(fixture.server.health().activeServers, ["same-server"]);
 
     const firstClosed = waitForClose(first);
-    const secondWire = createWire(second);
+    const secondWire = createWire(second, fixture.server);
     await activate(secondWire, "same-server");
     const close = await firstClosed;
 
@@ -189,7 +189,7 @@ test("OP_REVOKED cancel during model wait prevents a later state-changing Tool r
   const fixture = await createFixture(model);
   const client = await openSocket(fixture.url, SECRET);
   try {
-    const wire = createWire(client);
+    const wire = createWire(client, fixture.server);
     await activate(wire, "server-cancel");
 
     const requestId = uuid(606);
@@ -245,7 +245,7 @@ test("serverId mismatch after authentication closes the connection", async () =>
   const fixture = await createFixture(new FakeModel(async () => finalStep("ok")));
   const client = await openSocket(fixture.url, SECRET);
   try {
-    const wire = createWire(client);
+    const wire = createWire(client, fixture.server);
     await activate(wire, "bound-server");
 
     const closed = waitForClose(client);
@@ -336,8 +336,10 @@ async function activate(wire, serverId) {
       },
     },
   });
-  await waitUntil(() => wire.serverHealth?.().activeServers?.includes(serverId) ?? true, 10);
-  await sleep(20);
+  await waitUntil(
+    () => wire.serverHealth().activeServers.includes(serverId),
+    500,
+  );
 }
 
 function chat({ serverId, requestId, sessionId, text }) {
@@ -359,7 +361,7 @@ function chat({ serverId, requestId, sessionId, text }) {
   };
 }
 
-function createWire(socket) {
+function createWire(socket, server) {
   const received = [];
   const waiters = [];
   socket.on("message", (raw, isBinary) => {
@@ -377,6 +379,9 @@ function createWire(socket) {
 
   return {
     received,
+    serverHealth() {
+      return server.health();
+    },
     send(message) {
       socket.send(JSON.stringify(message));
     },
