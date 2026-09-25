@@ -1,0 +1,91 @@
+name: T10 Model Live TEMP
+
+on:
+  push:
+    branches:
+      - codex/t10-acceptance
+
+permissions:
+  contents: read
+
+jobs:
+  model-live:
+    name: A09 A10 external model live
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TYPESAFE_API_KEY: ${{ secrets.TYPESAFE_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: brain/package-lock.json
+
+      - name: Install and build Brain
+        working-directory: brain
+        run: |
+          npm ci
+          npm run build
+
+      - name: Check live credential availability
+        id: keys
+        shell: bash
+        run: |
+          if [ -n "$OPENAI_API_KEY" ]; then
+            echo "openai=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "openai=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -n "$TYPESAFE_API_KEY" ]; then
+            echo "typesafe=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "typesafe=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "OpenAI configured: $([ -n "$OPENAI_API_KEY" ] && echo yes || echo no)"
+          echo "TypeSafe configured: $([ -n "$TYPESAFE_API_KEY" ] && echo yes || echo no)"
+
+      - name: A10 real Luna + Jev smoke
+        if: steps.keys.outputs.openai == 'true' && steps.keys.outputs.typesafe == 'true'
+        run: node evals/t05/live-models.mjs > /tmp/t10-a10.json
+
+      - name: A09 200-case real Jev evaluation
+        if: steps.keys.outputs.typesafe == 'true'
+        run: node evals/t05/run-jev-eval.mjs --output /tmp/t10-a09.json
+
+      - name: Publish non-secret evidence summary
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p tests/acceptance/out/model-live
+          if [ -f /tmp/t10-a10.json ]; then
+            jq '{
+              verifiedAt,
+              requestId,
+              jev,
+              luna,
+              firstToolCalls,
+              simulatedAdapterResult,
+              note
+            }' /tmp/t10-a10.json > tests/acceptance/out/model-live/a10.json
+          else
+            printf '{"status":"UNVERIFIED","reason":"required GitHub secrets unavailable or live smoke did not complete"}\n' > tests/acceptance/out/model-live/a10.json
+          fi
+          if [ -f /tmp/t10-a09.json ]; then
+            jq 'del(.evidence)' /tmp/t10-a09.json > tests/acceptance/out/model-live/a09-summary.json
+          else
+            printf '{"status":"UNVERIFIED","reason":"TYPESAFE_API_KEY unavailable or live evaluation did not complete"}\n' > tests/acceptance/out/model-live/a09-summary.json
+          fi
+          cat tests/acceptance/out/model-live/a10.json
+          cat tests/acceptance/out/model-live/a09-summary.json
+
+      - name: Upload non-secret live model evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: t10-model-live-evidence
+          path: tests/acceptance/out/model-live
+          if-no-files-found: error
