@@ -1,5 +1,7 @@
 # Minecraft JARVIS 통신 계약 1.0
 
+> **E14 status (2026-09-27):** 이 문서는 Remote Brain 시절의 protocol 1.0 계약을 보존하는 역사적/호환성 자료다. 현재 production runtime에는 Adapter ↔ Brain WebSocket 경계가 없으며, 권한·Tool·deadline·deduplication 정책은 JVM 내부 `EmbeddedBrain`과 `CommonRuntime`에서 직접 집행한다. 아래 wire 세부사항을 현재 운영 절차로 해석하지 않는다.
+
 작성일: 2026-09-24  
 관련 작업: T01  
 선행 기준: docs/compatibility.md, docs/Minecraft_JARVIS_WORK_SPEC.md  
@@ -376,22 +378,19 @@ Java와 TypeScript 모두 protocol/fixtures/manifest.json을 읽어 동일 fixtu
 
 T01에서 schema/fixture 구조 검증을 수행했으며, build/CI 자동화는 T02에서 연결한다.
 
-### Runtime validator와 generated contract
+### E14 이후 contract asset 상태
 
-현재 Brain production WebSocket 경계는 `protocol/schema/protocol.schema.json`에서 생성한
-TypeScript schema module을 AJV로 컴파일해 inbound/outbound wire message를 검증한다.
-field 길이, UUID/date-time 형식, enum, unknown field, Tool별 arguments/result shape 같은 구조 검증은
-이 schema에 둔다. 연결 순서, 인증된 `serverId` binding, deadline의 시간 순서, 현재 OP 여부,
-session/request binding 같은 의미 검증은 runtime 코드에 남긴다.
+E13에서 Java `ProtocolCodec`, `ProtocolMessage`, WebSocket transport와 connection binding이 제거되었고, E14에서 TypeScript Brain runtime과 AJV validator가 제거되었다.
 
-protocol version과 capabilities의 고정 limit은 schema의 `const`에서 생성한다.
-세션 TTL과 request deadline처럼 wire 형식이 아닌 제품 정책은
-`config/v0.1-policy.json`을 기준으로 생성한다. 생성 결과는 TypeScript와 Java에 commit하며,
-Brain CI의 `npm run check:contract`가 원본과 생성물이 일치하는지 확인한다.
-원본 변경 후에는 `brain/`에서 `npm run generate:contract`를 실행한다.
+`protocol/schema/protocol.schema.json`과 fixtures는 삭제하지 않고 다음 용도로 유지한다.
 
-Java `ProtocolCodec`은 현재 단계에서 제거하지 않는다. Java는 동일 fixture suite와 생성된 protocol
-constants를 소비하고, Java-side 구조/의미 검증 단순화는 wire compatibility를 유지하며 점진적으로 진행한다.
+- Remote/Embedded migration의 historical compatibility reference
+- 과거 T10 evidence 해석
+- Tool/envelope shape 회귀 분석
+- `GeneratedContractConstants.java`의 역사적 source
+
+현재 production Java path의 Tool argument 검증은 `ToolArgumentCodec`, Tool metadata는 `Protocol.ToolName`, 실제 활성 Tool은 `ToolRegistry`, authority/deadline/deduplication은 `CommonRuntime`이 담당한다.
+
 
 ## 19. T01 인계
 

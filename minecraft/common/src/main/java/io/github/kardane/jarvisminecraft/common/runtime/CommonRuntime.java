@@ -45,8 +45,8 @@ public final class CommonRuntime {
     }
 
     /**
-     * Creates a transport-neutral execution scope. The runtimeId is a process-local generation
-     * identifier used only for deduplication ownership; it is not a WebSocket connection.
+     * Creates an execution scope. The runtimeId is a process-local generation identifier used
+     * only for deduplication ownership across Embedded Brain lifecycles.
      */
     public ExecutionRuntime openRuntime(
         UUID runtimeId,

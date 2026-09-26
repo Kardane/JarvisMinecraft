@@ -1,13 +1,19 @@
-# Protocol fixtures
+# Protocol compatibility assets
 
-This directory is the language-neutral contract shared by the Java Minecraft adapters and the TypeScript Brain.
+이 디렉터리는 Remote Brain 시절의 language-neutral wire contract를 보존한다.
 
 - Schema: `schema/protocol.schema.json`
 - JSON Schema draft: 2020-12
-- Current protocol: `1.0`
-- Validators MUST enable UUID/date-time format checks and MUST NOT coerce input values.
-- Every file in `fixtures/valid/` must validate.
-- Every file in `fixtures/invalid/` must fail validation.
-- `fixtures/manifest.json` is the common test manifest consumed by both runtimes once T02 creates build/test entry points.
+- Historical protocol version: `1.0`
+- Valid/invalid fixture: `fixtures/`
 
-Schema validation is only the first gate. Runtime semantic checks defined in `docs/protocol.md` still apply, including the 64 KiB UTF-8 message limit, deadline ordering, authenticated server/session binding, active capability checks, OP revalidation, and action deduplication.
+E13/E14 이후 production runtime에는 Adapter ↔ Brain WebSocket 경계가 없다. 따라서 이 schema는 현재 JVM 내부 호출의 serialization contract가 아니라 다음 목적의 정적 자산이다.
+
+- Embedded 전환 전후 정책/Tool shape 비교
+- 과거 T10 evidence 해석
+- 회귀 분석과 migration compatibility 참고
+- contract constants의 역사적 source
+
+권한, OP 재검사, active Tool, deadline, deduplication, `OUTCOME_UNKNOWN` 같은 안전 정책은 현재 Java `CommonRuntime`과 `EmbeddedBrain`에서 직접 집행한다.
+
+새 production 기능을 추가할 때는 `ToolArgumentCodec`, `Protocol.ToolName`, Tool result model과 Embedded runtime 검증을 우선 기준으로 사용한다. 이 schema를 다시 network runtime으로 간주하지 않는다.

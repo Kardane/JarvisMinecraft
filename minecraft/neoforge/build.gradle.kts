@@ -52,7 +52,8 @@ neoForge {
             programArgument("--nogui")
             systemProperty("jarvis.t08BootSmoke", "true")
             systemProperty("jarvis.t08BootMarker", t08BootMarker.absolutePath)
-            systemProperty("jarvis.sharedSecret", "correct-horse-battery-staple")
+            systemProperty("jarvis.openaiApiKey", "t08-boot-smoke-openai")
+            systemProperty("jarvis.typesafeApiKey", "t08-boot-smoke-typesafe")
             taskBefore(prepareT08BootSmoke)
             disableIdeRun()
         }

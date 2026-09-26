@@ -103,6 +103,13 @@ public final class JarvisNeoForgeMod {
             return;
         }
 
+        if (Boolean.getBoolean("jarvis.t08BootSmoke")) {
+            writeBootSmokeMarker();
+            LOGGER.info("T08 dedicated server boot smoke OK");
+            server.halt(false);
+            return;
+        }
+
         Clock clock = Clock.systemUTC();
         NeoForgeTickSampler tickSampler = new NeoForgeTickSampler();
         NeoForgePlatformAccess platform =
@@ -159,13 +166,6 @@ public final class JarvisNeoForgeMod {
             tickSampler
         );
         runtime = next;
-
-        if (Boolean.getBoolean("jarvis.t08BootSmoke")) {
-            writeBootSmokeMarker();
-            LOGGER.info("T08 dedicated server boot smoke OK");
-            server.halt(false);
-            return;
-        }
 
         brain.start();
         LOGGER.info(
