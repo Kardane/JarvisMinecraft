@@ -74,16 +74,14 @@ public final class JarvisFabricMod implements ModInitializer {
             return;
         }
 
-        final String serverId;
         final EmbeddedBrainSettings embeddedSettings;
         try {
-            serverId = setting(
-                "jarvis.serverId",
-                "JARVIS_SERVER_ID",
-                "main"
-            );
-            embeddedSettings = new EmbeddedBrainSettings(
-                serverId,
+            embeddedSettings = EmbeddedBrainSettings.resolve(
+                setting(
+                    "jarvis.serverId",
+                    "JARVIS_SERVER_ID",
+                    ""
+                ),
                 setting(
                     "jarvis.openaiApiKey",
                     "OPENAI_API_KEY",
@@ -96,8 +94,7 @@ public final class JarvisFabricMod implements ModInitializer {
                 ),
                 Path.of(
                     "config",
-                    "jarvisminecraft",
-                    "audit"
+                    "jarvisminecraft"
                 )
             );
         } catch (RuntimeException failure) {
@@ -168,7 +165,7 @@ public final class JarvisFabricMod implements ModInitializer {
 
         LOGGER.info(
             "JARVIS Fabric enabled for serverId="
-                + serverId
+                + embeddedSettings.serverId()
                 + " with Embedded Brain."
         );
     }

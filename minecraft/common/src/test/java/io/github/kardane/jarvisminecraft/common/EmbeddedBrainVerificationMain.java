@@ -535,22 +535,73 @@ public final class EmbeddedBrainVerificationMain {
         broken.closeAsync().toCompletableFuture().join();
     }
 
-    private static void settingsContract() {
-        EmbeddedBrainSettings settings = new EmbeddedBrainSettings(
-            "main",
+    private static void settingsContract() throws Exception {
+        Path dataDirectory = Files.createTempDirectory(
+            "jarvis-e15-settings-"
+        );
+
+        EmbeddedBrainSettings first = EmbeddedBrainSettings.resolve(
+            "",
             "openai",
             "typesafe",
-            Path.of("audit")
+            dataDirectory
         );
-        require("main".equals(settings.serverId()), "Embedded server id changed.");
+        EmbeddedBrainSettings second = EmbeddedBrainSettings.resolve(
+            null,
+            "openai",
+            "typesafe",
+            dataDirectory
+        );
+
+        require(
+            first.serverId().startsWith("local-"),
+            "Auto-generated server id did not use the local prefix."
+        );
+        require(
+            first.serverId().equals(second.serverId()),
+            "Auto-generated server id was not stable across reloads."
+        );
+        require(
+            Files.readString(dataDirectory.resolve("server-id.txt")).trim()
+                .equals(first.serverId()),
+            "Auto-generated server id was not persisted."
+        );
+        require(
+            first.auditDirectory().equals(dataDirectory.resolve("audit")),
+            "Default audit directory is not platform-data/audit."
+        );
+
+        EmbeddedBrainSettings overridden = EmbeddedBrainSettings.resolve(
+            "explicit-server",
+            "openai",
+            "typesafe",
+            Files.createTempDirectory("jarvis-e15-override-")
+        );
+        require(
+            "explicit-server".equals(overridden.serverId()),
+            "Explicit server id override was not honored."
+        );
+
         try {
-            new EmbeddedBrainSettings(
-                "main",
+            EmbeddedBrainSettings.resolve(
+                "",
                 "",
                 "typesafe",
-                Path.of("audit")
+                dataDirectory
             );
             throw new AssertionError("Blank OpenAI key was accepted.");
+        } catch (IllegalArgumentException expected) {
+            // Expected.
+        }
+
+        try {
+            EmbeddedBrainSettings.resolve(
+                "invalid server id",
+                "openai",
+                "typesafe",
+                dataDirectory
+            );
+            throw new AssertionError("Invalid server id override was accepted.");
         } catch (IllegalArgumentException expected) {
             // Expected.
         }

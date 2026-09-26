@@ -44,11 +44,14 @@ public final class JarvisPaperPlugin extends JavaPlugin {
 
         saveDefaultConfig();
 
-        final String serverId = getConfig().getString("server-id", "main");
         final EmbeddedBrainSettings embeddedSettings;
         try {
-            embeddedSettings = new EmbeddedBrainSettings(
-                serverId,
+            embeddedSettings = EmbeddedBrainSettings.resolve(
+                setting(
+                    "jarvis.serverId",
+                    "JARVIS_SERVER_ID",
+                    ""
+                ),
                 setting(
                     "jarvis.openaiApiKey",
                     "OPENAI_API_KEY",
@@ -59,7 +62,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
                     "TYPESAFE_API_KEY",
                     getConfig().getString("typesafe-api-key", "")
                 ),
-                getDataFolder().toPath().resolve("audit")
+                getDataFolder().toPath()
             );
         } catch (RuntimeException failure) {
             getLogger().log(
@@ -115,7 +118,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         brain.start();
         getLogger().info(
             "JARVIS Paper enabled for serverId="
-                + serverId
+                + embeddedSettings.serverId()
                 + " with Embedded Brain."
         );
     }

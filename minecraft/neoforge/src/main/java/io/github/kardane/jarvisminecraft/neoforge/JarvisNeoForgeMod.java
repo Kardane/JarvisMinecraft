@@ -68,16 +68,14 @@ public final class JarvisNeoForgeMod {
             return;
         }
 
-        final String serverId;
         final EmbeddedBrainSettings embeddedSettings;
         try {
-            serverId = setting(
-                "jarvis.serverId",
-                "JARVIS_SERVER_ID",
-                "main"
-            );
-            embeddedSettings = new EmbeddedBrainSettings(
-                serverId,
+            embeddedSettings = EmbeddedBrainSettings.resolve(
+                setting(
+                    "jarvis.serverId",
+                    "JARVIS_SERVER_ID",
+                    ""
+                ),
                 setting(
                     "jarvis.openaiApiKey",
                     "OPENAI_API_KEY",
@@ -90,8 +88,7 @@ public final class JarvisNeoForgeMod {
                 ),
                 Path.of(
                     "config",
-                    "jarvisminecraft",
-                    "audit"
+                    "jarvisminecraft"
                 )
             );
         } catch (RuntimeException failure) {
@@ -170,7 +167,7 @@ public final class JarvisNeoForgeMod {
         brain.start();
         LOGGER.info(
             "JARVIS NeoForge enabled for serverId="
-                + serverId
+                + embeddedSettings.serverId()
                 + " with Embedded Brain."
         );
     }
