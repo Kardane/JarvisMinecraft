@@ -55,7 +55,7 @@ public final class OpenAiLunaClient implements LunaClient {
         );
     }
 
-    public OpenAiLunaClient(
+    OpenAiLunaClient(
         OpenAIClientAsync client,
         ToolArgumentCodec argumentCodec,
         Clock clock
