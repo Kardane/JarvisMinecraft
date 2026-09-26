@@ -80,10 +80,6 @@ public final class CommonRuntime {
         return new ConnectionRuntime(openRuntime(connectionId, serverId, activeTools));
     }
 
-    public Set<ToolName> registeredTools() {
-        return registry.tools();
-    }
-
     public record ToolInvocation(
         Instant sentAt,
         Instant deadlineAt,
