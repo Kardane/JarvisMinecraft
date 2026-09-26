@@ -3,7 +3,7 @@ package io.github.kardane.jarvisminecraft.paper.chat;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperPlatformAccess;
-import io.github.kardane.jarvisminecraft.paper.transport.PaperBrainConnection;
+import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.papermc.paper.event.player.ChatEvent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -25,7 +25,7 @@ public final class PaperChatListener implements Listener {
             + "'대화 끝'으로 종료하고, '!내용'은 이번 메시지만 일반 채팅으로 보냅니다.";
 
     private final ChatSessionManager sessions;
-    private final PaperBrainConnection brain;
+    private final BrainGateway brain;
     private final PaperPlatformAccess platform;
     private final ServerScheduler scheduler;
     private final PlainTextComponentSerializer plain =
@@ -33,7 +33,7 @@ public final class PaperChatListener implements Listener {
 
     public PaperChatListener(
         ChatSessionManager sessions,
-        PaperBrainConnection brain,
+        BrainGateway brain,
         PaperPlatformAccess platform,
         ServerScheduler scheduler
     ) {
