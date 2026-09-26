@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.fabric;
 
+import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
@@ -116,7 +117,7 @@ public final class JarvisFabricMod implements ModInitializer {
         String adapterVersion = modVersion("jarvisminecraft");
         String loaderVersion = modVersion("fabricloader");
 
-        FabricBrainConnection brain = new FabricBrainConnection(
+        BrainGateway brain = new FabricBrainConnection(
             config.serverId(),
             server.getVersion(),
             adapterVersion,
@@ -234,7 +235,7 @@ public final class JarvisFabricMod implements ModInitializer {
 
     private record RuntimeState(
         MinecraftServer server,
-        FabricBrainConnection brain,
+        BrainGateway brain,
         FabricChatController chat,
         ScheduledExecutorService reconnectExecutor
     ) {
