@@ -74,6 +74,15 @@ public final class ChatSessionManager {
         sessions.remove(requesterUuid);
     }
 
+    public synchronized boolean end(UUID requesterUuid, UUID sessionId) {
+        Session current = sessions.get(requesterUuid);
+        if (current == null || !current.sessionId().equals(sessionId)) {
+            return false;
+        }
+        sessions.remove(requesterUuid);
+        return true;
+    }
+
     public synchronized List<SessionHandle> pruneExpired() {
         Instant now = clock.instant();
         List<SessionHandle> removed = new ArrayList<>();
