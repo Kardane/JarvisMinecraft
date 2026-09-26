@@ -15,6 +15,7 @@ import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 
+import java.net.http.HttpClient;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
@@ -126,7 +127,14 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             sessions,
             new InMemoryConversationHistoryStore(),
             new AiRequestScheduler(aiExecutor),
-            new JdkJevClassifier(typesafeApiKey),
+            new JdkJevClassifier(
+                typesafeApiKey,
+                JdkJevClassifier.DEFAULT_ENDPOINT,
+                HttpClient.newBuilder()
+                    .executor(aiExecutor)
+                    .build(),
+                clock
+            ),
             new DeterministicRoutePolicy(),
             luna,
             audit,
@@ -242,6 +250,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     public void cancelActor(UUID requesterUuid, CancelReason reason) {
         Objects.requireNonNull(requesterUuid, "requesterUuid");
         Objects.requireNonNull(reason, "reason");
+        sessions.invalidate(requesterUuid);
         brain.cancelActor(requesterUuid);
     }
 
@@ -254,6 +263,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         Objects.requireNonNull(requesterUuid, "requesterUuid");
         Objects.requireNonNull(sessionId, "sessionId");
         Objects.requireNonNull(reason, "reason");
+        sessions.end(requesterUuid, sessionId);
         brain.cancelSession(requesterUuid, sessionId);
     }
 
@@ -305,8 +315,18 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     }
 
     private void scheduleDelivery(Runnable delivery) {
+        synchronized (this) {
+            if (!started || stopped) {
+                return;
+            }
+        }
         try {
             serverScheduler.submit(() -> {
+                synchronized (this) {
+                    if (!started || stopped) {
+                        return CompletableFuture.completedFuture(null);
+                    }
+                }
                 delivery.run();
                 return CompletableFuture.completedFuture(null);
             });
