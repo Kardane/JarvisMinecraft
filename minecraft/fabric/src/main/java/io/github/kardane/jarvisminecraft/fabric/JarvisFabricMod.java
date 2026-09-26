@@ -3,6 +3,7 @@ package io.github.kardane.jarvisminecraft.fabric;
 import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainSettings;
+import io.github.kardane.jarvisminecraft.common.brain.PackagingSmoke;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
@@ -71,6 +72,13 @@ public final class JarvisFabricMod implements ModInitializer {
                     + server.getVersion()
                     + "."
             );
+            return;
+        }
+
+        if (PackagingSmoke.requested()) {
+            PackagingSmoke.mark("Fabric");
+            LOGGER.info("E16 Fabric clean boot smoke OK");
+            server.stop(false);
             return;
         }
 

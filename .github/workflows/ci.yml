@@ -27,3 +27,43 @@ jobs:
 
       - name: Build with committed dependency locks
         run: ./gradlew build --stacktrace
+
+  e16-clean-boot:
+    name: E16 clean boot / ${{ matrix.platform }}
+    needs: java-build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - paper
+          - fabric
+          - neoforge
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Build deployable artifact
+        shell: bash
+        run: |
+          case "${{ matrix.platform }}" in
+            paper)
+              ./gradlew :minecraft:paper:jar --stacktrace
+              ;;
+            fabric)
+              ./gradlew :minecraft:fabric:remapJar --stacktrace
+              ;;
+            neoforge)
+              ./gradlew :minecraft:neoforge:jar --stacktrace
+              ;;
+          esac
+
+      - name: Boot clean server without provider keys
+        run: bash scripts/e16-boot-smoke.sh "${{ matrix.platform }}"

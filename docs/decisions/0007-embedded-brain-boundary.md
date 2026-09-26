@@ -23,6 +23,9 @@ JarvisMinecraft는 과거 Minecraft Adapter와 TypeScript Brain을 loopback WebS
 8. AI HTTPS 호출은 비동기로 수행하며 Minecraft server/tick thread에서 기다리지 않는다.
 9. 기존 Java runtime의 `ToolName`, `ToolRegistry`, `AuditSink`, `CommonRuntime`, `RequesterAuthority`, `DeadlinePolicy`, `DeduplicationLedger`, `ServerScheduler`를 재사용한다.
 10. Tool argument 검증은 하나의 Java contract parser를 공유하고 AI 전용 validator를 중복 구현하지 않는다.
+11. E16부터 공식 OpenAI Java SDK runtime은 플랫폼별 단일 artifact 안에 포함한다.
+12. SDK와 Jackson/OkHttp/Kotlin 등 SDK runtime dependency package는 JARVIS 내부 namespace로 relocation해 Minecraft 플랫폼 classpath와 격리한다.
+13. Minecraft가 제공하는 Gson은 번들하지 않고 compile-only로 유지한다.
 
 ## 유지할 정책 불변조건
 
@@ -150,6 +153,16 @@ E12 shared fixture에서 deterministic policy parity와 핵심 safety invariant�
 - E12까지 Remote/Embedded 두 경로를 유지하는 일시적 migration 비용이 발생했다.
 - Jev/Luna JVM client와 audit sink 구현이 필요하다.
 
-## 비결정 사항
+## E16 packaging 결정
 
-이 ADR은 OpenAI Java SDK의 최종 packaging 전략이나 Jev HTTP wire 세부사항을 고정하지 않는다. 해당 구현은 실제 Paper/Fabric/NeoForge classloader 검증 결과에 따라 후속 단계에서 결정한다.
+OpenAI Java SDK packaging 전략은 E16에서 확정했다.
+
+```text
+platform artifact
+  ├─ platform Adapter
+  ├─ minecraft/common Embedded Brain
+  └─ relocated OpenAI SDK runtime
+       └─ io.github.kardane.jarvisminecraft.internal.shaded.*
+```
+
+각 플랫폼 artifact는 하나의 배포 JAR/MOD로 생성하며, 정적 artifact 검사와 clean-server boot smoke로 packaging/classloader 경계를 검증한다. Jev는 JDK `HttpClient` 경로를 유지하므로 별도 third-party HTTP runtime을 추가하지 않는다.

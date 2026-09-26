@@ -1,4 +1,5 @@
-import org.gradle.api.tasks.SourceSetContainer
+import org.gradle.api.file.DuplicatesStrategy
+import org.gradle.jvm.tasks.Jar
 
 plugins {
     `java-library`
@@ -34,15 +35,15 @@ tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
 }
 
-val commonMainOutput = project(":minecraft:common")
-    .extensions
-    .getByType<SourceSetContainer>()
-    .named("main")
-    .map { it.output }
+val commonEmbeddedJar = project(":minecraft:common")
+    .tasks
+    .named<Jar>("shadowJar")
 
 tasks.jar {
-    dependsOn(":minecraft:common:classes")
-    from(commonMainOutput)
+    dependsOn(commonEmbeddedJar)
+    from(commonEmbeddedJar.map { zipTree(it.archiveFile.get().asFile) })
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    archiveFileName.set("jarvisminecraft-paper.jar")
 }
 
 val t06Verification by tasks.registering(JavaExec::class) {

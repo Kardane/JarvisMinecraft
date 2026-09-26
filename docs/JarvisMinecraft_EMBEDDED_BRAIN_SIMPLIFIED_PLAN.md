@@ -1199,6 +1199,8 @@ Node runtime 제거
 
 # Phase E15 — Config 단순화
 
+상태: **완료 (2026-09-27)**
+
 ## 실제 필수값
 
 ```text
@@ -1237,6 +1239,8 @@ JARVIS_RECONNECT_DELAY_TICKS
 ---
 
 # Phase E16 — Packaging 검증
+
+상태: **완료 (2026-09-27)**
 
 각 플랫폼 artifact가 다음을 포함해야 한다.
 
