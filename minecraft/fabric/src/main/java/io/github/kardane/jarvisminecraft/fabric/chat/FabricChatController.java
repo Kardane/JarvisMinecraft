@@ -3,7 +3,7 @@ package io.github.kardane.jarvisminecraft.fabric.chat;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.fabric.platform.FabricPlatformAccess;
-import io.github.kardane.jarvisminecraft.fabric.transport.FabricBrainConnection;
+import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 
@@ -20,7 +20,7 @@ public final class FabricChatController {
 
     private final MinecraftServer server;
     private final ChatSessionManager sessions;
-    private final FabricBrainConnection brain;
+    private final BrainGateway brain;
     private final FabricPlatformAccess platform;
     private final ServerScheduler scheduler;
     private final Logger logger;
@@ -29,7 +29,7 @@ public final class FabricChatController {
     public FabricChatController(
         MinecraftServer server,
         ChatSessionManager sessions,
-        FabricBrainConnection brain,
+        BrainGateway brain,
         FabricPlatformAccess platform,
         ServerScheduler scheduler,
         Logger logger
