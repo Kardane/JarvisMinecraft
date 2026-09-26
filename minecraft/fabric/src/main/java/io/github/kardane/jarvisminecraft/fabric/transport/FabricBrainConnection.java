@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.fabric.transport;
 
+import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftTools;
@@ -17,7 +18,7 @@ import java.util.logging.Logger;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.CancelReason;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
 
-public final class FabricBrainConnection {
+public final class FabricBrainConnection implements BrainGateway {
     public static final Set<ToolName> V01_TOOLS = StandardMinecraftTools.TOOLS;
 
     private final AdapterBrainConnection delegate;

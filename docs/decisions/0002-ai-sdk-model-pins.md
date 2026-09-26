@@ -14,6 +14,7 @@ T02/T05의 초기 기준을 다음과 같이 고정한다.
 
 - Node.js: 24 LTS
 - OpenAI JS SDK: 7.22.0
+- OpenAI Java SDK: 4.69.2 (Embedded Brain JVM bridge)
 - OpenAI model: `gpt-6-luna`
 - API: Responses API
 - reasoning effort: `medium`
@@ -64,5 +65,6 @@ T00에서는 문서와 공개 패키지/릴리스를 확인했다. 실제 API �
 - GPT-6 Luna: https://developers.openai.com/api/docs/models/gpt-6-luna
 - OpenAI function calling: https://developers.openai.com/api/docs/guides/function-calling
 - OpenAI Node SDK: https://github.com/openai/openai-node
+- OpenAI Java SDK: https://github.com/openai/openai-java
 - TypeSafe models: https://docs.typesafe.ai/models
 - TypeSafe JavaScript SDK: https://docs.typesafe.ai/sdk/javascript

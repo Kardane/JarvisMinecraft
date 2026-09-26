@@ -14,6 +14,10 @@ dependencies {
     // in production and explicit on the common verification runtime.
     compileOnly("com.google.code.gson:gson:2.11.0")
     testImplementation("com.google.code.gson:gson:2.11.0")
+
+    // E7: compile the embedded Luna bridge against the official OpenAI Java SDK.
+    // Runtime bundling/shading is intentionally deferred to the packaging phase.
+    compileOnly("com.openai:openai-java:4.69.2")
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -30,6 +34,15 @@ val t03Verification by tasks.registering(JavaExec::class) {
     systemProperty("jarvis.repoRoot", rootProject.projectDir.absolutePath)
 }
 
+val embeddedBrainVerification by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "Runs Embedded Brain E8-E10 orchestration, audit and gateway contract tests."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("io.github.kardane.jarvisminecraft.common.EmbeddedBrainVerificationMain")
+}
+
 tasks.named("check") {
     dependsOn(t03Verification)
+    dependsOn(embeddedBrainVerification)
 }

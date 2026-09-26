@@ -52,6 +52,7 @@ public final class ProtocolCodec {
         .serializeNulls()
         .registerTypeAdapter(Instant.class, new InstantJsonAdapter())
         .create();
+    private final ToolArgumentCodec toolArguments = new ToolArgumentCodec();
 
     public ProtocolMessage decode(String json) {
         if (json == null) {
@@ -316,104 +317,7 @@ public final class ProtocolCodec {
         exactFields(payload, Set.of("tool", "arguments"));
         ToolName tool = ToolName.fromWire(string(payload, "tool", 1, 64));
         JsonObject args = object(payload, "arguments");
-        return new ProtocolMessage.ToolRequest(tool, parseArguments(tool, args));
-    }
-
-    private ToolArguments parseArguments(ToolName tool, JsonObject args) {
-        return switch (tool) {
-            case GET_SERVER_STATUS -> {
-                exactFields(args, Set.of());
-                yield new NoArguments();
-            }
-            case GET_ONLINE_PLAYERS -> {
-                exactFields(args, Set.of("cursor", "limit"));
-                yield new PagingArguments(
-                    nullableString(args, "cursor", 256),
-                    integer(args, "limit", 1, 100)
-                );
-            }
-            case GET_PLAYER -> parseGetPlayerArguments(args);
-            case GET_PLAYER_LOCATION -> {
-                exactFields(args, Set.of("playerUuid"));
-                yield new PlayerUuidArguments(uuid(args, "playerUuid", false));
-            }
-            case GET_CMI_PLAYER_INFO -> {
-                exactFields(args, Set.of("playerUuid"));
-                yield new PlayerUuidArguments(uuid(args, "playerUuid", false));
-            }
-            case GET_NEARBY_PLAYERS -> {
-                exactFields(args, Set.of("center", "radius", "limit"));
-                double radius = number(args, "radius");
-                if (!(radius > 0.0 && radius <= 64.0)) {
-                    throw invalid("Nearby radius must be > 0 and <= 64.");
-                }
-                yield new NearbyArguments(
-                    parseLocation(object(args, "center")),
-                    radius,
-                    integer(args, "limit", 1, 100)
-                );
-            }
-            case GET_WORLD_INFO -> {
-                exactFields(args, Set.of("worldId"));
-                yield new WorldInfoArguments(string(args, "worldId", 1, 128));
-            }
-            case TELEPORT_STAFF -> {
-                exactFields(args, Set.of("targetPlayerUuid"));
-                yield new TeleportArguments(uuid(args, "targetPlayerUuid", false));
-            }
-            case LOOKUP_AREA_HISTORY -> {
-                exactFields(args, Set.of("center", "radius", "lookbackSeconds", "cursor", "limit"));
-                yield new AreaHistoryArguments(
-                    parseLocation(object(args, "center")),
-                    integer(args, "radius", 0, 64),
-                    integer(args, "lookbackSeconds", 1, 86_400),
-                    nullableString(args, "cursor", 256),
-                    integer(args, "limit", 1, 100)
-                );
-            }
-            case LOOKUP_PLAYER_HISTORY -> {
-                exactFields(args, Set.of("playerUuid", "lookbackSeconds", "cursor", "limit"));
-                yield new PlayerHistoryArguments(
-                    uuid(args, "playerUuid", false),
-                    integer(args, "lookbackSeconds", 1, 86_400),
-                    nullableString(args, "cursor", 256),
-                    integer(args, "limit", 1, 100)
-                );
-            }
-            case GET_REGIONS_AT_LOCATION -> {
-                exactFields(args, Set.of("location"));
-                yield new RegionsAtLocationArguments(parseLocation(object(args, "location")));
-            }
-            case GET_REGION_INFO -> {
-                exactFields(args, Set.of("worldId", "regionId"));
-                yield new RegionInfoArguments(
-                    string(args, "worldId", 1, 128),
-                    string(args, "regionId", 1, 128)
-                );
-            }
-            case CHECK_BUILD_PERMISSION -> {
-                exactFields(args, Set.of("playerUuid", "location"));
-                yield new BuildPermissionArguments(
-                    uuid(args, "playerUuid", false),
-                    parseLocation(object(args, "location"))
-                );
-            }
-        };
-    }
-
-    private ToolArguments parseGetPlayerArguments(JsonObject args) {
-        if (args.size() != 1) {
-            throw invalid("get_player requires exactly one selector.");
-        }
-        if (args.has("playerUuid")) {
-            exactFields(args, Set.of("playerUuid"));
-            return new GetPlayerByUuidArguments(uuid(args, "playerUuid", false));
-        }
-        if (args.has("exactName")) {
-            exactFields(args, Set.of("exactName"));
-            return new GetPlayerByNameArguments(string(args, "exactName", 1, 16));
-        }
-        throw invalid("get_player selector is invalid.");
+        return new ProtocolMessage.ToolRequest(tool, toolArguments.parse(tool, args));
     }
 
     private ProtocolMessage.ToolResultPayload parseToolResult(JsonObject payload) {

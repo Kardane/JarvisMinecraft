@@ -6,8 +6,9 @@ import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolArgument
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 
 import java.time.Clock;
-import java.time.Duration;
+import java.time.Instant;
 import java.util.EnumSet;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -38,105 +39,151 @@ public final class CommonRuntime {
         RequesterAuthority authority,
         Clock clock
     ) {
-        this.registry = registry;
-        this.scheduler = scheduler;
-        this.authority = authority;
-        this.deadlines = new DeadlinePolicy(clock);
+        this.registry = Objects.requireNonNull(registry, "registry");
+        this.scheduler = Objects.requireNonNull(scheduler, "scheduler");
+        this.authority = Objects.requireNonNull(authority, "authority");
+        this.deadlines = new DeadlinePolicy(Objects.requireNonNull(clock, "clock"));
         this.actions = new DeduplicationLedger(4096);
     }
 
-    public ConnectionRuntime openConnection(
-        UUID connectionId,
+    /**
+     * Creates a transport-neutral execution scope. The runtimeId is a process-local generation
+     * identifier used only for deduplication ownership; it is not a WebSocket connection.
+     */
+    public ExecutionRuntime openRuntime(
+        UUID runtimeId,
         String serverId,
         Set<ToolName> activeTools
     ) {
-        if (connectionId == null) {
-            throw new IllegalArgumentException("connectionId");
+        if (runtimeId == null) {
+            throw new IllegalArgumentException("runtimeId");
         }
         if (serverId == null || serverId.isBlank()) {
             throw new IllegalArgumentException("serverId");
         }
-        return new ConnectionRuntime(
-            connectionId,
+        Objects.requireNonNull(activeTools, "activeTools");
+        return new ExecutionRuntime(
+            runtimeId,
             serverId,
             activeTools.isEmpty() ? Set.of() : EnumSet.copyOf(activeTools)
         );
     }
 
-    public final class ConnectionRuntime {
-        private final UUID connectionId;
+    /**
+     * Remote compatibility wrapper retained while the WebSocket Brain remains a parity reference.
+     */
+    public ConnectionRuntime openConnection(
+        UUID connectionId,
+        String serverId,
+        Set<ToolName> activeTools
+    ) {
+        return new ConnectionRuntime(openRuntime(connectionId, serverId, activeTools));
+    }
+
+    public record ToolInvocation(
+        Instant sentAt,
+        Instant deadlineAt,
+        UUID requesterUuid,
+        UUID requestId,
+        UUID sessionId,
+        UUID toolCallId,
+        UUID actionId,
+        ToolName tool,
+        ToolArguments arguments
+    ) {
+        public ToolInvocation {
+            Objects.requireNonNull(sentAt, "sentAt");
+            Objects.requireNonNull(deadlineAt, "deadlineAt");
+            Objects.requireNonNull(requesterUuid, "requesterUuid");
+            Objects.requireNonNull(requestId, "requestId");
+            Objects.requireNonNull(sessionId, "sessionId");
+            Objects.requireNonNull(toolCallId, "toolCallId");
+            Objects.requireNonNull(tool, "tool");
+            Objects.requireNonNull(arguments, "arguments");
+        }
+    }
+
+    public final class ExecutionRuntime {
+        private final UUID runtimeId;
         private final String serverId;
         private final Set<ToolName> activeTools;
         private final ToolCallLedger toolCalls = new ToolCallLedger(4096);
 
-        private ConnectionRuntime(UUID connectionId, String serverId, Set<ToolName> activeTools) {
-            this.connectionId = connectionId;
+        private ExecutionRuntime(
+            UUID runtimeId,
+            String serverId,
+            Set<ToolName> activeTools
+        ) {
+            this.runtimeId = runtimeId;
             this.serverId = serverId;
             this.activeTools = Set.copyOf(activeTools);
         }
 
-        public UUID connectionId() {
-            return connectionId;
+        public UUID runtimeId() {
+            return runtimeId;
         }
 
-        public CompletionStage<ToolResult> execute(ProtocolMessage message) {
+        public String serverId() {
+            return serverId;
+        }
+
+        public Set<ToolName> activeTools() {
+            return activeTools;
+        }
+
+        public CompletionStage<ToolResult> execute(ToolInvocation invocation) {
             try {
-                if (message.type() != MessageType.TOOL_REQUEST) {
-                    throw new ProtocolException(ErrorCode.INVALID_ARGUMENT, "Expected tool.request.");
-                }
-                if (!serverId.equals(message.serverId())) {
-                    throw new ProtocolException(ErrorCode.UNAUTHORIZED, "serverId does not match connection binding.");
-                }
-                if (message.requestId() == null || message.sessionId() == null
-                    || message.requesterUuid() == null || message.toolCallId() == null) {
-                    throw new ProtocolException(ErrorCode.INVALID_ARGUMENT, "Missing Tool binding identifiers.");
-                }
+                validate(invocation);
 
-                deadlines.validate(message);
-
-                ProtocolMessage.ToolRequest request = (ProtocolMessage.ToolRequest) message.payload();
-                ToolName tool = request.tool();
-                if (tool.stateChanging() && message.actionId() == null) {
-                    throw new ProtocolException(ErrorCode.INVALID_ARGUMENT, "State-changing Tool requires actionId.");
-                }
-                if (!tool.stateChanging() && message.actionId() != null) {
-                    throw new ProtocolException(ErrorCode.INVALID_ARGUMENT, "Read-only Tool requires actionId=null.");
-                }
+                ToolName tool = invocation.tool();
                 if (!activeTools.contains(tool) || !registry.contains(tool)) {
-                    throw new ProtocolException(ErrorCode.UNSUPPORTED, "Tool is not active on this server.");
+                    throw new ProtocolException(
+                        ErrorCode.UNSUPPORTED,
+                        "Tool is not active on this server."
+                    );
                 }
 
-                if (!authority.isOnlineOperator(message.requesterUuid())) {
-                    throw new ProtocolException(ErrorCode.UNAUTHORIZED, "Requester is not a current online operator.");
+                if (!authority.isOnlineOperator(invocation.requesterUuid())) {
+                    throw new ProtocolException(
+                        ErrorCode.UNAUTHORIZED,
+                        "Requester is not a current online operator."
+                    );
                 }
 
-                ToolCallStart toolStart = toolCalls.begin(message.toolCallId());
+                ToolCallStart toolStart = toolCalls.begin(invocation.toolCallId());
                 if (toolStart.kind() == ToolCallStart.Kind.IN_FLIGHT) {
-                    return completed(error(ErrorCode.BUSY, "Tool call is already executing.", true));
+                    return completed(
+                        error(ErrorCode.BUSY, "Tool call is already executing.", true)
+                    );
                 }
                 if (toolStart.kind() == ToolCallStart.Kind.CACHED) {
                     return completed(toolStart.result());
                 }
 
                 if (tool.stateChanging()) {
-                    ActionStart actionStart = actions.beginAction(message.actionId(), connectionId);
+                    ActionStart actionStart =
+                        actions.beginAction(invocation.actionId(), runtimeId);
                     switch (actionStart.kind()) {
                         case IN_FLIGHT -> {
-                            ToolResult result = error(ErrorCode.BUSY, "Action is already executing.", true);
-                            toolCalls.complete(message.toolCallId(), result);
+                            ToolResult result =
+                                error(ErrorCode.BUSY, "Action is already executing.", true);
+                            toolCalls.complete(invocation.toolCallId(), result);
                             return completed(result);
                         }
                         case CACHED -> {
-                            toolCalls.complete(message.toolCallId(), actionStart.result());
+                            toolCalls.complete(
+                                invocation.toolCallId(),
+                                actionStart.result()
+                            );
                             return completed(actionStart.result());
                         }
                         case STALE_CONNECTION -> {
                             ToolResult result = error(
                                 ErrorCode.CANCELLED,
-                                "Action belongs to a previous connection and will not be replayed.",
+                                "Action belongs to a previous runtime generation and will not be replayed.",
                                 false
                             );
-                            toolCalls.complete(message.toolCallId(), result);
+                            toolCalls.complete(invocation.toolCallId(), result);
                             return completed(result);
                         }
                         case FRESH -> {
@@ -147,92 +194,222 @@ public final class CommonRuntime {
 
                 ToolExecutionContext context = new ToolExecutionContext(
                     serverId,
-                    connectionId,
-                    message.requesterUuid(),
-                    message.requestId(),
-                    message.sessionId(),
-                    message.toolCallId(),
-                    message.actionId(),
-                    message.deadlineAt()
+                    runtimeId,
+                    invocation.requesterUuid(),
+                    invocation.requestId(),
+                    invocation.sessionId(),
+                    invocation.toolCallId(),
+                    invocation.actionId(),
+                    invocation.deadlineAt()
                 );
 
                 CompletionStage<ToolResult> scheduled;
                 try {
-                    scheduled = scheduler.submit(() -> registry.execute(tool, context, request.arguments()));
-                } catch (RuntimeException e) {
-                    ToolResult result = error(ErrorCode.INTERNAL, "Scheduler rejected Tool execution.", false);
-                    settle(message, tool, result, ActionState.FAILED);
+                    scheduled = scheduler.submit(
+                        () -> registry.execute(
+                            tool,
+                            context,
+                            invocation.arguments()
+                        )
+                    );
+                } catch (RuntimeException failure) {
+                    ToolResult result = error(
+                        ErrorCode.INTERNAL,
+                        "Scheduler rejected Tool execution.",
+                        false
+                    );
+                    settle(invocation, result, ActionState.FAILED);
                     return completed(result);
                 }
 
-                return raceDeadline(message, tool, scheduled);
-            } catch (ProtocolException e) {
-                return completed(error(e.code(), e.getMessage(), false));
-            } catch (RuntimeException e) {
-                return completed(error(ErrorCode.INTERNAL, "Internal Tool execution failure.", false));
+                return raceDeadline(invocation, scheduled);
+            } catch (ProtocolException failure) {
+                return completed(
+                    error(failure.code(), failure.getMessage(), false)
+                );
+            } catch (RuntimeException failure) {
+                return completed(
+                    error(
+                        ErrorCode.INTERNAL,
+                        "Internal Tool execution failure.",
+                        false
+                    )
+                );
+            }
+        }
+
+        private void validate(ToolInvocation invocation) {
+            Objects.requireNonNull(invocation, "invocation");
+            deadlines.validate(invocation.sentAt(), invocation.deadlineAt());
+
+            if (invocation.tool().stateChanging() && invocation.actionId() == null) {
+                throw new ProtocolException(
+                    ErrorCode.INVALID_ARGUMENT,
+                    "State-changing Tool requires actionId."
+                );
+            }
+            if (!invocation.tool().stateChanging() && invocation.actionId() != null) {
+                throw new ProtocolException(
+                    ErrorCode.INVALID_ARGUMENT,
+                    "Read-only Tool requires actionId=null."
+                );
             }
         }
 
         private CompletionStage<ToolResult> raceDeadline(
-            ProtocolMessage message,
-            ToolName tool,
+            ToolInvocation invocation,
             CompletionStage<ToolResult> scheduled
         ) {
             CompletableFuture<ToolResult> output = new CompletableFuture<>();
-            long delay = deadlines.remainingMillis(message.deadlineAt());
+            long delay = deadlines.remainingMillis(invocation.deadlineAt());
 
             scheduled.whenComplete((result, failure) -> {
                 ToolResult terminal = failure == null
                     ? result
-                    : error(ErrorCode.INTERNAL, "Tool execution failed.", false);
-                ActionState state = terminal.status() == io.github.kardane.jarvisminecraft.common.protocol.Protocol.ResultStatus.OK
-                    || terminal.status() == io.github.kardane.jarvisminecraft.common.protocol.Protocol.ResultStatus.EMPTY
+                    : error(
+                        ErrorCode.INTERNAL,
+                        "Tool execution failed.",
+                        false
+                    );
+                ActionState state =
+                    terminal.status()
+                        == io.github.kardane.jarvisminecraft.common.protocol.Protocol.ResultStatus.OK
+                        || terminal.status()
+                        == io.github.kardane.jarvisminecraft.common.protocol.Protocol.ResultStatus.EMPTY
                     ? ActionState.SUCCEEDED
                     : ActionState.FAILED;
                 if (output.complete(terminal)) {
-                    settle(message, tool, terminal, state);
+                    settle(invocation, terminal, state);
                 }
             });
 
-            CompletableFuture.delayedExecutor(delay, TimeUnit.MILLISECONDS).execute(() -> {
-                ToolResult timeout = tool.stateChanging()
-                    ? error(
-                        ErrorCode.OUTCOME_UNKNOWN,
-                        "State-changing Tool did not produce a result before the deadline.",
-                        false
-                    )
-                    : error(ErrorCode.TIMEOUT, "Tool execution exceeded its deadline.", true);
-                if (output.complete(timeout)) {
-                    settle(
-                        message,
-                        tool,
-                        timeout,
-                        tool.stateChanging() ? ActionState.OUTCOME_UNKNOWN : ActionState.FAILED
-                    );
-                }
-            });
+            CompletableFuture.delayedExecutor(delay, TimeUnit.MILLISECONDS)
+                .execute(() -> {
+                    ToolResult timeout = invocation.tool().stateChanging()
+                        ? error(
+                            ErrorCode.OUTCOME_UNKNOWN,
+                            "State-changing Tool did not produce a result before the deadline.",
+                            false
+                        )
+                        : error(
+                            ErrorCode.TIMEOUT,
+                            "Tool execution exceeded its deadline.",
+                            true
+                        );
+                    if (output.complete(timeout)) {
+                        settle(
+                            invocation,
+                            timeout,
+                            invocation.tool().stateChanging()
+                                ? ActionState.OUTCOME_UNKNOWN
+                                : ActionState.FAILED
+                        );
+                    }
+                });
 
             return output;
         }
 
         private void settle(
-            ProtocolMessage message,
-            ToolName tool,
+            ToolInvocation invocation,
             ToolResult result,
             ActionState actionState
         ) {
-            toolCalls.complete(message.toolCallId(), result);
-            if (tool.stateChanging()) {
-                actions.completeAction(message.actionId(), connectionId, actionState, result);
+            toolCalls.complete(invocation.toolCallId(), result);
+            if (invocation.tool().stateChanging()) {
+                actions.completeAction(
+                    invocation.actionId(),
+                    runtimeId,
+                    actionState,
+                    result
+                );
             }
         }
 
         private CompletionStage<ToolResult> completed(ToolResult result) {
             return CompletableFuture.completedFuture(result);
         }
+    }
 
-        private ToolResult error(ErrorCode code, String message, boolean retryable) {
-            return ToolResult.error(code, message, retryable, deadlines.now(), COMMON_SOURCE);
+    public final class ConnectionRuntime {
+        private final ExecutionRuntime delegate;
+
+        private ConnectionRuntime(ExecutionRuntime delegate) {
+            this.delegate = delegate;
         }
+
+        public UUID connectionId() {
+            return delegate.runtimeId();
+        }
+
+        public CompletionStage<ToolResult> execute(ProtocolMessage message) {
+            try {
+                Objects.requireNonNull(message, "message");
+                if (message.type() != MessageType.TOOL_REQUEST) {
+                    throw new ProtocolException(
+                        ErrorCode.INVALID_ARGUMENT,
+                        "Expected tool.request."
+                    );
+                }
+                if (!delegate.serverId().equals(message.serverId())) {
+                    throw new ProtocolException(
+                        ErrorCode.UNAUTHORIZED,
+                        "serverId does not match connection binding."
+                    );
+                }
+                if (
+                    message.requestId() == null
+                        || message.sessionId() == null
+                        || message.requesterUuid() == null
+                        || message.toolCallId() == null
+                ) {
+                    throw new ProtocolException(
+                        ErrorCode.INVALID_ARGUMENT,
+                        "Missing Tool binding identifiers."
+                    );
+                }
+                ProtocolMessage.ToolRequest request =
+                    (ProtocolMessage.ToolRequest) message.payload();
+                return delegate.execute(
+                    new ToolInvocation(
+                        message.sentAt(),
+                        message.deadlineAt(),
+                        message.requesterUuid(),
+                        message.requestId(),
+                        message.sessionId(),
+                        message.toolCallId(),
+                        message.actionId(),
+                        request.tool(),
+                        request.arguments()
+                    )
+                );
+            } catch (ProtocolException failure) {
+                return CompletableFuture.completedFuture(
+                    error(failure.code(), failure.getMessage(), false)
+                );
+            } catch (RuntimeException failure) {
+                return CompletableFuture.completedFuture(
+                    error(
+                        ErrorCode.INTERNAL,
+                        "Internal Tool execution failure.",
+                        false
+                    )
+                );
+            }
+        }
+    }
+
+    private ToolResult error(
+        ErrorCode code,
+        String message,
+        boolean retryable
+    ) {
+        return ToolResult.error(
+            code,
+            message,
+            retryable,
+            deadlines.now(),
+            COMMON_SOURCE
+        );
     }
 }

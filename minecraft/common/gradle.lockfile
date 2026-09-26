@@ -1,6 +1,19 @@
 # This is a Gradle generated file for dependency locking.
 # Manual edits can break the build and are not advised.
 # This file is expected to be part of source control.
+com.fasterxml.jackson:jackson-bom:2.18.9=compileClasspath
+com.fasterxml.jackson.core:jackson-annotations:2.18.9=compileClasspath
+com.fasterxml.jackson.core:jackson-core:2.18.9=compileClasspath
+com.fasterxml.jackson.core:jackson-databind:2.18.9=compileClasspath
 com.google.code.gson:gson:2.11.0=compileClasspath,testCompileClasspath,testRuntimeClasspath
 com.google.errorprone:error_prone_annotations:2.27.0=compileClasspath,testCompileClasspath,testRuntimeClasspath
+com.openai:openai-java:4.69.2=compileClasspath
+com.openai:openai-java-client-okhttp:4.69.2=compileClasspath
+com.openai:openai-java-core:4.69.2=compileClasspath
+io.swagger.core.v3:swagger-annotations:2.2.31=compileClasspath
+org.jetbrains.kotlin:kotlin-stdlib-common:1.8.0=compileClasspath
+org.jetbrains.kotlin:kotlin-stdlib-jdk7:1.8.0=compileClasspath
+org.jetbrains.kotlin:kotlin-stdlib-jdk8:1.8.0=compileClasspath
+org.jetbrains.kotlin:kotlin-stdlib:1.8.0=compileClasspath
+org.jetbrains:annotations:13.0=compileClasspath
 empty=annotationProcessor,testAnnotationProcessor

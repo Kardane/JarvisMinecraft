@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.common.transport;
 
+import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.generated.GeneratedContractConstants;
 import io.github.kardane.jarvisminecraft.common.protocol.Protocol;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolCodec;
@@ -28,7 +29,7 @@ import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ErrorCo
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.MessageType;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
 
-public final class AdapterBrainConnection {
+public final class AdapterBrainConnection implements BrainGateway {
     private final String serverId;
     private final String platformId;
     private final String platformDisplayName;

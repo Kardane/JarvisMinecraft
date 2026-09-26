@@ -2,7 +2,7 @@
 
 ## Scope
 
-This document describes the v0.1 Brain operations boundary. Minecraft adapters do not store OpenAI or TypeSafe credentials.
+This document describes the v0.1 Remote Brain operations boundary and the in-progress Embedded Brain migration mode. Remote remains the default mode. In Embedded mode, provider credentials are read by the Minecraft process instead of a separate Brain process.
 
 ## Required environment
 
@@ -24,6 +24,47 @@ The fixed v0.1 policy is:
 - rollback action: disabled
 
 There is no configuration switch that disables OP-only enforcement in v0.1.
+
+## Embedded migration mode
+
+Paper, Fabric, and NeoForge currently support a temporary migration selector:
+
+```text
+remote
+embedded
+```
+
+The default remains `remote` until Remote/Embedded parity and packaging work are complete.
+
+Common selector overrides:
+
+- system property: `jarvis.brainMode`
+- environment: `JARVIS_BRAIN_MODE`
+
+Embedded mode requires:
+
+- `OPENAI_API_KEY`
+- `TYPESAFE_API_KEY`
+
+Paper also accepts `brain-mode`, `openai-api-key`, and `typesafe-api-key` in its plugin configuration, with system properties/environment taking precedence for secrets. Its Embedded audit directory is the plugin data directory under `audit/`.
+
+Fabric and NeoForge use system properties/environment for Embedded credentials. Their current migration audit directory is `config/jarvisminecraft/audit`.
+
+Embedded mode composes:
+
+```text
+ChatSessionManager
+  -> EmbeddedBrainGateway
+  -> EmbeddedBrain
+  -> Jev
+  -> DeterministicRoutePolicy
+  -> Luna
+  -> AuditSink
+  -> CommonRuntime.ExecutionRuntime
+  -> Platform Tool implementation
+```
+
+This migration mode is wired and covered by deterministic JVM verification, but it is not yet the final packaged operator experience. The OpenAI Java SDK is currently a compile-time dependency; platform artifact bundling/shading is deferred to the packaging phase. Keep Remote mode as the operational default until that work is complete.
 
 ## Audit log
 
