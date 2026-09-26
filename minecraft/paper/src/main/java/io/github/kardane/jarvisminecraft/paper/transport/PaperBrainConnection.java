@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.paper.transport;
 
+import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
@@ -19,7 +20,7 @@ import java.util.logging.Logger;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.CancelReason;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
 
-public final class PaperBrainConnection {
+public final class PaperBrainConnection implements BrainGateway {
     public static final Set<ToolName> V01_TOOLS = StandardMinecraftTools.TOOLS;
 
     private final AdapterBrainConnection delegate;
