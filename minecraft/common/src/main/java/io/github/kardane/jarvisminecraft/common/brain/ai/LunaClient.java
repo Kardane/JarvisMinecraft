@@ -3,7 +3,7 @@ package io.github.kardane.jarvisminecraft.common.brain.ai;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
 
-public interface LunaClient {
+public interface LunaClient extends AutoCloseable {
     String modelId();
 
     CompletionStage<LunaStep> next(
