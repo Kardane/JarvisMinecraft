@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.neoforge.transport;
 
+import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftTools;
@@ -17,7 +18,7 @@ import java.util.logging.Logger;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.CancelReason;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
 
-public final class NeoForgeBrainConnection {
+public final class NeoForgeBrainConnection implements BrainGateway {
     public static final Set<ToolName> V01_TOOLS = StandardMinecraftTools.TOOLS;
 
     private final AdapterBrainConnection delegate;
