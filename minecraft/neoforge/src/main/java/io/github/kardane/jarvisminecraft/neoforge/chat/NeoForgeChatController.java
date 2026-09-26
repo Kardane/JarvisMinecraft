@@ -3,7 +3,7 @@ package io.github.kardane.jarvisminecraft.neoforge.chat;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAccess;
-import io.github.kardane.jarvisminecraft.neoforge.transport.NeoForgeBrainConnection;
+import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -22,7 +22,7 @@ public final class NeoForgeChatController {
 
     private final MinecraftServer server;
     private final ChatSessionManager sessions;
-    private final NeoForgeBrainConnection brain;
+    private final BrainGateway brain;
     private final NeoForgePlatformAccess platform;
     private final ServerScheduler scheduler;
     private final Logger logger;
@@ -32,7 +32,7 @@ public final class NeoForgeChatController {
     public NeoForgeChatController(
         MinecraftServer server,
         ChatSessionManager sessions,
-        NeoForgeBrainConnection brain,
+        BrainGateway brain,
         NeoForgePlatformAccess platform,
         ServerScheduler scheduler,
         Logger logger
