@@ -110,7 +110,7 @@ Paper optional Provider는 공통 Tool registry에 연결되지만 실행 모델
 
 ## Embedded 전환 seam의 현재 상태
 
-현재 production 경로는 아직 loopback WebSocket Remote Brain을 사용한다. 다만 플랫폼 chat/controller와 entrypoint는 공통 `BrainGateway` 경계에 의존하며, 기존 `AdapterBrainConnection`과 플랫폼별 Brain connection wrapper가 이 경계를 구현한다. 따라서 후속 Embedded 구현은 채팅 계층을 다시 변경하지 않고 같은 gateway 자리에 연결할 수 있다.
+현재 기본 migration mode는 loopback WebSocket Remote Brain이다. 동시에 Paper/Fabric/NeoForge entrypoint에는 `remote | embedded` 선택 seam이 구현되어 있으며, 양쪽 모두 공통 `BrainGateway` 경계를 사용한다. Remote 경로는 parity reference로 유지하고 Embedded 경로는 `EmbeddedBrainGateway`를 통해 같은 chat/session 계층에 연결된다.
 
 Tool 입력 검증은 `ToolArgumentCodec`으로 분리되어 Remote protocol의 `ProtocolCodec`이 이를 재사용한다. 이후 Luna function-call 인자도 같은 codec을 사용하도록 연결한다. Tool metadata는 계속 `Protocol.ToolName`, 실제 활성 Tool set은 `ToolRegistry`가 소유한다.
 
@@ -120,7 +120,13 @@ E4~E7 foundation으로 `RequestBudget`, 단일 JVM 서버 범위의 `AiRequestSc
 
 Luna Tool schema는 모델 입력 품질을 위한 AI 표현 계층이고 실행 권한의 source of truth가 아니다. function arguments는 반드시 공용 `ToolArgumentCodec`으로 다시 typed parsing되며, inactive Tool은 Luna bridge에서 거부한다. OpenAI SDK는 현재 compile-time dependency로 고정되어 있고 실제 플랫폼 artifact bundling/shading은 packaging 단계에서 검증한다.
 
-이 E4~E7 객체들은 아직 production chat 경로에 조립되지 않았다. 실제 `ChatSessionManager → EmbeddedBrain → Jev → Luna → CommonRuntime` 연결은 다음 Embedded orchestration 단계의 책임이다.
+E8~E10에서 이 foundation은 실제 Embedded 요청 경로로 조립되었다. `EmbeddedBrain`은 `ChatSessionManager → AiRequestScheduler → Jev → DeterministicRoutePolicy → Luna → AuditSink → CommonRuntime.ExecutionRuntime` 흐름을 소유한다. CommonRuntime에는 transport-neutral `ToolInvocation` 경계가 추가되었고, 기존 Remote `ConnectionRuntime`은 protocol message를 이 invocation으로 변환하는 compatibility wrapper로 남아 있다.
+
+Embedded state-changing Tool은 `AuditSink.record()`가 성공한 뒤에만 `CommonRuntime`으로 내려간다. Java `AsyncJsonlAuditSink`는 bounded queue, masking, retention/size rotation, health snapshot을 제공하며 `record()`을 실제 append 성공 이후에만 true로 완료한다. post-execution audit 실패는 Tool 결과를 변경하거나 retry하지 않는다.
+
+응답 전달은 `EmbeddedBrainGateway`가 `ServerScheduler`를 통해 플랫폼 thread로 되돌린 뒤 current online OP와 active session을 다시 확인한다. cancel actor/session은 별도 Brain-side TTL state를 만들지 않고 `ChatSessionManager`의 단일 session authority를 갱신한다. stop 이후 늦게 완료된 AI 작업은 `EmbeddedBrain` running guard에서 Tool 실행으로 진행할 수 없다.
+
+세 플랫폼 모두 migration feature flag로 Embedded 경로가 wiring되어 있지만 기본값은 아직 `remote`다. OpenAI SDK는 현재 common의 compile-time dependency이므로 실제 배포 artifact의 SDK bundling/shading 검증은 후속 packaging 단계(E16)에서 수행한다.
 
 ## 빌드와 운영
 
