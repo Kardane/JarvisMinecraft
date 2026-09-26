@@ -3,15 +3,20 @@ package io.github.kardane.jarvisminecraft.common;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
+import io.github.kardane.jarvisminecraft.common.brain.ConversationEntry;
+import io.github.kardane.jarvisminecraft.common.brain.InMemoryConversationHistoryStore;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolCodec;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolArgumentCodec;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.TeleportArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.TeleportData;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
+import io.github.kardane.jarvisminecraft.common.transport.AdapterBrainConnection;
 import io.github.kardane.jarvisminecraft.common.transport.SharedSecretAuthenticator;
 
 import java.io.IOException;
@@ -43,6 +48,9 @@ public final class T03VerificationMain {
         Path repoRoot = Path.of(requireProperty("jarvis.repoRoot"));
         fixtureContract(repoRoot);
         platformIsolation(repoRoot);
+        brainGatewayContract();
+        toolArgumentContract();
+        conversationHistoryContract();
         sharedSecretContract();
         deadlineContract(repoRoot);
         schedulerDedupAndReconnectContract(repoRoot);
@@ -87,6 +95,124 @@ public final class T03VerificationMain {
                 require(!source.contains("net.neoforged"), "common imports NeoForge: " + path);
             }
         }
+    }
+
+    private static void brainGatewayContract() {
+        require(
+            BrainGateway.class.isAssignableFrom(AdapterBrainConnection.class),
+            "Remote AdapterBrainConnection must implement BrainGateway."
+        );
+    }
+
+    private static void toolArgumentContract() {
+        ToolArgumentCodec arguments = new ToolArgumentCodec();
+
+        UUID target = UUID.fromString("22222222-2222-4222-8222-222222222222");
+        JsonObject teleport = new JsonObject();
+        teleport.addProperty("targetPlayerUuid", target.toString());
+
+        var parsed = arguments.parse(ToolName.TELEPORT_STAFF, teleport);
+        require(parsed instanceof TeleportArguments, "Teleport arguments were not typed.");
+        require(
+            ((TeleportArguments) parsed).targetPlayerUuid().equals(target),
+            "Teleport target changed during parsing."
+        );
+
+        JsonObject unknownField = teleport.deepCopy();
+        unknownField.addProperty("unexpected", true);
+        expectProtocolFailure(() -> arguments.parse(ToolName.TELEPORT_STAFF, unknownField));
+
+        JsonObject nearby = new JsonObject();
+        JsonObject center = new JsonObject();
+        center.addProperty("worldId", "minecraft:overworld");
+        center.addProperty("x", 0);
+        center.addProperty("y", 64);
+        center.addProperty("z", 0);
+        center.addProperty("yaw", 0);
+        center.addProperty("pitch", 0);
+        nearby.add("center", center);
+        nearby.addProperty("radius", 65);
+        nearby.addProperty("limit", 10);
+        expectProtocolFailure(() -> arguments.parse(ToolName.GET_NEARBY_PLAYERS, nearby));
+
+        require(
+            ToolName.TELEPORT_STAFF.stateChanging(),
+            "ToolName must remain the source of state-changing metadata."
+        );
+        require(
+            "staff.self_teleport".equals(ToolName.TELEPORT_STAFF.capability()),
+            "ToolName capability metadata changed unexpectedly."
+        );
+    }
+
+    private static void conversationHistoryContract() {
+        InMemoryConversationHistoryStore history =
+            new InMemoryConversationHistoryStore(2);
+
+        UUID actor = UUID.fromString("11111111-1111-4111-8111-111111111111");
+        UUID otherActor = UUID.fromString("33333333-3333-4333-8333-333333333333");
+        UUID session = UUID.fromString("44444444-4444-4444-8444-444444444444");
+        UUID otherSession = UUID.fromString("55555555-5555-4555-8555-555555555555");
+
+        history.append(
+            actor,
+            session,
+            new ConversationEntry.UserMessage("one", UUID.randomUUID(), FIXTURE_NOW)
+        );
+        history.append(
+            actor,
+            session,
+            new ConversationEntry.AssistantMessage("two", UUID.randomUUID(), FIXTURE_NOW.plusSeconds(1))
+        );
+        history.append(
+            actor,
+            session,
+            new ConversationEntry.UserMessage("three", UUID.randomUUID(), FIXTURE_NOW.plusSeconds(2))
+        );
+
+        var bounded = history.history(actor, session);
+        require(bounded.size() == 2, "Conversation history did not enforce its bound.");
+        require(
+            bounded.get(0) instanceof ConversationEntry.AssistantMessage,
+            "Conversation history did not evict the oldest entry."
+        );
+
+        history.append(
+            actor,
+            otherSession,
+            new ConversationEntry.UserMessage("other session", UUID.randomUUID(), FIXTURE_NOW)
+        );
+        history.append(
+            otherActor,
+            session,
+            new ConversationEntry.UserMessage("other actor", UUID.randomUUID(), FIXTURE_NOW)
+        );
+
+        require(
+            history.history(actor, otherSession).size() == 1,
+            "Conversation histories leaked across sessions."
+        );
+        require(
+            history.history(otherActor, session).size() == 1,
+            "Conversation histories leaked across actors."
+        );
+
+        history.clearSession(actor, session);
+        require(history.history(actor, session).isEmpty(), "Session history was not cleared.");
+        require(
+            history.history(actor, otherSession).size() == 1,
+            "Clearing one session removed another session."
+        );
+
+        history.clearActor(actor);
+        require(
+            history.history(actor, otherSession).isEmpty(),
+            "Actor history was not cleared."
+        );
+        require(
+            history.history(otherActor, session).size() == 1,
+            "Clearing one actor removed another actor."
+        );
     }
 
     private static void sharedSecretContract() {
