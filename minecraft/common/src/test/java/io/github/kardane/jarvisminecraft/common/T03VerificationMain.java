@@ -12,6 +12,7 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.DeterministicRoutePolic
 import io.github.kardane.jarvisminecraft.common.brain.ai.JdkJevClassifier;
 import io.github.kardane.jarvisminecraft.common.brain.ai.JevCategory;
 import io.github.kardane.jarvisminecraft.common.brain.ai.JevClassification;
+import io.github.kardane.jarvisminecraft.common.brain.ai.JevInput;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaPrompt;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaToolSchemas;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaTurnInput;
@@ -381,6 +382,37 @@ public final class T03VerificationMain {
         require(
             JdkJevClassifier.MAX_TIMEOUT.equals(java.time.Duration.ofSeconds(3)),
             "Jev timeout pin changed unexpectedly."
+        );
+
+        UUID jevRequest = UUID.fromString("85555555-5555-4555-8555-555555555555");
+        JevInput jevInput = JevInput.fromConversation(
+            List.of(
+                new ConversationEntry.UserMessage("첫 질문", jevRequest, FIXTURE_NOW),
+                new ConversationEntry.AssistantMessage(
+                    "첫 답변",
+                    jevRequest,
+                    FIXTURE_NOW.plusSeconds(1)
+                ),
+                new ConversationEntry.UserMessage(
+                    "지금 서버 상태 알려줘",
+                    jevRequest,
+                    FIXTURE_NOW.plusSeconds(2)
+                )
+            ),
+            List.of(new ProtocolMessage.Capability("minecraft.core", "test", null))
+        );
+        require(
+            "지금 서버 상태 알려줘".equals(jevInput.latestMessage()),
+            "Jev input did not select the latest user message."
+        );
+        require(
+            jevInput.shortTopic().contains("user: 첫 질문")
+                && jevInput.shortTopic().contains("assistant: 첫 답변"),
+            "Jev short-topic rendering changed."
+        );
+        require(
+            jevInput.capabilities().equals(List.of("minecraft.core")),
+            "Jev capability projection changed."
         );
 
         EnumSet<ToolName> active = EnumSet.of(
