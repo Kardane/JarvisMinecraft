@@ -12,4 +12,9 @@ public interface LunaClient {
     );
 
     void clear(UUID requestId);
+
+    default void close() {
+        // Implementations that own transport resources may override.
+    }
 }
+
