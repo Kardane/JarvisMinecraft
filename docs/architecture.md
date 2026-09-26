@@ -8,7 +8,7 @@
 
 이 문서는 **현재 소스 구조와 책임 경계**만 설명한다. 특정 commit SHA, worktree 진행률, release gate, 일회성 테스트 결과는 기록하지 않는다. 그런 시점별 증거는 `docs/verification/`에 보존한다.
 
-규범적 제품 범위는 `Minecraft_JARVIS_WORK_SPEC.md`, wire contract는 `protocol.md`와 `protocol/schema/protocol.schema.json`, Tool 계약은 `tools.md`, 장기 설계 결정은 `docs/decisions/`을 따른다. Jev + Luna 이중 모델과 권한 경계는 [ADR-0005](decisions/0005-jev-luna-routing-authority-boundary.md), optional Provider 공통화 임계값은 [ADR-0006](decisions/0006-provider-abstraction-threshold.md)에 고정한다.
+규범적 제품 범위는 `Minecraft_JARVIS_WORK_SPEC.md`, wire contract는 `protocol.md`와 `protocol/schema/protocol.schema.json`, Tool 계약은 `tools.md`, 장기 설계 결정은 `docs/decisions/`을 따른다. Jev + Luna 이중 모델과 권한 경계는 [ADR-0005](decisions/0005-jev-luna-routing-authority-boundary.md), optional Provider 공통화 임계값은 [ADR-0006](decisions/0006-provider-abstraction-threshold.md), Embedded Brain 전환 원칙은 [ADR-0007](decisions/0007-embedded-brain-boundary.md)에 고정한다.
 
 ## 목적과 구성 요소
 
@@ -32,7 +32,7 @@ flowchart LR
 | Paper Adapter | `minecraft/paper`: plugin entrypoint/config, chat session/listener, scheduler/platform access, Tool service, Brain connection, optional Provider assembly | `IntegrationRegistry`가 CoreProtect, WorldGuard/WorldEdit, CMI/CMILib 조합을 검사해 선택 로딩한다. Provider Tool은 staged registry에서 성공적으로 초기화된 경우에만 원자적으로 등록하며, 외부 API 연결 실패 시 미노출한다. |
 | Fabric Adapter | `minecraft/fabric`: server mod entrypoint/config, chat session/controller, scheduler/platform access, tick sampler, Tool service, Brain connection | Fabric server API에 한정한다. 클라이언트 전용 API에 의존하지 않는다. |
 | NeoForge Adapter | `minecraft/neoforge`: dedicated server mod entrypoint/config, chat session/controller, scheduler/platform access, tick sampler, Tool service, Brain connection | NeoForge dedicated server API를 사용한다. |
-| Common Java | `minecraft/common`: protocol DTO/codec, shared chat/request binding state, `AdapterBrainConnection`, standard Tool orchestration, deadline, deduplication ledger, requester authority, Tool registry, scheduler SPI, shared-secret WebSocket transport | Minecraft 플랫폼 API를 import하지 않는다. |
+| Common Java | `minecraft/common`: protocol DTO/codec, `ToolArgumentCodec`, shared chat/request binding state, transport-agnostic `BrainGateway`, Remote `AdapterBrainConnection`, conversation history foundation, standard Tool orchestration, deadline, deduplication ledger, requester authority, Tool registry, scheduler SPI, shared-secret WebSocket transport | Minecraft 플랫폼 API를 import하지 않는다. |
 | Brain core | `brain/src/core`: actor/session binding, capabilities, serial request scheduler, budgets, Tool allowlist, model/audit ports | serverId/request/session identity를 분리해 관리한다. |
 | AI routing | `brain/src/ai`: TypeSafe Jev classifier, deterministic route policy, GPT-6 Luna Responses Tool loop, strict Tool schemas | 모델 출력은 Tool 요청 제안이다. 최종 검사와 실행은 Adapter 경계에서 한다. |
 | Brain operations/server | `brain/src/ops`, `brain/src/server`: config, secret masking, rotating JSONL audit, health, daemon composition, authenticated WebSocket server | Node 24 프로세스로 실행하고 listener는 loopback에만 bind한다. inbound/outbound wire message는 canonical JSON Schema 기반 AJV validator를 통과한다. |
@@ -107,6 +107,14 @@ Paper optional Provider는 공통 Tool registry에 연결되지만 실행 모델
 - **IntegrationRegistry**: optional API linkage를 격리하기 위해 module entrypoint를 reflectively load한다. 각 module은 staged ToolRegistry에 먼저 등록되고 전체 초기화가 성공한 경우에만 main registry에 반영된다.
 
 따라서 현재는 Provider 공통 `BoundedAsyncExecutor`나 cursor store를 두지 않는다. 두 번째 Provider가 동일한 blocking/timeout/queue 또는 requester-bound snapshot semantics를 실제로 요구할 때만 공통 인프라를 추출한다. 구체적인 추출 조건과 reflection 유지 근거는 [ADR-0006](decisions/0006-provider-abstraction-threshold.md)을 따른다.
+
+## Embedded 전환 seam의 현재 상태
+
+현재 production 경로는 아직 loopback WebSocket Remote Brain을 사용한다. 다만 플랫폼 chat/controller와 entrypoint는 공통 `BrainGateway` 경계에 의존하며, 기존 `AdapterBrainConnection`과 플랫폼별 Brain connection wrapper가 이 경계를 구현한다. 따라서 후속 Embedded 구현은 채팅 계층을 다시 변경하지 않고 같은 gateway 자리에 연결할 수 있다.
+
+Tool 입력 검증은 `ToolArgumentCodec`으로 분리되어 Remote protocol의 `ProtocolCodec`이 이를 재사용한다. 이후 Luna function-call 인자도 같은 codec을 사용하도록 연결한다. Tool metadata는 계속 `Protocol.ToolName`, 실제 활성 Tool set은 `ToolRegistry`가 소유한다.
+
+`ConversationHistoryStore`와 bounded in-memory 구현은 추가되었지만 현재 Remote production 흐름에는 아직 연결하지 않았다. 이 저장소는 모델 conversation history만 담당하며 session TTL과 active lifecycle은 기존 `ChatSessionManager`가 계속 단독으로 소유한다.
 
 ## 빌드와 운영
 
