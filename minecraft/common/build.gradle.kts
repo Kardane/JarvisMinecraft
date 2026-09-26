@@ -34,6 +34,15 @@ val t03Verification by tasks.registering(JavaExec::class) {
     systemProperty("jarvis.repoRoot", rootProject.projectDir.absolutePath)
 }
 
+val embeddedBrainVerification by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "Runs Embedded Brain E8-E10 orchestration, audit and gateway contract tests."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("io.github.kardane.jarvisminecraft.common.EmbeddedBrainVerificationMain")
+}
+
 tasks.named("check") {
     dependsOn(t03Verification)
+    dependsOn(embeddedBrainVerification)
 }
