@@ -133,28 +133,35 @@ public final class AiRequestScheduler {
     private <T> void startLocked(QueueItem<T> item) {
         activeCount += 1;
         activeSessions.add(item.key());
-        executor.execute(() -> {
-            CompletionStage<T> stage;
-            try {
-                stage = Objects.requireNonNull(
-                    item.job().get(),
-                    "AI scheduler job returned null CompletionStage."
-                );
-            } catch (Throwable failure) {
-                item.result().completeExceptionally(failure);
-                finish(item.key());
-                return;
-            }
-
-            stage.whenComplete((value, failure) -> {
-                if (failure == null) {
-                    item.result().complete(value);
-                } else {
+        try {
+            executor.execute(() -> {
+                CompletionStage<T> stage;
+                try {
+                    stage = Objects.requireNonNull(
+                        item.job().get(),
+                        "AI scheduler job returned null CompletionStage."
+                    );
+                } catch (Throwable failure) {
                     item.result().completeExceptionally(failure);
+                    finish(item.key());
+                    return;
                 }
-                finish(item.key());
+
+                stage.whenComplete((value, failure) -> {
+                    if (failure == null) {
+                        item.result().complete(value);
+                    } else {
+                        item.result().completeExceptionally(failure);
+                    }
+                    finish(item.key());
+                });
             });
-        });
+        } catch (RuntimeException failure) {
+            activeCount -= 1;
+            activeSessions.remove(item.key());
+            item.result().completeExceptionally(failure);
+            dispatchLocked();
+        }
     }
 
     private void finish(SessionKey key) {
