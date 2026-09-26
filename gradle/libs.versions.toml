@@ -7,6 +7,7 @@ yarn = "1.21.8+build.1"
 fabric-loom = "1.12.2"
 neoforge = "21.8.52"
 moddev = "2.0.147"
+shadow = "9.2.2"
 
 [libraries]
 paper-api = { module = "io.papermc.paper:paper-api", version.ref = "paper" }
@@ -16,3 +17,4 @@ fabric-api = { module = "net.fabricmc.fabric-api:fabric-api", version.ref = "fab
 [plugins]
 fabric-loom = { id = "fabric-loom", version.ref = "fabric-loom" }
 neoforge-moddev = { id = "net.neoforged.moddev", version.ref = "moddev" }
+shadow = { id = "com.gradleup.shadow", version.ref = "shadow" }

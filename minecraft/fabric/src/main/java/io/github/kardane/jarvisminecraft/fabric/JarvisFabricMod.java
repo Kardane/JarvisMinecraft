@@ -3,6 +3,7 @@ package io.github.kardane.jarvisminecraft.fabric;
 import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainSettings;
+import io.github.kardane.jarvisminecraft.common.brain.PackagingSmoke;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
@@ -74,16 +75,21 @@ public final class JarvisFabricMod implements ModInitializer {
             return;
         }
 
-        final String serverId;
+        if (PackagingSmoke.requested()) {
+            PackagingSmoke.mark("Fabric");
+            LOGGER.info("E16 Fabric clean boot smoke OK");
+            server.stop(false);
+            return;
+        }
+
         final EmbeddedBrainSettings embeddedSettings;
         try {
-            serverId = setting(
-                "jarvis.serverId",
-                "JARVIS_SERVER_ID",
-                "main"
-            );
-            embeddedSettings = new EmbeddedBrainSettings(
-                serverId,
+            embeddedSettings = EmbeddedBrainSettings.resolve(
+                setting(
+                    "jarvis.serverId",
+                    "JARVIS_SERVER_ID",
+                    ""
+                ),
                 setting(
                     "jarvis.openaiApiKey",
                     "OPENAI_API_KEY",
@@ -96,8 +102,7 @@ public final class JarvisFabricMod implements ModInitializer {
                 ),
                 Path.of(
                     "config",
-                    "jarvisminecraft",
-                    "audit"
+                    "jarvisminecraft"
                 )
             );
         } catch (RuntimeException failure) {
@@ -168,7 +173,7 @@ public final class JarvisFabricMod implements ModInitializer {
 
         LOGGER.info(
             "JARVIS Fabric enabled for serverId="
-                + serverId
+                + embeddedSettings.serverId()
                 + " with Embedded Brain."
         );
     }

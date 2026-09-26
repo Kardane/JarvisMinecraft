@@ -13,7 +13,12 @@ Supply these to the Minecraft server process through your normal secret store:
 
 Optional:
 
-- `JARVIS_SERVER_ID` — defaults to `main`
+- `JARVIS_SERVER_ID` / `jarvis.serverId` — explicit logical server ID override
+
+When no override is supplied, JARVIS creates a stable local ID once and reuses it on later starts:
+
+- Paper: `plugins/JarvisMinecraft/server-id.txt`
+- Fabric / NeoForge: `config/jarvisminecraft/server-id.txt`
 
 Reference values are shown in `config/jarvis.env.example`.
 
@@ -23,11 +28,12 @@ Do not log provider keys, raw process environments, or complete configuration ob
 
 ### Paper
 
-Paper accepts:
+Paper's generated `config.yml` contains only:
 
-- `server-id`
 - `openai-api-key`
 - `typesafe-api-key`
+
+The server ID is generated automatically unless the optional system-property/environment override is supplied.
 
 System properties/environment take precedence over plugin-config credentials:
 
@@ -159,7 +165,9 @@ Deterministic verification:
 ./gradlew build
 ```
 
-This includes the E12 Embedded policy parity/safety verification plus T06/T07/T08 platform contract tests and existing Provider tests.
+This includes the E12 Embedded policy parity/safety verification, T06/T07/T08 platform contract tests, existing Provider tests, and E16 deployable-artifact content verification.
+
+CI also boots a clean Paper, Fabric, and NeoForge server with each packaged artifact and an E16 smoke flag. The smoke exits before provider credentials are required; normal production startup still requires both provider keys.
 
 Live provider verification requires real credentials:
 

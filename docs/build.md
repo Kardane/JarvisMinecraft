@@ -25,7 +25,21 @@ E14 이후 production build/runtime에는 Node.js/npm이 필요하지 않는다.
 ./gradlew build
 ```
 
-CI도 동일한 Java/Gradle build를 실행한다.
+CI도 동일한 Java/Gradle build를 실행하며, E16에서는 추가로 세 플랫폼 clean-server boot smoke를 실행한다.
+
+## 배포 artifact
+
+E16 이후 플랫폼별 배포 파일은 다음 이름으로 생성된다.
+
+```text
+minecraft/paper/build/libs/jarvisminecraft-paper.jar
+minecraft/fabric/build/libs/jarvisminecraft-fabric.jar
+minecraft/neoforge/build/libs/jarvisminecraft-neoforge.jar
+```
+
+각 artifact는 `minecraft/common`의 Embedded Brain과 공식 OpenAI Java SDK runtime을 포함한다. SDK 및 runtime dependency package는 `io.github.kardane.jarvisminecraft.internal.shaded` 아래로 relocation해 Minecraft/Paper/Fabric/NeoForge의 Jackson/OkHttp/Kotlin classpath와 분리한다. Minecraft가 제공하는 Gson은 artifact에 중복 포함하지 않는다.
+
+루트 `verifyE16Artifacts` task가 필수 Embedded Brain class, relocated SDK class, unrelocated conflict package 부재, Node/JavaScript runtime asset 부재를 검사한다.
 
 ## 주요 deterministic verification
 

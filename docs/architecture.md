@@ -81,11 +81,13 @@ Jev와 Luna 네트워크 호출은 Minecraft server/tick thread를 점유하지 
 
 Embedded Brain의 `AsyncJsonlAuditSink`는 bounded queue, JSONL rotation/retention, masking과 health 상태를 제공한다. state-changing Tool의 pre-execution record가 실제 저장되지 않으면 실행을 거부한다. post-execution audit 실패는 이미 실행된 Tool을 retry하게 만들지 않는다.
 
-## E12-E14 전환 결과
+## E12-E16 전환 결과
 
 - E12: Remote reference와 Embedded Java가 같은 shared parity fixture를 통과하도록 정책 회귀 테스트를 추가했다.
 - E13: WebSocket transport, shared-secret auth, protocol codec/message DTO, request-binding connection registry, 플랫폼 Remote wrapper/config를 제거했다.
 - E14: TypeScript/Node production Brain, WebSocket server/daemon/CLI, Node CI job을 제거했다.
+- E15: provider API key 두 개만 필수 설정으로 남기고, logical server ID는 플랫폼 data directory에 안정적으로 자동 생성/영속화한다.
+- E16: 공식 OpenAI Java SDK runtime을 플랫폼 artifact 안에 포함하고 dependency package를 내부 namespace로 relocation한다. Paper/Fabric/NeoForge 각각 단일 deployable artifact와 clean-server boot smoke를 검증한다.
 - protocol schema/fixtures, Jev 평가 데이터, E12 fixture, 과거 T10 evidence는 분석 및 회귀 기준으로 보존한다.
 
 과거 Remote 전송 계약과 T10 결과는 역사적 검증 자료다. 현재 production runtime path에는 Node process나 WebSocket 연결이 존재하지 않는다.

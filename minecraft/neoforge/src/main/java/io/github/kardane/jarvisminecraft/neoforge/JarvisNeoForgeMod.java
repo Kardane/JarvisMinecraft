@@ -3,6 +3,7 @@ package io.github.kardane.jarvisminecraft.neoforge;
 import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainSettings;
+import io.github.kardane.jarvisminecraft.common.brain.PackagingSmoke;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
@@ -68,16 +69,28 @@ public final class JarvisNeoForgeMod {
             return;
         }
 
-        final String serverId;
+        if (PackagingSmoke.requested()) {
+            PackagingSmoke.mark("NeoForge");
+            LOGGER.info("E16 NeoForge clean boot smoke OK");
+            server.halt(false);
+            return;
+        }
+
+        if (Boolean.getBoolean("jarvis.t08BootSmoke")) {
+            writeBootSmokeMarker();
+            LOGGER.info("T08 dedicated server boot smoke OK");
+            server.halt(false);
+            return;
+        }
+
         final EmbeddedBrainSettings embeddedSettings;
         try {
-            serverId = setting(
-                "jarvis.serverId",
-                "JARVIS_SERVER_ID",
-                "main"
-            );
-            embeddedSettings = new EmbeddedBrainSettings(
-                serverId,
+            embeddedSettings = EmbeddedBrainSettings.resolve(
+                setting(
+                    "jarvis.serverId",
+                    "JARVIS_SERVER_ID",
+                    ""
+                ),
                 setting(
                     "jarvis.openaiApiKey",
                     "OPENAI_API_KEY",
@@ -90,8 +103,7 @@ public final class JarvisNeoForgeMod {
                 ),
                 Path.of(
                     "config",
-                    "jarvisminecraft",
-                    "audit"
+                    "jarvisminecraft"
                 )
             );
         } catch (RuntimeException failure) {
@@ -100,13 +112,6 @@ public final class JarvisNeoForgeMod {
                 "JARVIS NeoForge configuration is invalid. No secret value was logged.",
                 failure
             );
-            return;
-        }
-
-        if (Boolean.getBoolean("jarvis.t08BootSmoke")) {
-            writeBootSmokeMarker();
-            LOGGER.info("T08 dedicated server boot smoke OK");
-            server.halt(false);
             return;
         }
 
@@ -170,7 +175,7 @@ public final class JarvisNeoForgeMod {
         brain.start();
         LOGGER.info(
             "JARVIS NeoForge enabled for serverId="
-                + serverId
+                + embeddedSettings.serverId()
                 + " with Embedded Brain."
         );
     }
