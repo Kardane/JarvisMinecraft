@@ -62,6 +62,8 @@ public final class EmbeddedBrainVerificationMain {
         embeddedReadOnlyLoop();
         preAuditFailClosed();
         gatewayDeliveryAuthorityRecheck();
+        gatewayCancellationOwnsSession();
+        gatewayStopSuppressesLateDelivery();
         jsonlAuditContract();
         settingsContract();
         System.out.println("Embedded Brain E8-E10 verification OK");
@@ -358,6 +360,127 @@ public final class EmbeddedBrainVerificationMain {
             "Gateway delivered a stale response after OP authority was revoked."
         );
         gateway.stop();
+    }
+
+    private static void gatewayCancellationOwnsSession() {
+        UUID actor = UUID.fromString("23100000-0000-4000-8000-000000000001");
+        ChatSessionManager sessions = new ChatSessionManager(CLOCK);
+        UUID sessionId = startSession(sessions, actor);
+
+        ToolRegistry registry = new ToolRegistry();
+        CommonRuntime runtime = new CommonRuntime(
+            registry,
+            directScheduler(),
+            ignored -> true,
+            CLOCK
+        );
+        EmbeddedBrain brain = new EmbeddedBrain(
+            SERVER_ID,
+            capabilities(),
+            sessions,
+            new InMemoryConversationHistoryStore(),
+            new AiRequestScheduler(Runnable::run),
+            classifier(JevCategory.GENERAL),
+            new DeterministicRoutePolicy(),
+            new SequenceLuna(
+                new LunaStep.Final(
+                    "unused",
+                    LunaStep.SessionState.CONTINUE
+                )
+            ),
+            AuditSink.noOp(),
+            runtime.openRuntime(
+                UUID.fromString("13100000-0000-4000-8000-000000000001"),
+                SERVER_ID,
+                registry.tools()
+            ),
+            CLOCK
+        );
+
+        EmbeddedBrainGateway gateway = new EmbeddedBrainGateway(
+            brain,
+            sessions,
+            new FakePlatform(true),
+            directScheduler(),
+            CLOCK
+        );
+        gateway.start();
+        gateway.cancelSession(
+            actor,
+            sessionId,
+            io.github.kardane.jarvisminecraft.common.protocol.Protocol.CancelReason.SESSION_ENDED
+        );
+
+        require(
+            !sessions.isActive(actor, sessionId),
+            "Gateway cancelSession did not update ChatSessionManager authority."
+        );
+        gateway.stop();
+    }
+
+    private static void gatewayStopSuppressesLateDelivery() {
+        UUID actor = UUID.fromString("23200000-0000-4000-8000-000000000001");
+        ChatSessionManager sessions = new ChatSessionManager(CLOCK);
+        UUID sessionId = startSession(sessions, actor);
+
+        ToolRegistry registry = new ToolRegistry();
+        CommonRuntime runtime = new CommonRuntime(
+            registry,
+            directScheduler(),
+            ignored -> true,
+            CLOCK
+        );
+
+        CompletableFuture<LunaStep> gate = new CompletableFuture<>();
+        EmbeddedBrain brain = new EmbeddedBrain(
+            SERVER_ID,
+            capabilities(),
+            sessions,
+            new InMemoryConversationHistoryStore(),
+            new AiRequestScheduler(Runnable::run),
+            classifier(JevCategory.GENERAL),
+            new DeterministicRoutePolicy(),
+            new GatedLuna(gate),
+            AuditSink.noOp(),
+            runtime.openRuntime(
+                UUID.fromString("13200000-0000-4000-8000-000000000001"),
+                SERVER_ID,
+                registry.tools()
+            ),
+            CLOCK
+        );
+
+        FakePlatform platform = new FakePlatform(true);
+        EmbeddedBrainGateway gateway = new EmbeddedBrainGateway(
+            brain,
+            sessions,
+            platform,
+            directScheduler(),
+            CLOCK
+        );
+        gateway.start();
+
+        boolean accepted = gateway.submitChat(
+            actor,
+            "Operator",
+            sessionId,
+            "DIRECT",
+            "자비스 늦은 응답 테스트"
+        ).toCompletableFuture().join();
+        require(accepted, "Gateway did not accept stop-race fixture.");
+
+        gateway.stop();
+        gate.complete(
+            new LunaStep.Final(
+                "stop 이후 전달되면 안 됨",
+                LunaStep.SessionState.CONTINUE
+            )
+        );
+
+        require(
+            platform.messages.isEmpty(),
+            "Gateway delivered a response after stop."
+        );
     }
 
     private static void jsonlAuditContract() throws Exception {
