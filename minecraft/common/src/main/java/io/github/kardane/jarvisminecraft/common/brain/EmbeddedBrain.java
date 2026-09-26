@@ -52,6 +52,7 @@ public final class EmbeddedBrain {
     private final CommonRuntime.ExecutionRuntime toolRuntime;
     private final Clock clock;
     private final Map<SessionKey, Set<UUID>> activeRequestIds = new HashMap<>();
+    private volatile boolean stopped;
 
     public EmbeddedBrain(
         String serverId,
@@ -86,6 +87,7 @@ public final class EmbeddedBrain {
 
     public CompletionStage<Reply> submit(ChatRequest request) {
         Objects.requireNonNull(request, "request");
+        assertRunning();
         assertSession(request.requesterUuid(), request.sessionId());
 
         track(request.requesterUuid(), request.sessionId(), request.requestId());
@@ -135,6 +137,7 @@ public final class EmbeddedBrain {
     }
 
     public void stop() {
+        stopped = true;
         scheduler.shutdown();
         Set<UUID> requestIds = new HashSet<>();
         synchronized (activeRequestIds) {
@@ -148,6 +151,7 @@ public final class EmbeddedBrain {
 
     private CompletionStage<Reply> processScheduled(ChatRequest request) {
         try {
+            assertRunning();
             assertSession(request.requesterUuid(), request.sessionId());
             RequestBudget budget =
                 new RequestBudget(request.deadlineAt(), request.receivedAt());
@@ -169,8 +173,16 @@ public final class EmbeddedBrain {
                 capabilities
             );
 
-            return jev.classify(input, budget.deadlineAt())
-                .handle((classification, failure) -> {
+            Instant jevDeadline = earlier(
+                budget.deadlineAt(),
+                clock.instant().plus(JdkJevClassifier.MAX_TIMEOUT)
+            );
+            return withDeadline(
+                jev.classify(input, jevDeadline),
+                jevDeadline,
+                ErrorCode.TIMEOUT,
+                "Jev classification timed out."
+            ).handle((classification, failure) -> {
                     if (
                         failure != null
                             || classification == null
@@ -196,6 +208,7 @@ public final class EmbeddedBrain {
         DeterministicRoutePolicy.RoutingDecision routing
     ) {
         try {
+            assertRunning();
             assertSession(request.requesterUuid(), request.sessionId());
             budget.consumeModelRound(clock.instant());
 
@@ -226,6 +239,15 @@ public final class EmbeddedBrain {
 
                     if (outcome.failure() != null) {
                         luna.clear(request.requestId());
+                        history.append(
+                            request.requesterUuid(),
+                            request.sessionId(),
+                            new ConversationEntry.AssistantMessage(
+                                LUNA_FAILURE_TEXT,
+                                request.requestId(),
+                                clock.instant()
+                            )
+                        );
                         return CompletableFuture.completedFuture(
                             new Reply(
                                 LUNA_FAILURE_TEXT,
@@ -304,6 +326,7 @@ public final class EmbeddedBrain {
         DeterministicRoutePolicy.RoutingDecision routing,
         LunaStep.ToolCall call
     ) {
+        assertRunning();
         assertSession(request.requesterUuid(), request.sessionId());
         budget.assertLive(clock.instant());
 
@@ -336,6 +359,7 @@ public final class EmbeddedBrain {
             : CompletableFuture.completedFuture(null);
 
         return preAudit.thenCompose(ignored -> {
+            assertRunning();
             assertSession(request.requesterUuid(), request.sessionId());
 
             CommonRuntime.ToolInvocation invocation =
@@ -467,6 +491,15 @@ public final class EmbeddedBrain {
             throw new ProtocolException(
                 ErrorCode.INVALID_ARGUMENT,
                 "Model final text is outside protocol limits."
+            );
+        }
+    }
+
+    private void assertRunning() {
+        if (stopped) {
+            throw new ProtocolException(
+                ErrorCode.CANCELLED,
+                "Embedded Brain is stopped."
             );
         }
     }
