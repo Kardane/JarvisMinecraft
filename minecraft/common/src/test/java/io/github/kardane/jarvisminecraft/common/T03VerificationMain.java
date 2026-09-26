@@ -6,10 +6,20 @@ import com.google.gson.JsonParser;
 import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.ConversationEntry;
 import io.github.kardane.jarvisminecraft.common.brain.InMemoryConversationHistoryStore;
+import io.github.kardane.jarvisminecraft.common.brain.AiRequestScheduler;
+import io.github.kardane.jarvisminecraft.common.brain.RequestBudget;
+import io.github.kardane.jarvisminecraft.common.brain.ai.DeterministicRoutePolicy;
+import io.github.kardane.jarvisminecraft.common.brain.ai.JdkJevClassifier;
+import io.github.kardane.jarvisminecraft.common.brain.ai.JevCategory;
+import io.github.kardane.jarvisminecraft.common.brain.ai.JevClassification;
+import io.github.kardane.jarvisminecraft.common.brain.ai.LunaPrompt;
+import io.github.kardane.jarvisminecraft.common.brain.ai.LunaToolSchemas;
+import io.github.kardane.jarvisminecraft.common.brain.ai.LunaTurnInput;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolCodec;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolArgumentCodec;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.GetPlayerByNameArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.TeleportArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.TeleportData;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
@@ -27,8 +37,11 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.EnumSet;
+import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -51,6 +64,10 @@ public final class T03VerificationMain {
         brainGatewayContract();
         toolArgumentContract();
         conversationHistoryContract();
+        requestBudgetContract();
+        aiRequestSchedulerContract();
+        jevRoutingContract();
+        lunaContract();
         sharedSecretContract();
         deadlineContract(repoRoot);
         schedulerDedupAndReconnectContract(repoRoot);
@@ -215,6 +232,295 @@ public final class T03VerificationMain {
         );
     }
 
+    private static void requestBudgetContract() {
+        Instant startedAt = FIXTURE_NOW;
+        RequestBudget bounded = new RequestBudget(
+            startedAt.plusSeconds(10),
+            startedAt
+        );
+        require(
+            bounded.deadlineAt().equals(startedAt.plusSeconds(10)),
+            "RequestBudget must honor the earlier Adapter deadline."
+        );
+
+        for (int index = 0; index < RequestBudget.MAX_MODEL_ROUNDS; index += 1) {
+            bounded.consumeModelRound(startedAt.plusSeconds(1));
+        }
+        require(
+            bounded.remainingModelRounds() == 0,
+            "RequestBudget model rounds were not consumed."
+        );
+        expectProtocolCode(
+            ErrorCode.BUSY,
+            () -> bounded.consumeModelRound(startedAt.plusSeconds(1))
+        );
+
+        RequestBudget tools = new RequestBudget(
+            startedAt.plusSeconds(60),
+            startedAt
+        );
+        tools.consumeToolCalls(RequestBudget.MAX_TOOL_CALLS, startedAt.plusSeconds(1));
+        require(
+            tools.remainingToolCalls() == 0,
+            "RequestBudget Tool calls were not consumed."
+        );
+        expectProtocolCode(
+            ErrorCode.BUSY,
+            () -> tools.consumeToolCalls(1, startedAt.plusSeconds(1))
+        );
+
+        RequestBudget expired = new RequestBudget(
+            startedAt.plusSeconds(5),
+            startedAt
+        );
+        expectProtocolCode(
+            ErrorCode.TIMEOUT,
+            () -> expired.assertLive(startedAt.plusSeconds(5))
+        );
+    }
+
+    private static void aiRequestSchedulerContract() {
+        AiRequestScheduler scheduler =
+            new AiRequestScheduler(Runnable::run, 2, 1, 2);
+
+        UUID actorOne = UUID.fromString("61111111-1111-4111-8111-111111111111");
+        UUID actorTwo = UUID.fromString("62222222-2222-4222-8222-222222222222");
+        UUID actorThree = UUID.fromString("63333333-3333-4333-8333-333333333333");
+        UUID actorFour = UUID.fromString("64444444-4444-4444-8444-444444444444");
+        UUID sessionOne = UUID.fromString("71111111-1111-4111-8111-111111111111");
+        UUID sessionTwo = UUID.fromString("72222222-2222-4222-8222-222222222222");
+        UUID sessionThree = UUID.fromString("73333333-3333-4333-8333-333333333333");
+        UUID sessionFour = UUID.fromString("74444444-4444-4444-8444-444444444444");
+
+        AtomicInteger starts = new AtomicInteger();
+        CompletableFuture<String> firstGate = new CompletableFuture<>();
+        CompletableFuture<String> secondActorGate = new CompletableFuture<>();
+
+        CompletionStage<String> first = scheduler.submit(
+            actorOne,
+            sessionOne,
+            () -> {
+                starts.incrementAndGet();
+                return firstGate;
+            }
+        );
+        CompletionStage<String> sameSessionQueued = scheduler.submit(
+            actorOne,
+            sessionOne,
+            () -> {
+                starts.incrementAndGet();
+                return CompletableFuture.completedFuture("second");
+            }
+        );
+        CompletionStage<String> secondActor = scheduler.submit(
+            actorTwo,
+            sessionTwo,
+            () -> {
+                starts.incrementAndGet();
+                return secondActorGate;
+            }
+        );
+        CompletionStage<String> thirdActorQueued = scheduler.submit(
+            actorThree,
+            sessionThree,
+            () -> {
+                starts.incrementAndGet();
+                return CompletableFuture.completedFuture("third");
+            }
+        );
+
+        require(starts.get() == 2, "AI scheduler exceeded concurrency or session serialization.");
+        require(
+            scheduler.snapshot().activeRequests() == 2
+                && scheduler.snapshot().queuedTotal() == 2,
+            "AI scheduler snapshot did not reflect bounded active/queued work."
+        );
+
+        CompletionStage<String> overflow = scheduler.submit(
+            actorFour,
+            sessionFour,
+            () -> CompletableFuture.completedFuture("overflow")
+        );
+        expectStageProtocolCode(ErrorCode.BUSY, overflow);
+
+        scheduler.cancelSession(actorThree, sessionThree);
+        expectStageProtocolCode(ErrorCode.CANCELLED, thirdActorQueued);
+        require(
+            scheduler.snapshot().queuedTotal() == 1,
+            "Session cancellation did not remove queued AI work."
+        );
+
+        firstGate.complete("first");
+        require("first".equals(first.toCompletableFuture().join()), "First AI request failed.");
+        require(
+            "second".equals(sameSessionQueued.toCompletableFuture().join()),
+            "Queued same-session request did not run after the active request."
+        );
+        require(starts.get() == 3, "Same-session request did not serialize.");
+
+        secondActorGate.complete("other");
+        require(
+            "other".equals(secondActor.toCompletableFuture().join()),
+            "Second actor AI request failed."
+        );
+
+        scheduler.shutdown();
+        CompletionStage<String> afterShutdown = scheduler.submit(
+            actorOne,
+            sessionOne,
+            () -> CompletableFuture.completedFuture("late")
+        );
+        expectStageProtocolCode(ErrorCode.CANCELLED, afterShutdown);
+    }
+
+    private static void jevRoutingContract() {
+        require(
+            "jev-1.13.0".equals(JdkJevClassifier.MODEL),
+            "Jev model pin changed unexpectedly."
+        );
+        require(
+            JdkJevClassifier.MAX_TIMEOUT.equals(java.time.Duration.ofSeconds(3)),
+            "Jev timeout pin changed unexpectedly."
+        );
+
+        EnumSet<ToolName> active = EnumSet.of(
+            ToolName.GET_SERVER_STATUS,
+            ToolName.GET_PLAYER,
+            ToolName.GET_PLAYER_LOCATION,
+            ToolName.TELEPORT_STAFF,
+            ToolName.GET_WORLD_INFO
+        );
+
+        DeterministicRoutePolicy policy = new DeterministicRoutePolicy(0.80);
+        JevClassification action = new JevClassification(
+            JevCategory.ACTION_REQUEST,
+            0.95,
+            Map.of(JevCategory.ACTION_REQUEST, 0.95),
+            JdkJevClassifier.MODEL,
+            "req_action"
+        );
+        var routed = policy.route(action, active);
+        require(
+            routed.availableTools().equals(
+                EnumSet.of(
+                    ToolName.GET_PLAYER,
+                    ToolName.GET_PLAYER_LOCATION,
+                    ToolName.TELEPORT_STAFF
+                )
+            ),
+            "ACTION_REQUEST route exposed the wrong Tool subset."
+        );
+        require(!routed.fallbackActive(), "Healthy Jev route unexpectedly entered fallback.");
+
+        JevClassification lowConfidence = new JevClassification(
+            JevCategory.ACTION_REQUEST,
+            0.40,
+            Map.of(JevCategory.ACTION_REQUEST, 0.40),
+            JdkJevClassifier.MODEL,
+            "req_low"
+        );
+        var fallback = policy.route(lowConfidence, active);
+        require(fallback.fallbackActive(), "Low-confidence Jev result did not enter fallback.");
+        require(
+            fallback.fallbackReason()
+                == DeterministicRoutePolicy.FallbackReason.JEV_LOW_CONFIDENCE,
+            "Low-confidence fallback reason changed."
+        );
+        require(
+            !fallback.availableTools().contains(ToolName.TELEPORT_STAFF),
+            "Read-only fallback exposed a state-changing Tool."
+        );
+        require(
+            fallback.availableTools().contains(ToolName.GET_SERVER_STATUS),
+            "Read-only fallback lost an active read-only Tool."
+        );
+
+        var errorFallback = policy.errorFallback(active);
+        require(
+            errorFallback.fallbackReason()
+                == DeterministicRoutePolicy.FallbackReason.JEV_ERROR,
+            "Jev error fallback reason changed."
+        );
+        require(
+            !errorFallback.availableTools().contains(ToolName.TELEPORT_STAFF),
+            "Jev error fallback exposed a state-changing Tool."
+        );
+    }
+
+    private static void lunaContract() {
+        LunaToolSchemas schemas = new LunaToolSchemas(new ToolArgumentCodec());
+        EnumSet<ToolName> active =
+            EnumSet.of(ToolName.GET_PLAYER, ToolName.TELEPORT_STAFF);
+
+        var definitions = schemas.definitions(active);
+        require(definitions.size() == 3, "Luna AI Tool aliases changed unexpectedly.");
+        require(
+            definitions.stream().allMatch(
+                definition ->
+                    definition.parameters()
+                        .get("additionalProperties")
+                        .getAsBoolean() == false
+            ),
+            "Luna function schemas must reject additional properties."
+        );
+
+        var playerCall = schemas.translate(
+            "get_player_by_name",
+            "{\"exactName\":\"Steve\"}",
+            active
+        );
+        require(
+            playerCall.tool() == ToolName.GET_PLAYER
+                && playerCall.arguments() instanceof GetPlayerByNameArguments,
+            "Luna player alias did not translate to the core Tool contract."
+        );
+
+        expectFailure(
+            () -> schemas.translate(
+                "teleport_staff",
+                "{\"targetPlayerUuid\":\"22222222-2222-4222-8222-222222222222\"}",
+                EnumSet.of(ToolName.GET_PLAYER)
+            )
+        );
+
+        UUID requestId = UUID.fromString("81111111-1111-4111-8111-111111111111");
+        LunaTurnInput turn = new LunaTurnInput(
+            requestId,
+            "Operator",
+            List.of(
+                new ConversationEntry.UserMessage(
+                    "자비스 서버 상태 알려줘",
+                    requestId,
+                    FIXTURE_NOW
+                )
+            ),
+            List.of(),
+            EnumSet.of(ToolName.GET_SERVER_STATUS),
+            RequestBudget.MAX_TOOL_CALLS,
+            RequestBudget.MAX_MODEL_ROUNDS,
+            FIXTURE_NOW.plusSeconds(30)
+        );
+
+        String rendered = LunaPrompt.renderConversation(turn);
+        require(
+            rendered.contains("USER: 자비스 서버 상태 알려줘"),
+            "Luna conversation rendering lost the latest user message."
+        );
+        require(
+            "gpt-6-luna".equals(LunaPrompt.MODEL),
+            "Luna model pin changed unexpectedly."
+        );
+
+        DeterministicRoutePolicy policy = new DeterministicRoutePolicy();
+        String degradedInstructions = LunaPrompt.instructions(
+            policy.errorFallback(EnumSet.of(ToolName.GET_SERVER_STATUS))
+        );
+        require(
+            degradedInstructions.contains("ROUTING FALLBACK IS ACTIVE."),
+            "Luna fallback instructions were not applied."
+        );
+    }
+
     private static void sharedSecretContract() {
         expectFailure(() -> new SharedSecretAuthenticator(""));
         expectFailure(() -> new SharedSecretAuthenticator("CHANGE_ME"));
@@ -354,6 +660,36 @@ public final class T03VerificationMain {
             // Expected.
         } catch (Exception other) {
             throw new AssertionError("Expected ProtocolException, got " + other, other);
+        }
+    }
+
+    private static void expectProtocolCode(ErrorCode code, Runnable action) {
+        try {
+            action.run();
+            throw new AssertionError("Expected ProtocolException with code " + code + ".");
+        } catch (ProtocolException expected) {
+            require(expected.code() == code, "Unexpected protocol error code: " + expected.code());
+        }
+    }
+
+    private static void expectStageProtocolCode(
+        ErrorCode code,
+        CompletionStage<?> stage
+    ) {
+        try {
+            stage.toCompletableFuture().join();
+            throw new AssertionError("Expected failed stage with code " + code + ".");
+        } catch (CompletionException expected) {
+            Throwable cause = expected.getCause();
+            require(
+                cause instanceof ProtocolException,
+                "Expected ProtocolException stage failure, got " + cause
+            );
+            require(
+                ((ProtocolException) cause).code() == code,
+                "Unexpected stage protocol error code: "
+                    + ((ProtocolException) cause).code()
+            );
         }
     }
 
