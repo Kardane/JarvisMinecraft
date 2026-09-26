@@ -169,8 +169,8 @@ public final class JdkJevClassifier implements JevClassifier {
             probabilities.put(key, probability(entry.getValue(), entry.getKey()));
         }
 
-        String requestId = response.headers().firstValue("x-request-id")
-            .or(() -> response.headers().firstValue("request-id"))
+        String requestId = response.headers()
+            .firstValue("x-typesafe-request-id")
             .orElse(null);
 
         return new JevClassification(
