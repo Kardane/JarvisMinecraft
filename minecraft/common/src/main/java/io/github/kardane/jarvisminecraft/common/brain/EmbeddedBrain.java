@@ -232,6 +232,7 @@ public final class EmbeddedBrain {
 
             return model.handle((step, failure) -> new ModelOutcome(step, failure))
                 .thenCompose(outcome -> {
+                    assertRunning();
                     assertSession(
                         request.requesterUuid(),
                         request.sessionId()
