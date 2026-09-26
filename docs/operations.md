@@ -2,96 +2,104 @@
 
 ## Scope
 
-This document describes the v0.1 Remote Brain operations boundary and the in-progress Embedded Brain migration mode. Remote remains the default mode. In Embedded mode, provider credentials are read by the Minecraft process instead of a separate Brain process.
+JARVIS now runs the Brain inside the Minecraft server JVM. There is no Node.js Brain daemon, WebSocket listener, shared-secret handshake, or reconnect process to operate.
 
-## Required environment
+## Required secrets
 
-Copy `config/brain.env.example` into your process manager or secret store and replace all placeholders.
-
-Required secrets:
-
-- `OPENAI_API_KEY`
-- `TYPESAFE_API_KEY`
-- `JARVIS_SHARED_SECRET`
-
-The Brain listener is restricted to loopback in v0.1. `JARVIS_BRAIN_HOST` accepts only `127.0.0.1`, `::1`, or `localhost`.
-
-The fixed v0.1 policy is:
-
-- OP-only access: enabled
-- responses: requester-only
-- warning action: disabled
-- rollback action: disabled
-
-There is no configuration switch that disables OP-only enforcement in v0.1.
-
-## Embedded migration mode
-
-Paper, Fabric, and NeoForge currently support a temporary migration selector:
-
-```text
-remote
-embedded
-```
-
-The default remains `remote` until Remote/Embedded parity and packaging work are complete.
-
-Common selector overrides:
-
-- system property: `jarvis.brainMode`
-- environment: `JARVIS_BRAIN_MODE`
-
-Embedded mode requires:
+Supply these to the Minecraft server process through your normal secret store:
 
 - `OPENAI_API_KEY`
 - `TYPESAFE_API_KEY`
 
-Paper also accepts `brain-mode`, `openai-api-key`, and `typesafe-api-key` in its plugin configuration, with system properties/environment taking precedence for secrets. Its Embedded audit directory is the plugin data directory under `audit/`.
+Optional:
 
-Fabric and NeoForge use system properties/environment for Embedded credentials. Their current migration audit directory is `config/jarvisminecraft/audit`.
+- `JARVIS_SERVER_ID` — defaults to `main`
 
-Embedded mode composes:
+Reference values are shown in `config/jarvis.env.example`.
+
+Do not log provider keys, raw process environments, or complete configuration objects.
+
+## Platform configuration
+
+### Paper
+
+Paper accepts:
+
+- `server-id`
+- `openai-api-key`
+- `typesafe-api-key`
+
+System properties/environment take precedence over plugin-config credentials:
+
+- `jarvis.openaiApiKey` / `OPENAI_API_KEY`
+- `jarvis.typesafeApiKey` / `TYPESAFE_API_KEY`
+
+Audit directory:
+
+`plugins/JarvisMinecraft/audit`
+
+### Fabric / NeoForge
+
+Use system properties or environment:
+
+- `jarvis.serverId` / `JARVIS_SERVER_ID`
+- `jarvis.openaiApiKey` / `OPENAI_API_KEY`
+- `jarvis.typesafeApiKey` / `TYPESAFE_API_KEY`
+
+Audit directory:
+
+`config/jarvisminecraft/audit`
+
+## Startup
+
+At platform startup JARVIS:
+
+1. validates server ID and provider credentials;
+2. builds the platform Tool registry;
+3. activates optional Paper Providers only when their dependencies/API discovery succeed;
+4. constructs `CommonRuntime`;
+5. constructs `ChatSessionManager`;
+6. constructs `EmbeddedBrainGateway` and `EmbeddedBrain`;
+7. constructs the Jev HTTP classifier, Luna client, AI scheduler and JSONL audit sink;
+8. starts accepting OP chat requests.
+
+Configuration failure disables/stops JARVIS startup rather than falling back to a weaker policy.
+
+There is no separate Brain startup order.
+
+## Request execution
 
 ```text
 ChatSessionManager
   -> EmbeddedBrainGateway
-  -> EmbeddedBrain
+  -> AiRequestScheduler
   -> Jev
   -> DeterministicRoutePolicy
   -> Luna
   -> AuditSink
   -> CommonRuntime.ExecutionRuntime
-  -> Platform Tool implementation
+  -> Platform Tool
 ```
 
-This migration mode is wired and covered by deterministic JVM verification, but it is not yet the final packaged operator experience. The OpenAI Java SDK is currently a compile-time dependency; platform artifact bundling/shading is deferred to the packaging phase. Keep Remote mode as the operational default until that work is complete.
+The Minecraft server remains the authority for OP status and server state.
 
 ## Audit log
 
-The Brain audit sink implements the T04 `AuditPort`.
+The Java `AsyncJsonlAuditSink` writes bounded JSONL audit files. Its policy remains:
 
-Default storage:
-
-- directory: `./logs/jarvis-audit`
-- JSON Lines
 - 7-day retention
 - 100 MiB total cap
-- 8 MiB per-file rotation
-- 512-record asynchronous queue
+- 8 MiB per file
+- bounded asynchronous queue
+- sensitive-key/value masking
 
-Files are named:
+A state-changing Tool is executed only after its pre-execution audit record is successfully persisted. Queue saturation, filesystem failure, or audit write rejection causes the mutation to fail closed.
 
-`jarvis-audit-YYYY-MM-DD-NNNN.jsonl`
+Post-execution audit failure never triggers a Tool retry.
 
-Every accepted record is appended with asynchronous filesystem I/O. `record()` returns `true` only after the append succeeds.
+## Stored audit fields
 
-For a state-changing Tool, Brain Core awaits the pre-execution audit call. If the audit queue is full, the filesystem append fails, or the record cannot fit under the configured storage limits, `record()` returns `false` and the Tool is not executed.
-
-Post-execution audit failure never causes an automatic Tool retry because the Tool may already have changed server state.
-
-## Stored fields
-
-The audit record contains only the T04 audit contract:
+Audit records are limited to operational metadata such as:
 
 - timestamp
 - serverId
@@ -99,128 +107,71 @@ The audit record contains only the T04 audit contract:
 - requestId
 - toolCallId
 - actionId when applicable
-- Tool
-- risk
+- Tool/risk
 - validated argument summary
-- outcome
-- source
-- latency
+- outcome/source/latency
 - model ID
 - fallback reason
-- advertised capability descriptors
 
-The audit sink does not receive or store the full user prompt, private chat history, IP address, provider API keys, Adapter shared secret, or model hidden reasoning.
-
-Sensitive keys such as `secret`, `token`, `password`, `authorization`, and API-key fields are redacted again at the sink boundary. Known provider-key and bearer-token patterns inside string values are also redacted.
-
-## Health
-
-`OpsRuntime.health()` exposes:
-
-- overall `HEALTHY / DEGRADED / UNHEALTHY`
-- whether audit storage is currently writable
-- queue depth and capacity
-- rejected record count
-- last successful write time
-- last error time/code
-- current managed audit byte/file counts
-- provider-key configured booleans
-- fixed policy values
-
-It never returns secret values.
-
-A disk write failure marks audit health `UNHEALTHY`. Future records may retry the filesystem; a later successful append restores writable health.
-
-Queue saturation is surfaced as `AUDIT_QUEUE_FULL`. It is never silently dropped.
-
-## Startup
-
-The production Brain process is now part of the repository. It composes:
-
-`OpsRuntime -> TypeSafeJevClassifier -> OpenAiLunaPort -> JarvisAiModel -> BrainCore -> BrainWebSocketServer`
-
-Build and start it from the `brain` directory:
-
-```bash
-npm ci
-npm run build
-npm start
-```
-
-Required environment:
-
-- `OPENAI_API_KEY`
-- `TYPESAFE_API_KEY`
-- `JARVIS_SHARED_SECRET`
-
-Optional listener settings:
-
-- `JARVIS_BRAIN_HOST` — default `127.0.0.1`, loopback only
-- `JARVIS_BRAIN_PORT` — default `8181`
-
-The production Adapter endpoint is:
-
-`ws://<loopback-host>:<port>/ws`
-
-Startup order:
-
-1. validate provider keys and the Adapter shared secret;
-2. validate loopback bind host/port;
-3. construct the rotating audit runtime;
-4. construct the pinned Jev and GPT-6 Luna clients;
-5. construct `BrainCore`;
-6. bind the authenticated WebSocket server;
-7. accept Adapter hello/capabilities handshakes.
-
-If configuration, audit construction, or socket binding fails, startup fails instead of running with a weakened policy.
-
-Do not log the raw configuration object because it contains provider credentials.
-
-## Shutdown
-
-On SIGTERM/SIGINT:
-
-1. stop accepting new chats/connections;
-2. await `ops.close()` so queued audit entries drain;
-3. close Adapter transports;
-4. exit.
-
-Once closing starts, new audit records are rejected.
+Do not store provider secrets, full hidden reasoning, IP addresses, unrelated private chat, or complete server logs.
 
 ## Failure handling
 
-### Provider outage
+### Jev failure
 
-OpenAI/TypeSafe failures are handled by the T05 model policy. Do not insert an unapproved substitute model.
+Jev timeout/error/uncertain or configured low confidence activates the deterministic fallback route. Only currently active read-only Tools are exposed to Luna. State-changing Tools are withheld.
 
-### Audit disk failure
+### Luna failure
 
-Health becomes unhealthy. Read-only operations may continue according to Core policy. State-changing Tools are rejected because pre-execution audit confirmation fails.
+Return the fixed safe failure response. Do not invent server state or claim a Tool succeeded.
 
-Correct the disk/path/permission problem and verify health before retrying an action. Do not bypass the audit gate.
+### Audit failure
 
-### Queue saturation
+Read-only work may continue according to policy. State-changing work must fail closed until audit health recovers.
 
-The record that cannot be queued returns failure. Reduce request pressure or fix slow storage. Increasing the queue changes memory/backpressure behavior and should be capacity-tested.
+### Tool timeout
 
-### Retention/rotation failure
+Read-only Tool timeout is reported as timeout/error according to the runtime contract.
 
-A deletion or metadata error is treated as an audit I/O failure. This prevents silently exceeding the configured audit policy for subsequent state-changing actions.
+For state-changing Tools, a deadline expiry after execution may have started is `OUTCOME_UNKNOWN`. Do not automatically replay the action.
 
-## Data sent to external model providers
+### deop/logout/session end
 
-OpenAI receives the current operator request context needed for the answer, active Tool schemas, and bounded Tool results. TypeSafe receives the latest message, a short non-Tool topic summary, and capability names.
+Invalidate the actor/session and cancel queued work. Before Tool execution and before reply delivery, current online OP/session state is checked again.
 
-By default JARVIS does not send IP addresses, provider secrets, Adapter shared secrets, complete server logs, or unrelated private chats.
+## Shutdown
 
-## Verification
+Platform shutdown calls `BrainGateway.stop()`, which:
 
-T09 tests cover configuration rejection, secret masking, JSONL rotation/retention/total-cap behavior, queue saturation, disk failure, health, close/drain, and Brain Core fail-closed behavior for a state-changing Tool.
+1. stops accepting new Embedded Brain work;
+2. shuts down the bounded AI scheduler;
+3. clears active Luna request state;
+4. closes owned Luna/audit resources;
+5. rejects late delivery after the gateway is stopped.
 
-T10 records platform/client/model live evidence separately; passing T09 mock/contract tests is not reported as external-model or Minecraft-client E2E.
+There is no external Brain process to signal.
 
-### WebSocket authentication
+## Build verification
 
-Adapters connect outward to the Brain using the `X-Jarvis-Secret` header. The listener rejects an incorrect or missing secret before protocol activation. Only loopback bind hosts are allowed in v0.1.
+Deterministic verification:
 
-The first application message must be Adapter `hello`, followed by `capabilities`. A reconnect for the same `serverId` replaces the previous connection and invalidates its Brain session state. Binary messages, oversized payloads, protocol-version mismatches, serverId mismatches, and directionally invalid messages are closed as protocol violations.
+```bash
+./gradlew build
+```
+
+This includes the E12 Embedded policy parity/safety verification plus T06/T07/T08 platform contract tests and existing Provider tests.
+
+Live provider verification requires real credentials:
+
+```bash
+OPENAI_API_KEY=... TYPESAFE_API_KEY=... \
+  ./gradlew :minecraft:common:embeddedBrainLiveVerification
+```
+
+Never commit credentials or generated environment files.
+
+## Historical Remote artifacts
+
+The old protocol schema/fixtures and `tests/acceptance/out` results are retained as historical compatibility/evidence assets. They do not describe an active WebSocket service after E14.
+
+Node-based Brain and acceptance runners were removed. New runtime verification should target the Embedded Java path.

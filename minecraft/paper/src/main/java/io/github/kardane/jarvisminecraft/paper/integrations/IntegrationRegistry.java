@@ -1,7 +1,7 @@
 package io.github.kardane.jarvisminecraft.paper.integrations;
 
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
-import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
+import io.github.kardane.jarvisminecraft.common.brain.Capability;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperPlatformAccess;
 import io.github.kardane.jarvisminecraft.paper.tools.PaperToolService;
 import org.bukkit.Server;
@@ -180,7 +180,7 @@ public final class IntegrationRegistry implements AutoCloseable {
     }
 
     /** Returns only capabilities represented by currently registered Tools. */
-    public List<ProtocolMessage.Capability> capabilities(String paperMinecraftVersion) {
+    public List<Capability> capabilities(String paperMinecraftVersion) {
         Objects.requireNonNull(paperMinecraftVersion, "paperMinecraftVersion");
         return toolRegistry.tools().stream()
             .map(tool -> tool.capability())
@@ -190,12 +190,12 @@ public final class IntegrationRegistry implements AutoCloseable {
                 .filter(state -> state.availability() == ProviderAvailability.ACTIVE)
                 .filter(state -> state.capabilities().contains(capability))
                 .findFirst()
-                .map(state -> new ProtocolMessage.Capability(
+                .map(state -> new Capability(
                     capability,
                     state.provider(),
                     state.version()
                 ))
-                .orElseGet(() -> new ProtocolMessage.Capability(
+                .orElseGet(() -> new Capability(
                     capability,
                     "Paper",
                     paperMinecraftVersion

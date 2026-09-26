@@ -26,15 +26,6 @@ tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
 }
 
-val t03Verification by tasks.registering(JavaExec::class) {
-    group = "verification"
-    description = "Runs T03 fixture, reconnect, deduplication and scheduler contract tests."
-    dependsOn(tasks.testClasses)
-    classpath = sourceSets.test.get().runtimeClasspath
-    mainClass.set("io.github.kardane.jarvisminecraft.common.T03VerificationMain")
-    systemProperty("jarvis.repoRoot", rootProject.projectDir.absolutePath)
-}
-
 val embeddedBrainVerification by tasks.registering(JavaExec::class) {
     group = "verification"
     description = "Runs Embedded Brain E8-E10 orchestration, audit and gateway contract tests."
@@ -43,9 +34,18 @@ val embeddedBrainVerification by tasks.registering(JavaExec::class) {
     mainClass.set("io.github.kardane.jarvisminecraft.common.EmbeddedBrainVerificationMain")
 }
 
+val embeddedBrainParityVerification by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "Runs E12 Remote/Embedded policy parity fixtures and safety invariants."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("io.github.kardane.jarvisminecraft.common.EmbeddedBrainParityVerificationMain")
+    systemProperty("jarvis.repoRoot", rootProject.projectDir.absolutePath)
+}
+
 tasks.named("check") {
-    dependsOn(t03Verification)
     dependsOn(embeddedBrainVerification)
+    dependsOn(embeddedBrainParityVerification)
 }
 
 val embeddedBrainLiveVerification by tasks.registering(JavaExec::class) {

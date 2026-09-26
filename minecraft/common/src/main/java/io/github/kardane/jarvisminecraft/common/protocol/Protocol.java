@@ -1,50 +1,11 @@
 package io.github.kardane.jarvisminecraft.common.protocol;
 
 import com.google.gson.annotations.SerializedName;
-import io.github.kardane.jarvisminecraft.common.generated.GeneratedContractConstants;
 
 import java.util.Arrays;
 
 public final class Protocol {
-    public static final String VERSION = GeneratedContractConstants.PROTOCOL_VERSION;
-    public static final int MAX_MESSAGE_BYTES = GeneratedContractConstants.MAX_MESSAGE_BYTES;
-    public static final int MAX_TOOL_CALLS_PER_REQUEST =
-        GeneratedContractConstants.MAX_TOOL_CALLS_PER_REQUEST;
-    public static final int MAX_MODEL_ROUND_TRIPS_PER_REQUEST =
-        GeneratedContractConstants.MAX_MODEL_ROUND_TRIPS_PER_REQUEST;
-    public static final String SECRET_HEADER = "X-Jarvis-Secret";
-
     private Protocol() {
-    }
-
-    public enum MessageType {
-        @SerializedName("hello") HELLO("hello"),
-        @SerializedName("capabilities") CAPABILITIES("capabilities"),
-        @SerializedName("chat.message") CHAT_MESSAGE("chat.message"),
-        @SerializedName("chat.response") CHAT_RESPONSE("chat.response"),
-        @SerializedName("tool.request") TOOL_REQUEST("tool.request"),
-        @SerializedName("tool.result") TOOL_RESULT("tool.result"),
-        @SerializedName("cancel") CANCEL("cancel"),
-        @SerializedName("error") ERROR("error"),
-        @SerializedName("ping") PING("ping"),
-        @SerializedName("pong") PONG("pong");
-
-        private final String wireName;
-
-        MessageType(String wireName) {
-            this.wireName = wireName;
-        }
-
-        public String wireName() {
-            return wireName;
-        }
-
-        public static MessageType fromWire(String value) {
-            return Arrays.stream(values())
-                .filter(v -> v.wireName.equals(value))
-                .findFirst()
-                .orElseThrow(() -> new ProtocolException(ErrorCode.INVALID_ARGUMENT, "Unknown message type."));
-        }
     }
 
     public enum ErrorCode {

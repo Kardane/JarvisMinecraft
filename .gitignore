@@ -1,7 +1,5 @@
 .gradle/
 **/build/
-brain/node_modules/
-brain/dist/
 .env
 .env.*
 !.env.example

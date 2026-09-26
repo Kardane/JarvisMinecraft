@@ -1,7 +1,7 @@
 package io.github.kardane.jarvisminecraft.common.brain.ai;
 
 import io.github.kardane.jarvisminecraft.common.brain.ConversationEntry;
-import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
+import io.github.kardane.jarvisminecraft.common.brain.Capability;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -20,7 +20,7 @@ public record JevInput(
 
     public static JevInput fromConversation(
         List<ConversationEntry> history,
-        List<ProtocolMessage.Capability> capabilities
+        List<Capability> capabilities
     ) {
         Objects.requireNonNull(history, "history");
         Objects.requireNonNull(capabilities, "capabilities");
@@ -52,7 +52,7 @@ public record JevInput(
         return new JevInput(
             latestMessage,
             shortTopic,
-            capabilities.stream().map(ProtocolMessage.Capability::name).toList()
+            capabilities.stream().map(Capability::name).toList()
         );
     }
 

@@ -1,54 +1,28 @@
-# T10 acceptance harness
+# Historical T10 acceptance evidence
 
-This directory owns v0.1 acceptance evidence. It deliberately separates deterministic policy tests from live Minecraft/model evidence.
+E14 이후 이 디렉터리는 실행 가능한 Node acceptance harness가 아니라 **과거 T10 evidence archive** 역할을 한다.
 
-## Deterministic acceptance
+보존 항목:
 
-Prerequisite:
+- `out/paper.json`
+- `out/fabric.json`
+- `out/neoforge.json`
+- `out/a09-jev-report.json`
+- `out/a10-live-models-report.json`
 
-```bash
-cd brain
-npm ci
-npm run build
-cd ../tests/acceptance
-npm install --ignore-scripts --no-audit --no-fund
-npm run test:core
-```
+기존 core/live Node runner와 WebSocket acceptance gateway는 production Remote Brain과 함께 제거했다. 이 결과 파일을 현재 Embedded runtime의 신규 E2E 통과 증거로 재해석하지 않는다.
 
-The core suite maps tests to A01-A08 and A11-A13. A14 is v0.2-only.
-
-## Live platform harness
-
-The live harness uses:
-
-- the packaged JARVIS Adapter JAR;
-- a real Minecraft 1.21.8 dedicated server;
-- the production `BrainWebSocketServer` transport on loopback;
-- real offline-mode Minecraft protocol clients through Mineflayer;
-- deterministic BrainCore ModelPort logic so Minecraft/platform behavior can be tested without provider cost.
-
-Run one platform at a time:
+현재 deterministic 검증은:
 
 ```bash
-npm run live:paper
-npm run live:fabric
-npm run live:neoforge
+./gradlew build
 ```
 
-The harness creates isolated directories under `.t10/`, uses ports 25565 and 8181, and stops the server after the scenario.
-
-The acceptance gateway is now only a thin test harness around the production `BrainWebSocketServer`. It supplies a deterministic ModelPort and in-memory audit observer, but does not duplicate WebSocket authentication, handshake, binding, reconnect, Tool correlation, or cancellation logic.
-
-Therefore live platform tests exercise the same production transport implementation used by `npm start`. External A09/A10 still require the real Jev and GPT-6 Luna providers and are recorded separately.
-
-## External model evidence
-
-A09/A10 use the existing T05 scripts and require real credentials:
+현재 live Jev/Luna smoke는:
 
 ```bash
-cd brain && npm ci && npm run build && cd ..
-TYPESAFE_API_KEY=... node evals/t05/run-jev-eval.mjs --output /tmp/jev-report.json
-OPENAI_API_KEY=... TYPESAFE_API_KEY=... node evals/t05/live-models.mjs
+OPENAI_API_KEY=... TYPESAFE_API_KEY=... \
+  ./gradlew :minecraft:common:embeddedBrainLiveVerification
 ```
 
-Never commit keys or generated credential-bearing environment files.
+새 platform live acceptance harness가 필요하면 Embedded Brain을 직접 부팅하는 형태로 별도 추가해야 한다.

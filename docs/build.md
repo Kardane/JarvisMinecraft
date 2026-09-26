@@ -1,24 +1,8 @@
-# T02 Build Skeleton
+# Build and verification
 
-작성일: 2026-09-24  
-상태: T02 build/CI 기준
+갱신일: 2026-09-27
 
-## 고정 package 경로
-
-공통 base package:
-
-`io.github.kardane.jarvisminecraft`
-
-담당 경로:
-
-- T03 common: `io.github.kardane.jarvisminecraft.common`
-- T06 Paper: `io.github.kardane.jarvisminecraft.paper`
-- T07 Fabric: `io.github.kardane.jarvisminecraft.fabric`
-- T08 NeoForge: `io.github.kardane.jarvisminecraft.neoforge`
-
-플랫폼 구현은 다른 플랫폼 package를 import하지 않는다. 공통 모듈에는 Bukkit/Paper, Fabric, NeoForge, NMS import를 추가하지 않는다.
-
-## 빌드 기준
+## 기준
 
 - Java: 21
 - Gradle Wrapper: 8.14.5
@@ -30,35 +14,49 @@
 - Fabric Loom: 1.12.2
 - NeoForge: 21.8.52
 - ModDevGradle: 2.0.147
-- Node: 24
-- OpenAI SDK: 7.22.0
-- TypeSafe SDK: 0.6.0
+- OpenAI Java SDK: 4.69.2
+- Jev: TypeSafe HTTPS API through the Java classifier
 
-## 명령
+E14 이후 production build/runtime에는 Node.js/npm이 필요하지 않는다.
 
-Java 전체:
+## 전체 빌드
 
-`./gradlew build`
+```bash
+./gradlew build
+```
 
-Brain:
+CI도 동일한 Java/Gradle build를 실행한다.
 
-`cd brain && npm ci && npm run check && npm run build`
+## 주요 deterministic verification
 
-Protocol fixture 검증:
+`minecraft/common:check`에는 Embedded Brain orchestration 검증과 E12 policy parity/safety verification이 포함된다.
 
-`cd brain && npm run test:protocol`
+플랫폼 모듈의 `check`는 각각 T06/T07/T08 계약 검증을 실행한다. Paper는 optional Provider T11~T14 검증도 포함한다.
 
-## Lock 정책
+## Live model verification
 
-Gradle의 모든 subproject는 dependency locking을 켠다. npm은 `package-lock.json`을 사용한다.
+실제 Jev/Luna provider smoke는 credentials가 있을 때 명시적으로 실행한다.
 
-T02 bootstrap CI에서 실제 dependency resolution으로 생성한 lock 파일을 저장소에 커밋했다. 현재 CI는 `--write-locks`를 사용하지 않으며 커밋된 lock 파일과 `brain/package-lock.json`을 그대로 소비한다.
+```bash
+OPENAI_API_KEY=... TYPESAFE_API_KEY=... \
+  ./gradlew :minecraft:common:embeddedBrainLiveVerification
+```
 
-잠금 파일:
+이 작업은 기본 CI에서 외부 provider를 호출하지 않는다.
+
+## Dependency locking
+
+Gradle subproject는 committed dependency lock을 사용한다.
+
 - `minecraft/common/gradle.lockfile`
 - `minecraft/paper/gradle.lockfile`
 - `minecraft/fabric/gradle.lockfile`
 - `minecraft/neoforge/gradle.lockfile`
-- `brain/package-lock.json`
 
-루트 Gradle/build/CI 파일은 T02 병합 후 통합 담당만 수정한다. 다른 작업은 의존성 변경 요청을 인계한다.
+과거 `brain/package-lock.json`은 E14에서 Node Brain package와 함께 제거되었다.
+
+## Contract/evaluation assets
+
+`protocol/schema`, `protocol/fixtures`, `evals`, `tests/acceptance/out`은 삭제하지 않는다. 다만 E14 이후 이 자산들은 별도 Node runtime의 실행 입력이 아니라 compatibility, regression, historical evidence 용도다.
+
+`GeneratedContractConstants.java`는 schema/policy source와 함께 committed contract artifact로 유지한다. source 상수를 변경할 때 같은 change에서 Java 상수와 E12 fixture 기대값을 함께 검토한다.

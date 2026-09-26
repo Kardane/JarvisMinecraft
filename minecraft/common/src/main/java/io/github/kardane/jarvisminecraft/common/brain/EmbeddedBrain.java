@@ -10,7 +10,7 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaTurnInput;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
-import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
+import io.github.kardane.jarvisminecraft.common.brain.Capability;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 import io.github.kardane.jarvisminecraft.common.runtime.AuditSink;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
@@ -41,7 +41,7 @@ public final class EmbeddedBrain {
         "현재 GPT-6 Luna 응답을 완료할 수 없습니다. 서버 상태나 작업 성공 여부를 추측하지 않았습니다.";
 
     private final String serverId;
-    private final List<ProtocolMessage.Capability> capabilities;
+    private final List<Capability> capabilities;
     private final ChatSessionManager sessions;
     private final ConversationHistoryStore history;
     private final AiRequestScheduler scheduler;
@@ -56,7 +56,7 @@ public final class EmbeddedBrain {
 
     public EmbeddedBrain(
         String serverId,
-        List<ProtocolMessage.Capability> capabilities,
+        List<Capability> capabilities,
         ChatSessionManager sessions,
         ConversationHistoryStore history,
         AiRequestScheduler scheduler,

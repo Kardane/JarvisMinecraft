@@ -7,7 +7,7 @@
 
 ## 맥락
 
-현재 JarvisMinecraft는 Minecraft Adapter와 TypeScript Brain을 loopback WebSocket으로 분리한다. 이 구조는 Brain을 독립 프로세스로 운영하기 때문에 Node.js/npm 설치, Brain daemon 관리, 공유 비밀, hello/capabilities handshake, reconnect, ping/pong, 별도 process monitoring이 필요하다.
+JarvisMinecraft는 과거 Minecraft Adapter와 TypeScript Brain을 loopback WebSocket으로 분리했다. E12 parity 검증 후 E13/E14에서 해당 process boundary와 Node production Brain을 제거했고, 현재 production Brain은 Minecraft JVM 내부에 embedded된다.
 
 최종 배포 목표는 서버 관리자가 플랫폼별 JAR/MOD 하나와 모델 API 키만 준비하면 JARVIS를 사용할 수 있게 하는 것이다. 따라서 Brain의 세션·예산·분류·모델 orchestration을 JVM 안으로 옮기되, sidecar 구조에서 필요했던 process-boundary 상태를 Java 객체로 그대로 복제하지 않는다.
 
@@ -19,7 +19,7 @@
 4. Luna Tool call은 신뢰되지 않은 제안으로 취급한다.
 5. Minecraft 권한과 실제 상태의 최종 authority는 계속 `CommonRuntime`과 플랫폼 Adapter에 둔다.
 6. TypeScript Brain은 구조를 1:1 Java로 포팅하지 않고, 필요한 정책 불변조건만 이식한다.
-7. Remote Brain은 Embedded parity가 확보될 때까지 reference implementation으로 유지한다.
+7. Remote Brain은 E12 parity 기준점 확보까지만 reference implementation으로 유지했으며, E13/E14에서 제거한다.
 8. AI HTTPS 호출은 비동기로 수행하며 Minecraft server/tick thread에서 기다리지 않는다.
 9. 기존 Java runtime의 `ToolName`, `ToolRegistry`, `AuditSink`, `CommonRuntime`, `RequesterAuthority`, `DeadlinePolicy`, `DeduplicationLedger`, `ServerScheduler`를 재사용한다.
 10. Tool argument 검증은 하나의 Java contract parser를 공유하고 AI 전용 validator를 중복 구현하지 않는다.
@@ -111,7 +111,7 @@ Brain-side AdapterPort
 remote Tool result connection binding
 ```
 
-Remote Brain이 존재하는 마이그레이션 기간에는 기존 구현을 유지하지만 Embedded 경로는 이에 의존하지 않는다.
+E13/E14 완료 후 위 상태와 abstraction은 production source에서 제거되었다.
 
 ## 단계적 전환
 
@@ -133,7 +133,7 @@ WebSocket 제거
 Node Brain 제거
 ```
 
-Remote 삭제는 deterministic policy parity, 세 플랫폼 E2E, deop/logout race, audit fail-closed, `OUTCOME_UNKNOWN` no-retry가 검증된 이후에만 수행한다.
+E12 shared fixture에서 deterministic policy parity와 핵심 safety invariant를 검증한 뒤 E13에서 WebSocket 경계를, E14에서 Node production Brain을 제거했다. 과거 protocol/eval/evidence 자산은 보존한다.
 
 ## 결과
 
@@ -147,7 +147,7 @@ Remote 삭제는 deterministic policy parity, 세 플랫폼 E2E, deop/logout rac
 ### 비용
 
 - TypeScript Brain 정책을 Java로 의미 보존 이식해야 한다.
-- Remote/Embedded parity 기간 동안 두 경로가 일시적으로 공존한다.
+- E12까지 Remote/Embedded 두 경로를 유지하는 일시적 migration 비용이 발생했다.
 - Jev/Luna JVM client와 audit sink 구현이 필요하다.
 
 ## 비결정 사항
