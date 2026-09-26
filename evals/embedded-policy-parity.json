@@ -1,0 +1,156 @@
+{
+  "limits": {
+    "maxToolCalls": 8,
+    "maxModelRounds": 4,
+    "maxConcurrent": 4,
+    "maxQueuedPerSession": 2,
+    "maxQueuedTotal": 16
+  },
+  "routeCases": [
+    {
+      "name": "server-query",
+      "mode": "CLASSIFICATION",
+      "category": "SERVER_QUERY",
+      "confidence": 0.92,
+      "abstainBelow": null,
+      "activeTools": [
+        "get_server_status",
+        "get_online_players",
+        "get_player_location",
+        "teleport_staff"
+      ],
+      "expectedTools": [
+        "get_online_players",
+        "get_server_status"
+      ],
+      "expectedFallback": null
+    },
+    {
+      "name": "action-request",
+      "mode": "CLASSIFICATION",
+      "category": "ACTION_REQUEST",
+      "confidence": 0.97,
+      "abstainBelow": null,
+      "activeTools": [
+        "get_server_status",
+        "get_player",
+        "get_player_location",
+        "teleport_staff"
+      ],
+      "expectedTools": [
+        "get_player",
+        "get_player_location",
+        "teleport_staff"
+      ],
+      "expectedFallback": null
+    },
+    {
+      "name": "jev-error-read-only",
+      "mode": "ERROR",
+      "category": "UNCERTAIN",
+      "confidence": 0.0,
+      "abstainBelow": null,
+      "activeTools": [
+        "get_server_status",
+        "get_player_location",
+        "teleport_staff"
+      ],
+      "expectedTools": [
+        "get_player_location",
+        "get_server_status"
+      ],
+      "expectedFallback": "JEV_ERROR"
+    },
+    {
+      "name": "jev-uncertain-read-only",
+      "mode": "CLASSIFICATION",
+      "category": "UNCERTAIN",
+      "confidence": 0.4,
+      "abstainBelow": null,
+      "activeTools": [
+        "get_server_status",
+        "get_player_location",
+        "teleport_staff"
+      ],
+      "expectedTools": [
+        "get_player_location",
+        "get_server_status"
+      ],
+      "expectedFallback": "JEV_UNCERTAIN"
+    },
+    {
+      "name": "jev-low-confidence-read-only",
+      "mode": "CLASSIFICATION",
+      "category": "ACTION_REQUEST",
+      "confidence": 0.61,
+      "abstainBelow": 0.8,
+      "activeTools": [
+        "get_player",
+        "get_player_location",
+        "teleport_staff"
+      ],
+      "expectedTools": [
+        "get_player",
+        "get_player_location"
+      ],
+      "expectedFallback": "JEV_LOW_CONFIDENCE"
+    },
+    {
+      "name": "provider-unavailable-not-exposed",
+      "mode": "CLASSIFICATION",
+      "category": "REGION_QUERY",
+      "confidence": 0.94,
+      "abstainBelow": null,
+      "activeTools": [
+        "get_server_status",
+        "get_player_location"
+      ],
+      "expectedTools": [],
+      "expectedFallback": null
+    }
+  ],
+  "argumentCases": [
+    {
+      "name": "valid-teleport",
+      "tool": "teleport_staff",
+      "arguments": {
+        "targetPlayerUuid": "00000000-0000-4000-8000-000000000104"
+      },
+      "valid": true
+    },
+    {
+      "name": "unknown-field-rejected",
+      "tool": "get_player_location",
+      "arguments": {
+        "playerUuid": "00000000-0000-4000-8000-000000000104",
+        "command": "/op me"
+      },
+      "valid": false
+    },
+    {
+      "name": "out-of-range-radius-rejected",
+      "tool": "get_nearby_players",
+      "arguments": {
+        "center": {
+          "worldId": "world",
+          "x": 0,
+          "y": 64,
+          "z": 0,
+          "yaw": 0,
+          "pitch": 0
+        },
+        "radius": 1000,
+        "limit": 10
+      },
+      "valid": false
+    },
+    {
+      "name": "unknown-tool-rejected",
+      "tool": "run_console_command",
+      "arguments": {
+        "command": "stop"
+      },
+      "valid": false
+    }
+  ]
+}
