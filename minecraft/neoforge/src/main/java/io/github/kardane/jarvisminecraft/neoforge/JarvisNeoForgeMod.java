@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.neoforge;
 
+import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
@@ -108,7 +109,7 @@ public final class JarvisNeoForgeMod {
                 return thread;
             });
 
-        NeoForgeBrainConnection brain = new NeoForgeBrainConnection(
+        BrainGateway brain = new NeoForgeBrainConnection(
             config.serverId(),
             minecraftVersion,
             ADAPTER_VERSION,
@@ -280,7 +281,7 @@ public final class JarvisNeoForgeMod {
 
     private record RuntimeState(
         MinecraftServer server,
-        NeoForgeBrainConnection brain,
+        BrainGateway brain,
         NeoForgeChatController chat,
         NeoForgeTickSampler tickSampler,
         ScheduledExecutorService reconnectExecutor
