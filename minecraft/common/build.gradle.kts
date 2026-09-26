@@ -14,6 +14,10 @@ dependencies {
     // in production and explicit on the common verification runtime.
     compileOnly("com.google.code.gson:gson:2.11.0")
     testImplementation("com.google.code.gson:gson:2.11.0")
+
+    // E7: compile the embedded Luna bridge against the official OpenAI Java SDK.
+    // Runtime bundling/shading is intentionally deferred to the packaging phase.
+    compileOnly("com.openai:openai-java:4.69.2")
 }
 
 tasks.withType<JavaCompile>().configureEach {
