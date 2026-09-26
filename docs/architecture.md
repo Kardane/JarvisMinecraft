@@ -116,6 +116,12 @@ Tool 입력 검증은 `ToolArgumentCodec`으로 분리되어 Remote protocol의 
 
 `ConversationHistoryStore`와 bounded in-memory 구현은 추가되었지만 현재 Remote production 흐름에는 아직 연결하지 않았다. 이 저장소는 모델 conversation history만 담당하며 session TTL과 active lifecycle은 기존 `ChatSessionManager`가 계속 단독으로 소유한다.
 
+E4~E7 foundation으로 `RequestBudget`, 단일 JVM 서버 범위의 `AiRequestScheduler`, JDK `HttpClient` 기반 `JdkJevClassifier`, `DeterministicRoutePolicy`, Luna prompt/tool schema contract와 공식 OpenAI Java SDK 기반 `OpenAiLunaClient`가 추가되었다. Jev 입력은 기존 Brain과 같은 latest-user/short-topic/capability projection 규칙을 사용하며, Jev 오류·UNCERTAIN·저신뢰 fallback에서는 active Tool 중 read-only Tool만 노출한다.
+
+Luna Tool schema는 모델 입력 품질을 위한 AI 표현 계층이고 실행 권한의 source of truth가 아니다. function arguments는 반드시 공용 `ToolArgumentCodec`으로 다시 typed parsing되며, inactive Tool은 Luna bridge에서 거부한다. OpenAI SDK는 현재 compile-time dependency로 고정되어 있고 실제 플랫폼 artifact bundling/shading은 packaging 단계에서 검증한다.
+
+이 E4~E7 객체들은 아직 production chat 경로에 조립되지 않았다. 실제 `ChatSessionManager → EmbeddedBrain → Jev → Luna → CommonRuntime` 연결은 다음 Embedded orchestration 단계의 책임이다.
+
 ## 빌드와 운영
 
 Minecraft 모듈은 `minecraft/common`, `minecraft/paper`, `minecraft/fabric`, `minecraft/neoforge`; Brain은 `brain` TypeScript/Node package다. 기준은 Minecraft 1.21.8/Java 21, Node 24이며 구체 SDK와 plugin pin은 version catalog, lockfile, [`build.md`](build.md), ADR 문서를 확인한다.
