@@ -3,11 +3,9 @@ package io.github.kardane.jarvisminecraft.neoforge;
 import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainSettings;
-import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainSettings.BrainMode;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
-import io.github.kardane.jarvisminecraft.common.transport.JdkBrainWebSocketTransport;
 import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftTools;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.neoforge.chat.NeoForgeChatController;
@@ -16,7 +14,6 @@ import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAcces
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgeServerScheduler;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgeTickSampler;
 import io.github.kardane.jarvisminecraft.neoforge.tools.NeoForgeToolService;
-import io.github.kardane.jarvisminecraft.neoforge.transport.NeoForgeBrainConnection;
 import net.minecraft.SharedConstants;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -33,9 +30,6 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -74,47 +68,32 @@ public final class JarvisNeoForgeMod {
             return;
         }
 
-        final BrainMode brainMode;
         final String serverId;
-        final NeoForgeAdapterConfig remoteConfig;
         final EmbeddedBrainSettings embeddedSettings;
         try {
-            brainMode = EmbeddedBrainSettings.parseMode(
-                setting(
-                    "jarvis.brainMode",
-                    "JARVIS_BRAIN_MODE",
-                    "remote"
-                )
-            );
             serverId = setting(
                 "jarvis.serverId",
                 "JARVIS_SERVER_ID",
                 "main"
             );
-            if (brainMode == BrainMode.REMOTE) {
-                remoteConfig = loadRemoteConfig(serverId);
-                embeddedSettings = null;
-            } else {
-                remoteConfig = null;
-                embeddedSettings = new EmbeddedBrainSettings(
-                    serverId,
-                    setting(
-                        "jarvis.openaiApiKey",
-                        "OPENAI_API_KEY",
-                        ""
-                    ),
-                    setting(
-                        "jarvis.typesafeApiKey",
-                        "TYPESAFE_API_KEY",
-                        ""
-                    ),
-                    Path.of(
-                        "config",
-                        "jarvisminecraft",
-                        "audit"
-                    )
-                );
-            }
+            embeddedSettings = new EmbeddedBrainSettings(
+                serverId,
+                setting(
+                    "jarvis.openaiApiKey",
+                    "OPENAI_API_KEY",
+                    ""
+                ),
+                setting(
+                    "jarvis.typesafeApiKey",
+                    "TYPESAFE_API_KEY",
+                    ""
+                ),
+                Path.of(
+                    "config",
+                    "jarvisminecraft",
+                    "audit"
+                )
+            );
         } catch (RuntimeException failure) {
             LOGGER.log(
                 Level.SEVERE,
@@ -141,60 +120,23 @@ public final class JarvisNeoForgeMod {
         );
 
         ChatSessionManager sessions = new ChatSessionManager(clock);
-        ScheduledExecutorService reconnectExecutor = null;
 
-        BrainGateway brain;
-        if (brainMode == BrainMode.EMBEDDED) {
-            brain = EmbeddedBrainGateway.live(
-                embeddedSettings.serverId(),
-                StandardMinecraftTools.capabilities(
-                    "NeoForge",
-                    minecraftVersion
-                ),
-                embeddedSettings.openAiApiKey(),
-                embeddedSettings.typesafeApiKey(),
-                embeddedSettings.auditDirectory(),
-                sessions,
-                registry,
-                commonRuntime,
-                serverScheduler,
-                platform,
-                clock
-            );
-        } else {
-            reconnectExecutor =
-                Executors.newSingleThreadScheduledExecutor(runnable -> {
-                    Thread thread = new Thread(
-                        runnable,
-                        "jarvis-neoforge-reconnect"
-                    );
-                    thread.setDaemon(true);
-                    return thread;
-                });
-            ScheduledExecutorService remoteReconnectExecutor =
-                reconnectExecutor;
-            brain = new NeoForgeBrainConnection(
-                remoteConfig.serverId(),
-                minecraftVersion,
-                ADAPTER_VERSION,
-                NEOFORGE_VERSION,
-                clock,
-                commonRuntime,
-                serverScheduler,
-                platform,
-                sessions::isActive,
-                () -> new JdkBrainWebSocketTransport(
-                    remoteConfig.brainUri(),
-                    remoteConfig.sharedSecret()
-                ),
-                reconnect -> remoteReconnectExecutor.schedule(
-                    reconnect,
-                    remoteConfig.reconnectDelayTicks() * 50L,
-                    TimeUnit.MILLISECONDS
-                ),
-                LOGGER
-            );
-        }
+        BrainGateway brain = EmbeddedBrainGateway.live(
+            embeddedSettings.serverId(),
+            StandardMinecraftTools.capabilities(
+                "NeoForge",
+                minecraftVersion
+            ),
+            embeddedSettings.openAiApiKey(),
+            embeddedSettings.typesafeApiKey(),
+            embeddedSettings.auditDirectory(),
+            sessions,
+            registry,
+            commonRuntime,
+            serverScheduler,
+            platform,
+            clock
+        );
 
         NeoForgeChatController chat = new NeoForgeChatController(
             server,
@@ -214,8 +156,7 @@ public final class JarvisNeoForgeMod {
             server,
             brain,
             chat,
-            tickSampler,
-            reconnectExecutor
+            tickSampler
         );
         runtime = next;
 
@@ -230,9 +171,7 @@ public final class JarvisNeoForgeMod {
         LOGGER.info(
             "JARVIS NeoForge enabled for serverId="
                 + serverId
-                + " with Brain mode="
-                + brainMode.name().toLowerCase()
-                + "."
+                + " with Embedded Brain."
         );
     }
 
@@ -298,33 +237,6 @@ public final class JarvisNeoForgeMod {
         }
     }
 
-    private NeoForgeAdapterConfig loadRemoteConfig(String serverId) {
-        String brainUrl = setting(
-            "jarvis.brainUrl",
-            "JARVIS_BRAIN_URL",
-            "ws://127.0.0.1:8181/ws"
-        );
-        String sharedSecret = setting(
-            "jarvis.sharedSecret",
-            "JARVIS_SHARED_SECRET",
-            ""
-        );
-        long reconnectDelay = Long.parseLong(
-            setting(
-                "jarvis.reconnectDelayTicks",
-                "JARVIS_RECONNECT_DELAY_TICKS",
-                "40"
-            )
-        );
-
-        return NeoForgeAdapterConfig.validate(
-            serverId,
-            brainUrl,
-            sharedSecret,
-            reconnectDelay
-        );
-    }
-
     private String setting(
         String property,
         String environment,
@@ -345,14 +257,10 @@ public final class JarvisNeoForgeMod {
         MinecraftServer server,
         BrainGateway brain,
         NeoForgeChatController chat,
-        NeoForgeTickSampler tickSampler,
-        ScheduledExecutorService reconnectExecutor
+        NeoForgeTickSampler tickSampler
     ) {
         void close() {
             brain.stop();
-            if (reconnectExecutor != null) {
-                reconnectExecutor.shutdownNow();
-            }
         }
     }
 }

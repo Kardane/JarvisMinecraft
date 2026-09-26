@@ -1,7 +1,5 @@
 package io.github.kardane.jarvisminecraft.neoforge;
 
-import io.github.kardane.jarvisminecraft.common.protocol.Protocol;
-import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.GetPlayerByNameArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.NearbyArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.OnlinePlayersData;
@@ -15,6 +13,7 @@ import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WorldInfoArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WorldInfoData;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
+import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftTools;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAccess;
 import io.github.kardane.jarvisminecraft.common.platform.StandardPlatformAccess.LocationSnapshot;
@@ -24,10 +23,7 @@ import io.github.kardane.jarvisminecraft.common.platform.StandardPlatformAccess.
 import io.github.kardane.jarvisminecraft.common.platform.StandardPlatformAccess.TeleportSnapshot;
 import io.github.kardane.jarvisminecraft.common.platform.StandardPlatformAccess.WorldSnapshot;
 import io.github.kardane.jarvisminecraft.neoforge.tools.NeoForgeToolService;
-import io.github.kardane.jarvisminecraft.neoforge.transport.NeoForgeBrainConnection;
-import io.github.kardane.jarvisminecraft.common.runtime.RequestBindingRegistry;
 
-import java.net.URI;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -54,8 +50,6 @@ public final class T08VerificationMain {
 
     public static void main(String[] args) {
         chatContract();
-        configContract();
-        requestBindingContract();
         toolContract();
         System.out.println("T08 verification OK");
     }
@@ -101,56 +95,6 @@ public final class T08VerificationMain {
         );
     }
 
-    private static void configContract() {
-        NeoForgeAdapterConfig valid = NeoForgeAdapterConfig.validate(
-            "main",
-            "ws://127.0.0.1:8181/ws",
-            "correct-horse-battery-staple",
-            40
-        );
-        require("main".equals(valid.serverId()), "valid config server id mismatch");
-
-        expectFailure(() -> NeoForgeAdapterConfig.validate(
-            "main",
-            "ws://example.com:8181/ws",
-            "correct-horse-battery-staple",
-            40
-        ));
-        expectFailure(() -> NeoForgeAdapterConfig.validate(
-            "main",
-            "ws://127.0.0.1:8181/ws",
-            "CHANGE_ME",
-            40
-        ));
-        expectFailure(() -> NeoForgeAdapterConfig.validate(
-            "main",
-            "ws://127.0.0.1:8181/ws?secret=no",
-            "correct-horse-battery-staple",
-            40
-        ));
-    }
-
-    private static void requestBindingContract() {
-        MutableClock clock = new MutableClock(Instant.parse("2026-09-24T00:00:00Z"));
-        RequestBindingRegistry registry = new RequestBindingRegistry(clock);
-        registry.register(REQUEST, ADMIN, SESSION, clock.instant().plusSeconds(30));
-
-        ProtocolMessage valid = boundMessage(REQUEST, ADMIN, SESSION);
-        require(registry.matches(valid), "valid actor/request/session binding rejected");
-
-        require(
-            !registry.matches(boundMessage(REQUEST, STEVE, SESSION)),
-            "mismatched requester binding accepted"
-        );
-        require(
-            !registry.matches(boundMessage(REQUEST, ADMIN, UUID.randomUUID())),
-            "mismatched session binding accepted"
-        );
-
-        clock.advanceMillis(30_001);
-        require(!registry.matches(valid), "expired request binding accepted");
-    }
-
     private static void toolContract() {
         MutableClock clock = new MutableClock(Instant.parse("2026-09-24T00:00:00Z"));
         FakePlatform platform = new FakePlatform();
@@ -158,7 +102,7 @@ public final class T08VerificationMain {
 
         ToolRegistry registry = new ToolRegistry();
         new NeoForgeToolService(platform, clock).register(registry);
-        require(registry.tools().equals(NeoForgeBrainConnection.V01_TOOLS), "v0.1 Tool registry mismatch");
+        require(registry.tools().equals(StandardMinecraftTools.TOOLS), "v0.1 Tool registry mismatch");
 
         ToolRegistry.ToolExecutionContext context = new ToolRegistry.ToolExecutionContext(
             "main",
@@ -273,32 +217,6 @@ public final class T08VerificationMain {
         io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolArguments arguments
     ) {
         return registry.execute(tool, context, arguments).toCompletableFuture().join();
-    }
-
-    private static ProtocolMessage boundMessage(UUID requestId, UUID requester, UUID session) {
-        return new ProtocolMessage(
-            Protocol.VERSION,
-            Protocol.MessageType.CHAT_RESPONSE,
-            UUID.randomUUID(),
-            requestId,
-            "main",
-            session,
-            requester,
-            Instant.parse("2026-09-24T00:00:01Z"),
-            Instant.parse("2026-09-24T00:00:30Z"),
-            new ProtocolMessage.ChatResponse("ok", true, "CONTINUE"),
-            null,
-            null
-        );
-    }
-
-    private static void expectFailure(Runnable runnable) {
-        try {
-            runnable.run();
-            throw new AssertionError("expected failure");
-        } catch (IllegalArgumentException expected) {
-            // Expected.
-        }
     }
 
     private static void require(boolean condition, String message) {

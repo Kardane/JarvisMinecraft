@@ -19,7 +19,7 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.LunaTurnInput;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.platform.AdapterPlatformAccess;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
-import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
+import io.github.kardane.jarvisminecraft.common.brain.Capability;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.NoArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.TeleportArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.TeleportData;
@@ -536,16 +536,13 @@ public final class EmbeddedBrainVerificationMain {
     }
 
     private static void settingsContract() {
-        require(
-            EmbeddedBrainSettings.parseMode("embedded")
-                == EmbeddedBrainSettings.BrainMode.EMBEDDED,
-            "Embedded mode parser changed."
+        EmbeddedBrainSettings settings = new EmbeddedBrainSettings(
+            "main",
+            "openai",
+            "typesafe",
+            Path.of("audit")
         );
-        require(
-            EmbeddedBrainSettings.parseMode(null)
-                == EmbeddedBrainSettings.BrainMode.REMOTE,
-            "Remote migration mode must remain the default."
-        );
+        require("main".equals(settings.serverId()), "Embedded server id changed.");
         try {
             new EmbeddedBrainSettings(
                 "main",
@@ -603,14 +600,14 @@ public final class EmbeddedBrainVerificationMain {
             );
     }
 
-    private static List<ProtocolMessage.Capability> capabilities() {
+    private static List<Capability> capabilities() {
         return List.of(
-            new ProtocolMessage.Capability(
+            new Capability(
                 "server.status",
                 "Fixture",
                 "1"
             ),
-            new ProtocolMessage.Capability(
+            new Capability(
                 "staff.self_teleport",
                 "Fixture",
                 "1"

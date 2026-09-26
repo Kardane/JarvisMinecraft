@@ -3,18 +3,15 @@ package io.github.kardane.jarvisminecraft.paper;
 import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainSettings;
-import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainSettings.BrainMode;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
-import io.github.kardane.jarvisminecraft.common.transport.JdkBrainWebSocketTransport;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.paper.chat.PaperChatListener;
 import io.github.kardane.jarvisminecraft.paper.platform.BukkitPaperPlatformAccess;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperPlatformAccess;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperServerScheduler;
 import io.github.kardane.jarvisminecraft.paper.integrations.IntegrationRegistry;
-import io.github.kardane.jarvisminecraft.paper.transport.PaperBrainConnection;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -47,46 +44,23 @@ public final class JarvisPaperPlugin extends JavaPlugin {
 
         saveDefaultConfig();
 
-        final BrainMode brainMode;
         final String serverId = getConfig().getString("server-id", "main");
-        final PaperAdapterConfig remoteConfig;
         final EmbeddedBrainSettings embeddedSettings;
         try {
-            brainMode = EmbeddedBrainSettings.parseMode(
+            embeddedSettings = new EmbeddedBrainSettings(
+                serverId,
                 setting(
-                    "jarvis.brainMode",
-                    "JARVIS_BRAIN_MODE",
-                    getConfig().getString("brain-mode", "remote")
-                )
+                    "jarvis.openaiApiKey",
+                    "OPENAI_API_KEY",
+                    getConfig().getString("openai-api-key", "")
+                ),
+                setting(
+                    "jarvis.typesafeApiKey",
+                    "TYPESAFE_API_KEY",
+                    getConfig().getString("typesafe-api-key", "")
+                ),
+                getDataFolder().toPath().resolve("audit")
             );
-            if (brainMode == BrainMode.REMOTE) {
-                remoteConfig = PaperAdapterConfig.validate(
-                    serverId,
-                    getConfig().getString(
-                        "brain-url",
-                        "ws://127.0.0.1:8181/ws"
-                    ),
-                    getConfig().getString("shared-secret", ""),
-                    getConfig().getLong("reconnect-delay-ticks", 40L)
-                );
-                embeddedSettings = null;
-            } else {
-                remoteConfig = null;
-                embeddedSettings = new EmbeddedBrainSettings(
-                    serverId,
-                    setting(
-                        "jarvis.openaiApiKey",
-                        "OPENAI_API_KEY",
-                        getConfig().getString("openai-api-key", "")
-                    ),
-                    setting(
-                        "jarvis.typesafeApiKey",
-                        "TYPESAFE_API_KEY",
-                        getConfig().getString("typesafe-api-key", "")
-                    ),
-                    getDataFolder().toPath().resolve("audit")
-                );
-            }
         } catch (RuntimeException failure) {
             getLogger().log(
                 Level.SEVERE,
@@ -112,47 +86,19 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         );
 
         sessions = new ChatSessionManager(clock);
-        if (brainMode == BrainMode.EMBEDDED) {
-            brain = EmbeddedBrainGateway.live(
-                embeddedSettings.serverId(),
-                integrations.capabilities(Bukkit.getMinecraftVersion()),
-                embeddedSettings.openAiApiKey(),
-                embeddedSettings.typesafeApiKey(),
-                embeddedSettings.auditDirectory(),
-                sessions,
-                registry,
-                commonRuntime,
-                serverScheduler,
-                platform,
-                clock
-            );
-        } else {
-            brain = new PaperBrainConnection(
-                remoteConfig.serverId(),
-                Bukkit.getMinecraftVersion(),
-                ADAPTER_VERSION,
-                Bukkit.getBukkitVersion(),
-                registry.tools(),
-                integrations.capabilities(Bukkit.getMinecraftVersion()),
-                clock,
-                commonRuntime,
-                serverScheduler,
-                platform,
-                sessions::isActive,
-                () -> new JdkBrainWebSocketTransport(
-                    remoteConfig.brainUri(),
-                    remoteConfig.sharedSecret()
-                ),
-                reconnect -> getServer()
-                    .getScheduler()
-                    .runTaskLaterAsynchronously(
-                        this,
-                        reconnect,
-                        remoteConfig.reconnectDelayTicks()
-                    ),
-                getLogger()
-            );
-        }
+        brain = EmbeddedBrainGateway.live(
+            embeddedSettings.serverId(),
+            integrations.capabilities(Bukkit.getMinecraftVersion()),
+            embeddedSettings.openAiApiKey(),
+            embeddedSettings.typesafeApiKey(),
+            embeddedSettings.auditDirectory(),
+            sessions,
+            registry,
+            commonRuntime,
+            serverScheduler,
+            platform,
+            clock
+        );
 
         getServer().getPluginManager().registerEvents(
             new PaperChatListener(sessions, brain, platform, serverScheduler),
@@ -170,9 +116,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         getLogger().info(
             "JARVIS Paper enabled for serverId="
                 + serverId
-                + " with Brain mode="
-                + brainMode.name().toLowerCase()
-                + "."
+                + " with Embedded Brain."
         );
     }
 

@@ -1,7 +1,6 @@
 package io.github.kardane.jarvisminecraft.common.runtime;
 
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
-import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -15,11 +14,6 @@ public final class DeadlinePolicy {
 
     public DeadlinePolicy(Clock clock) {
         this.clock = Objects.requireNonNull(clock, "clock");
-    }
-
-    public void validate(ProtocolMessage message) {
-        Objects.requireNonNull(message, "message");
-        validate(message.sentAt(), message.deadlineAt());
     }
 
     public void validate(Instant sentAt, Instant deadlineAt) {

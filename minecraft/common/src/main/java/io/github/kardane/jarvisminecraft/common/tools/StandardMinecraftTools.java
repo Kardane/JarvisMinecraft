@@ -1,6 +1,6 @@
 package io.github.kardane.jarvisminecraft.common.tools;
 
-import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
+import io.github.kardane.jarvisminecraft.common.brain.Capability;
 
 import java.util.EnumSet;
 import java.util.List;
@@ -24,7 +24,7 @@ public final class StandardMinecraftTools {
     private StandardMinecraftTools() {
     }
 
-    public static List<ProtocolMessage.Capability> capabilities(
+    public static List<Capability> capabilities(
         String source,
         String version
     ) {
@@ -39,11 +39,11 @@ public final class StandardMinecraftTools {
         );
     }
 
-    private static ProtocolMessage.Capability capability(
+    private static Capability capability(
         String name,
         String source,
         String version
     ) {
-        return new ProtocolMessage.Capability(name, source, version);
+        return new Capability(name, source, version);
     }
 }

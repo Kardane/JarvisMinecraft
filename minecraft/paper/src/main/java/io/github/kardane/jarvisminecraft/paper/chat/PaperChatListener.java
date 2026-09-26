@@ -91,7 +91,7 @@ public final class PaperChatListener implements Listener {
                         if (platform.isOnlineOperator(requesterUuid)) {
                             platform.sendPrivatePlain(
                                 requesterUuid,
-                                "Brain에 연결되어 있지 않아 요청을 전달하지 못했습니다."
+                                "자비스 요청을 현재 처리하지 못했습니다."
                             );
                         }
                         return CompletableFuture.completedFuture(null);

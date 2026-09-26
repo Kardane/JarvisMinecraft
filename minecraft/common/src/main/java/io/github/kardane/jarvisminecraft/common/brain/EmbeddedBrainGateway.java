@@ -9,7 +9,7 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.OpenAiLunaClient;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.platform.AdapterPlatformAccess;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
-import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
+import io.github.kardane.jarvisminecraft.common.brain.Capability;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolArgumentCodec;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
@@ -88,7 +88,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
 
     public static EmbeddedBrainGateway live(
         String serverId,
-        List<ProtocolMessage.Capability> capabilities,
+        List<Capability> capabilities,
         String openAiApiKey,
         String typesafeApiKey,
         Path auditDirectory,

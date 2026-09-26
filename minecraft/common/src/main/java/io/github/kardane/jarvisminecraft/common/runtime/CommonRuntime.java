@@ -1,7 +1,6 @@
 package io.github.kardane.jarvisminecraft.common.runtime;
 
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
-import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 
@@ -17,7 +16,6 @@ import java.util.concurrent.TimeUnit;
 
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ActionState;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ErrorCode;
-import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.MessageType;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
 import static io.github.kardane.jarvisminecraft.common.runtime.DeduplicationLedger.ActionStart;
 import static io.github.kardane.jarvisminecraft.common.runtime.DeduplicationLedger.ToolCallLedger;
@@ -67,17 +65,6 @@ public final class CommonRuntime {
             serverId,
             activeTools.isEmpty() ? Set.of() : EnumSet.copyOf(activeTools)
         );
-    }
-
-    /**
-     * Remote compatibility wrapper retained while the WebSocket Brain remains a parity reference.
-     */
-    public ConnectionRuntime openConnection(
-        UUID connectionId,
-        String serverId,
-        Set<ToolName> activeTools
-    ) {
-        return new ConnectionRuntime(openRuntime(connectionId, serverId, activeTools));
     }
 
     public record ToolInvocation(
@@ -328,74 +315,6 @@ public final class CommonRuntime {
 
         private CompletionStage<ToolResult> completed(ToolResult result) {
             return CompletableFuture.completedFuture(result);
-        }
-    }
-
-    public final class ConnectionRuntime {
-        private final ExecutionRuntime delegate;
-
-        private ConnectionRuntime(ExecutionRuntime delegate) {
-            this.delegate = delegate;
-        }
-
-        public UUID connectionId() {
-            return delegate.runtimeId();
-        }
-
-        public CompletionStage<ToolResult> execute(ProtocolMessage message) {
-            try {
-                Objects.requireNonNull(message, "message");
-                if (message.type() != MessageType.TOOL_REQUEST) {
-                    throw new ProtocolException(
-                        ErrorCode.INVALID_ARGUMENT,
-                        "Expected tool.request."
-                    );
-                }
-                if (!delegate.serverId().equals(message.serverId())) {
-                    throw new ProtocolException(
-                        ErrorCode.UNAUTHORIZED,
-                        "serverId does not match connection binding."
-                    );
-                }
-                if (
-                    message.requestId() == null
-                        || message.sessionId() == null
-                        || message.requesterUuid() == null
-                        || message.toolCallId() == null
-                ) {
-                    throw new ProtocolException(
-                        ErrorCode.INVALID_ARGUMENT,
-                        "Missing Tool binding identifiers."
-                    );
-                }
-                ProtocolMessage.ToolRequest request =
-                    (ProtocolMessage.ToolRequest) message.payload();
-                return delegate.execute(
-                    new ToolInvocation(
-                        message.sentAt(),
-                        message.deadlineAt(),
-                        message.requesterUuid(),
-                        message.requestId(),
-                        message.sessionId(),
-                        message.toolCallId(),
-                        message.actionId(),
-                        request.tool(),
-                        request.arguments()
-                    )
-                );
-            } catch (ProtocolException failure) {
-                return CompletableFuture.completedFuture(
-                    error(failure.code(), failure.getMessage(), false)
-                );
-            } catch (RuntimeException failure) {
-                return CompletableFuture.completedFuture(
-                    error(
-                        ErrorCode.INTERNAL,
-                        "Internal Tool execution failure.",
-                        false
-                    )
-                );
-            }
         }
     }
 

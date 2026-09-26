@@ -1,7 +1,7 @@
 package io.github.kardane.jarvisminecraft.common.brain.ai;
 
 import io.github.kardane.jarvisminecraft.common.brain.ConversationEntry;
-import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
+import io.github.kardane.jarvisminecraft.common.brain.Capability;
 
 import java.time.Instant;
 import java.util.List;
@@ -15,7 +15,7 @@ public record LunaTurnInput(
     UUID requestId,
     String requesterName,
     List<ConversationEntry> history,
-    List<ProtocolMessage.Capability> capabilities,
+    List<Capability> capabilities,
     Set<ToolName> availableTools,
     int remainingToolCalls,
     int remainingModelRounds,

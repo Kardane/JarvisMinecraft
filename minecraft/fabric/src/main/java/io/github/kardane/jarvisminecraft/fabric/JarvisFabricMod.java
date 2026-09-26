@@ -3,11 +3,9 @@ package io.github.kardane.jarvisminecraft.fabric;
 import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainSettings;
-import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainSettings.BrainMode;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
-import io.github.kardane.jarvisminecraft.common.transport.JdkBrainWebSocketTransport;
 import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftTools;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.fabric.chat.FabricChatController;
@@ -15,20 +13,15 @@ import io.github.kardane.jarvisminecraft.fabric.platform.FabricPlatformAccess;
 import io.github.kardane.jarvisminecraft.fabric.platform.FabricServerScheduler;
 import io.github.kardane.jarvisminecraft.fabric.platform.MinecraftFabricPlatformAccess;
 import io.github.kardane.jarvisminecraft.fabric.tools.FabricToolService;
-import io.github.kardane.jarvisminecraft.fabric.transport.FabricBrainConnection;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.server.MinecraftServer;
 
 import java.nio.file.Path;
 import java.time.Clock;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -81,47 +74,32 @@ public final class JarvisFabricMod implements ModInitializer {
             return;
         }
 
-        final BrainMode brainMode;
         final String serverId;
-        final FabricAdapterConfig remoteConfig;
         final EmbeddedBrainSettings embeddedSettings;
         try {
-            brainMode = EmbeddedBrainSettings.parseMode(
-                setting(
-                    "jarvis.brainMode",
-                    "JARVIS_BRAIN_MODE",
-                    "remote"
-                )
-            );
             serverId = setting(
                 "jarvis.serverId",
                 "JARVIS_SERVER_ID",
                 "main"
             );
-            if (brainMode == BrainMode.REMOTE) {
-                remoteConfig = loadRemoteConfig(serverId);
-                embeddedSettings = null;
-            } else {
-                remoteConfig = null;
-                embeddedSettings = new EmbeddedBrainSettings(
-                    serverId,
-                    setting(
-                        "jarvis.openaiApiKey",
-                        "OPENAI_API_KEY",
-                        ""
-                    ),
-                    setting(
-                        "jarvis.typesafeApiKey",
-                        "TYPESAFE_API_KEY",
-                        ""
-                    ),
-                    Path.of(
-                        "config",
-                        "jarvisminecraft",
-                        "audit"
-                    )
-                );
-            }
+            embeddedSettings = new EmbeddedBrainSettings(
+                serverId,
+                setting(
+                    "jarvis.openaiApiKey",
+                    "OPENAI_API_KEY",
+                    ""
+                ),
+                setting(
+                    "jarvis.typesafeApiKey",
+                    "TYPESAFE_API_KEY",
+                    ""
+                ),
+                Path.of(
+                    "config",
+                    "jarvisminecraft",
+                    "audit"
+                )
+            );
         } catch (RuntimeException failure) {
             LOGGER.log(
                 Level.SEVERE,
@@ -147,63 +125,24 @@ public final class JarvisFabricMod implements ModInitializer {
         );
 
         ChatSessionManager sessions = new ChatSessionManager(clock);
-        ScheduledExecutorService reconnectExecutor = null;
 
-        String adapterVersion = modVersion("jarvisminecraft");
-        String loaderVersion = modVersion("fabricloader");
 
-        BrainGateway brain;
-        if (brainMode == BrainMode.EMBEDDED) {
-            brain = EmbeddedBrainGateway.live(
-                embeddedSettings.serverId(),
-                StandardMinecraftTools.capabilities(
-                    "Fabric",
-                    server.getVersion()
-                ),
-                embeddedSettings.openAiApiKey(),
-                embeddedSettings.typesafeApiKey(),
-                embeddedSettings.auditDirectory(),
-                sessions,
-                registry,
-                commonRuntime,
-                serverScheduler,
-                platform,
-                clock
-            );
-        } else {
-            reconnectExecutor =
-                Executors.newSingleThreadScheduledExecutor(runnable -> {
-                    Thread thread = new Thread(
-                        runnable,
-                        "jarvis-fabric-reconnect"
-                    );
-                    thread.setDaemon(true);
-                    return thread;
-                });
-            ScheduledExecutorService remoteReconnectExecutor =
-                reconnectExecutor;
-            brain = new FabricBrainConnection(
-                remoteConfig.serverId(),
-                server.getVersion(),
-                adapterVersion,
-                loaderVersion,
-                clock,
-                commonRuntime,
-                serverScheduler,
-                platform,
-                sessions::isActive,
-                () -> new JdkBrainWebSocketTransport(
-                    remoteConfig.brainUri(),
-                    remoteConfig.sharedSecret()
-                ),
-                reconnect -> remoteReconnectExecutor.schedule(
-                    reconnect,
-                    remoteConfig.reconnectDelayTicks() * 50L,
-                    TimeUnit.MILLISECONDS
-                ),
-                LOGGER
-            );
-        }
+        BrainGateway brain = EmbeddedBrainGateway.live(
+            embeddedSettings.serverId(),
+            StandardMinecraftTools.capabilities(
+                "Fabric",
+                server.getVersion()
+            ),
+            embeddedSettings.openAiApiKey(),
+            embeddedSettings.typesafeApiKey(),
+            embeddedSettings.auditDirectory(),
+            sessions,
+            registry,
+            commonRuntime,
+            serverScheduler,
+            platform,
+            clock
+        );
 
         FabricChatController chat = new FabricChatController(
             server,
@@ -222,8 +161,7 @@ public final class JarvisFabricMod implements ModInitializer {
         RuntimeState next = new RuntimeState(
             server,
             brain,
-            chat,
-            reconnectExecutor
+            chat
         );
         runtime = next;
         brain.start();
@@ -231,9 +169,7 @@ public final class JarvisFabricMod implements ModInitializer {
         LOGGER.info(
             "JARVIS Fabric enabled for serverId="
                 + serverId
-                + " with Brain mode="
-                + brainMode.name().toLowerCase()
-                + "."
+                + " with Embedded Brain."
         );
     }
 
@@ -244,33 +180,6 @@ public final class JarvisFabricMod implements ModInitializer {
         }
         runtime = null;
         current.close();
-    }
-
-    private FabricAdapterConfig loadRemoteConfig(String serverId) {
-        String brainUrl = setting(
-            "jarvis.brainUrl",
-            "JARVIS_BRAIN_URL",
-            "ws://127.0.0.1:8181/ws"
-        );
-        String sharedSecret = setting(
-            "jarvis.sharedSecret",
-            "JARVIS_SHARED_SECRET",
-            ""
-        );
-        long reconnectDelay = Long.parseLong(
-            setting(
-                "jarvis.reconnectDelayTicks",
-                "JARVIS_RECONNECT_DELAY_TICKS",
-                "40"
-            )
-        );
-
-        return FabricAdapterConfig.validate(
-            serverId,
-            brainUrl,
-            sharedSecret,
-            reconnectDelay
-        );
     }
 
     private String setting(
@@ -289,24 +198,13 @@ public final class JarvisFabricMod implements ModInitializer {
         return fallback;
     }
 
-    private String modVersion(String modId) {
-        return FabricLoader.getInstance()
-            .getModContainer(modId)
-            .map(container -> container.getMetadata().getVersion().getFriendlyString())
-            .orElse("unknown");
-    }
-
     private record RuntimeState(
         MinecraftServer server,
         BrainGateway brain,
-        FabricChatController chat,
-        ScheduledExecutorService reconnectExecutor
+        FabricChatController chat
     ) {
         void close() {
             brain.stop();
-            if (reconnectExecutor != null) {
-                reconnectExecutor.shutdownNow();
-            }
         }
     }
 }

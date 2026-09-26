@@ -18,7 +18,7 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.OpenAiLunaClient;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.platform.StandardPlatformAccess;
 import io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
-import io.github.kardane.jarvisminecraft.common.protocol.ProtocolMessage;
+import io.github.kardane.jarvisminecraft.common.brain.Capability;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolArgumentCodec;
 import io.github.kardane.jarvisminecraft.common.runtime.AuditSink;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
