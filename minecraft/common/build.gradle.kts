@@ -18,6 +18,7 @@ dependencies {
     // E7: compile the embedded Luna bridge against the official OpenAI Java SDK.
     // Runtime bundling/shading is intentionally deferred to the packaging phase.
     compileOnly("com.openai:openai-java:4.69.2")
+    testImplementation("com.openai:openai-java:4.69.2")
 }
 
 tasks.withType<JavaCompile>().configureEach {
@@ -45,4 +46,14 @@ val embeddedBrainVerification by tasks.registering(JavaExec::class) {
 tasks.named("check") {
     dependsOn(t03Verification)
     dependsOn(embeddedBrainVerification)
+}
+
+val embeddedBrainLiveVerification by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "Runs Embedded Brain E11 Live Jev/Luna integration verification against live APIs."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set("io.github.kardane.jarvisminecraft.common.EmbeddedBrainLiveVerificationMain")
+    systemProperty("jarvis.repoRoot", rootProject.projectDir.absolutePath)
+    jvmArgs("-Dfile.encoding=UTF-8", "-Dsun.stdout.encoding=UTF-8", "-Dsun.stderr.encoding=UTF-8")
 }
