@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.paper;
 
+import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
@@ -24,7 +25,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
     private static final String SUPPORTED_MINECRAFT_VERSION = "1.21.8";
     private static final String ADAPTER_VERSION = "0.1.0-dev";
 
-    private PaperBrainConnection brain;
+    private BrainGateway brain;
     private ChatSessionManager sessions;
     private PaperPlatformAccess platform;
     private IntegrationRegistry integrations;
