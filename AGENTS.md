@@ -2,7 +2,7 @@
 
 ## Project and Documentation Baseline
 
-- This repository implements JARVIS for Minecraft servers. It maintains the server platform adapters (Paper, Fabric, NeoForge), the shared Java module, the TypeScript Brain, and the language-neutral protocol contract together.
+- This repository implements JARVIS for Minecraft servers. It maintains the server platform adapters (Paper, Fabric, NeoForge), the shared Java Embedded Brain/runtime module, and retained language-neutral protocol compatibility assets together.
 - Use [`docs/architecture.md`](docs/architecture.md) as the source of truth for the current architecture and platform responsibilities, and [`docs/JarvisMinecraft_Phase1-8_Test_Guide.md`](docs/JarvisMinecraft_Phase1-8_Test_Guide.md) for the Phase 1–8 verification sequence and release gates. Follow [`docs/protocol.md`](docs/protocol.md) for message envelopes and connection rules, [`docs/tools.md`](docs/tools.md) for Tool inputs/results/ranges, and [`docs/compatibility.md`](docs/compatibility.md) plus [`docs/build.md`](docs/build.md) for version and build baselines. Do not duplicate those contracts here; update the authoritative document instead.
 - Before making changes, inspect the current branch, worktree, and changed files. Preserve existing staged, modified, and untracked files, and modify only the paths required by the request.
 - Do not record rapidly changing state such as the current commit SHA, branch progress, release-gate status, or recent test results in `AGENTS.md`. Store that evidence as dated/task-specific snapshots under `docs/verification/`, and keep architecture documents focused on the current structure.
@@ -22,9 +22,10 @@
 - Treat model output as an untrusted proposal. Process requests only after they pass the registered Tool allowlist, capability checks, strict argument validation, and range limits.
 - Do not add arbitrary console commands, SQL, code execution, arbitrary file access, forced movement of other players, ban/warn actions, or rollback. Scope expansion must first be approved in the architecture document and the relevant protocol/tool contracts.
 - Do not wait for AI/network/disk/DB I/O on a Minecraft tick or server thread. Call Minecraft APIs only from the execution context required by the platform. Re-check the player's OP and online state before delivering asynchronous results.
-- Read Brain API keys only from the Brain environment. Pass the shared secret only through the loopback WebSocket handshake's `X-Jarvis-Secret` header. Do not put secrets, full prompts, or unnecessary personal information in logs or model input.
+- Keep Provider credentials outside persona/knowledge content and operational logs. Paper may resolve Provider credentials from system property, environment, then plugin config fallback; Fabric/NeoForge use system property or environment. There is no production WebSocket shared-secret path. Do not put secrets, full prompts, or unnecessary personal information in logs or model input.
 - If Jev fails or is uncertain, do not expose mutation Tools. If Luna fails, do not invent facts; use the defined failure path. If the outcome of a mutation request is uncertain, return `OUTCOME_UNKNOWN` and do not retry automatically.
 - Treat external Paper Providers as optional features that require both public APIs and verified runtime capabilities. Do not enable a Tool merely because a plugin is installed.
+- Treat `persona.md` and `knowledge/*.md` as bounded contextual input only. They must never grant Tool authority, change `ExecutionPolicy`, override current server/OP authority, weaken audit/deadline/scheduling rules, or be written verbatim to operational logs. `knowledge/README.md` is operator guidance and is not model context.
 
 ## Changes and Verification
 
