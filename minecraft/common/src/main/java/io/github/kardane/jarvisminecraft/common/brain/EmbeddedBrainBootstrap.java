@@ -8,7 +8,10 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.OpenAiLunaClient;
 import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
+import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
+import io.github.kardane.jarvisminecraft.common.prompt.PromptContentLoader;
+import io.github.kardane.jarvisminecraft.common.prompt.PromptContentManager;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolArgumentCodec;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ExecutionPolicy;
@@ -71,6 +74,24 @@ final class EmbeddedBrainBootstrap {
             new ToolArgumentCodec()
         );
 
+        JarvisConfig initialConfig = configManager.current();
+        PromptContentLoader.Limits promptLimits =
+            new PromptContentLoader.Limits(
+                PromptContentLoader.Limits.DEFAULT_PERSONA_MAX_BYTES,
+                initialConfig.knowledge().maxFiles(),
+                initialConfig.knowledge().maxFileBytes(),
+                initialConfig.knowledge().maxTotalBytes()
+            );
+        PromptContentManager promptContent =
+            new PromptContentManager(
+                new PromptContentLoader(
+                    promptContentRoot(auditDirectory),
+                    initialConfig.personality().enabled(),
+                    initialConfig.knowledge().enabled(),
+                    promptLimits
+                )
+            );
+
         try {
             EmbeddedBrain brain = new EmbeddedBrain(
                 serverId,
@@ -99,11 +120,13 @@ final class EmbeddedBrainBootstrap {
                     registry.tools()
                 ),
                 clock,
-                log
+                log,
+                promptContent::current
             );
             return new LiveRuntime(
                 brain,
                 luna,
+                promptContent,
                 audit,
                 aiExecutor
             );
@@ -115,15 +138,35 @@ final class EmbeddedBrainBootstrap {
         }
     }
 
+    private static Path promptContentRoot(
+        Path auditDirectory
+    ) {
+        Path normalized = auditDirectory
+            .toAbsolutePath()
+            .normalize();
+        Path parent = normalized.getParent();
+        if (parent == null) {
+            throw new IllegalArgumentException(
+                "Audit directory must have a JARVIS data-directory parent."
+            );
+        }
+        return parent;
+    }
+
     record LiveRuntime(
         EmbeddedBrain brain,
         LunaClient luna,
+        PromptContentManager promptContent,
         AsyncJsonlAuditSink audit,
         ExecutorService aiExecutor
     ) {
         LiveRuntime {
             Objects.requireNonNull(brain, "brain");
             Objects.requireNonNull(luna, "luna");
+            Objects.requireNonNull(
+                promptContent,
+                "promptContent"
+            );
             Objects.requireNonNull(audit, "audit");
             Objects.requireNonNull(aiExecutor, "aiExecutor");
         }
