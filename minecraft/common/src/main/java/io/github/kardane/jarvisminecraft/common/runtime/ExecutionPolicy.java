@@ -53,6 +53,10 @@ public final class ExecutionPolicy {
         return Set.copyOf(allowed);
     }
 
+    public JarvisConfig.ExecutionMode currentMode() {
+        return configManager.current().execution().mode();
+    }
+
     public boolean allows(
         ToolName tool,
         boolean requesterToolAuthority,
