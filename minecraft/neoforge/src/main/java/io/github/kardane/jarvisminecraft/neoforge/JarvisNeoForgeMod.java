@@ -157,6 +157,7 @@ public final class JarvisNeoForgeMod {
             embeddedSettings.auditDirectory(),
             sessions,
             interactions,
+            configManager,
             registry,
             commonRuntime,
             serverScheduler,
@@ -191,7 +192,7 @@ public final class JarvisNeoForgeMod {
         brain.start();
         LOGGER.info(
             "JARVIS runtime policy config validated "
-                + "(interaction policy active; model/execution policy pending): "
+                + "(interaction + reasoning policy active; execution policy pending): "
                 + JarvisConfigSummary.from(configManager.current()).toLogLine()
         );
         LOGGER.info(

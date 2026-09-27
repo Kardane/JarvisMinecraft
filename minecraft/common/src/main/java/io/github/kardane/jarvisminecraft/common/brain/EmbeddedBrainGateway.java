@@ -6,6 +6,7 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.JdkJevClassifier;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaClient;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.OpenAiLunaClient;
+import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
 import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
@@ -167,6 +168,39 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         AdapterPlatformAccess platform,
         Clock clock
     ) {
+        return live(
+            serverId,
+            capabilities,
+            openAiApiKey,
+            typesafeApiKey,
+            auditDirectory,
+            sessions,
+            interactions,
+            new ConfigManager(JarvisConfig::defaults),
+            registry,
+            commonRuntime,
+            serverScheduler,
+            platform,
+            clock
+        );
+    }
+
+    public static EmbeddedBrainGateway live(
+        String serverId,
+        List<Capability> capabilities,
+        String openAiApiKey,
+        String typesafeApiKey,
+        Path auditDirectory,
+        ChatSessionManager sessions,
+        InteractionCoordinator interactions,
+        ConfigManager configManager,
+        ToolRegistry registry,
+        CommonRuntime commonRuntime,
+        ServerScheduler serverScheduler,
+        AdapterPlatformAccess platform,
+        Clock clock
+    ) {
+        Objects.requireNonNull(configManager, "configManager");
         Objects.requireNonNull(registry, "registry");
         Objects.requireNonNull(commonRuntime, "commonRuntime");
 
@@ -205,6 +239,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             ),
             new DeterministicRoutePolicy(),
             luna,
+            new ReasoningPolicy(configManager),
             audit,
             commonRuntime.openRuntime(
                 UUID.randomUUID(),

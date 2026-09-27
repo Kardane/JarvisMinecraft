@@ -121,6 +121,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             embeddedSettings.auditDirectory(),
             sessions,
             interactions,
+            configManager,
             registry,
             commonRuntime,
             serverScheduler,
@@ -149,7 +150,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         brain.start();
         getLogger().info(
             "JARVIS runtime policy config validated "
-                + "(interaction policy active; model/execution policy pending): "
+                + "(interaction + reasoning policy active; execution policy pending): "
                 + JarvisConfigSummary.from(configManager.current()).toLogLine()
         );
         getLogger().info(
