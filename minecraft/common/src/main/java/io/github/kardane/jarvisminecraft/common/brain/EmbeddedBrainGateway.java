@@ -4,6 +4,7 @@ import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
+import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationManager;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.NoOpJarvisLog;
 import io.github.kardane.jarvisminecraft.common.platform.AdapterPlatformAccess;
@@ -307,6 +308,82 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 auditDirectory,
                 sessions,
                 configManager,
+                registry,
+                commonRuntime,
+                clock,
+                log
+            );
+
+        try {
+            return new EmbeddedBrainGateway(
+                runtime.brain(),
+                sessions,
+                interactions,
+                configManager,
+                new ProgressNotifier(),
+                platform,
+                serverScheduler,
+                clock,
+                runtime,
+                log
+            );
+        } catch (RuntimeException failure) {
+            runtime.brain().stop();
+            runtime.closeOwnedResources();
+            throw failure;
+        }
+    }
+
+    public static EmbeddedBrainGateway live(
+        String serverId,
+        List<Capability> capabilities,
+        String openAiApiKey,
+        String typesafeApiKey,
+        Path auditDirectory,
+        ChatSessionManager sessions,
+        InteractionCoordinator interactions,
+        RuntimeConfigurationManager runtimeConfiguration,
+        ToolRegistry registry,
+        CommonRuntime commonRuntime,
+        ServerScheduler serverScheduler,
+        AdapterPlatformAccess platform,
+        Clock clock,
+        JarvisLog log
+    ) {
+        Objects.requireNonNull(
+            interactions,
+            "interactions"
+        );
+        Objects.requireNonNull(
+            runtimeConfiguration,
+            "runtimeConfiguration"
+        );
+        ConfigManager configManager =
+            runtimeConfiguration.configManager();
+        if (
+            interactions.configManager()
+                != configManager
+        ) {
+            throw new IllegalArgumentException(
+                "InteractionCoordinator and RuntimeConfigurationManager must share the same ConfigManager view."
+            );
+        }
+        Objects.requireNonNull(log, "log");
+        Objects.requireNonNull(registry, "registry");
+        Objects.requireNonNull(
+            commonRuntime,
+            "commonRuntime"
+        );
+
+        EmbeddedBrainBootstrap.LiveRuntime runtime =
+            EmbeddedBrainBootstrap.create(
+                serverId,
+                capabilities,
+                openAiApiKey,
+                typesafeApiKey,
+                auditDirectory,
+                sessions,
+                runtimeConfiguration,
                 registry,
                 commonRuntime,
                 clock,
