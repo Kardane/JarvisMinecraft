@@ -22,7 +22,7 @@ JarvisMinecraft는 과거 Minecraft Adapter와 TypeScript Brain을 loopback WebS
 7. Remote Brain은 E12 parity 기준점 확보까지만 reference implementation으로 유지했으며, E13/E14에서 제거한다.
 8. AI HTTPS 호출은 비동기로 수행하며 Minecraft server/tick thread에서 기다리지 않는다.
 9. 기존 Java runtime의 `ToolName`, `ToolRegistry`, `AuditSink`, `CommonRuntime`, `RequesterAuthority`, `DeadlinePolicy`, `DeduplicationLedger`, `ServerScheduler`를 재사용한다.
-10. Tool argument 검증은 하나의 Java contract parser를 공유하고 AI 전용 validator를 중복 구현하지 않는다.
+10. Tool argument shape/range/schema는 하나의 Java `ToolSpec`을 source of truth로 사용하고, protocol parser와 AI function schema가 이를 공유한다.
 11. E16부터 공식 OpenAI Java SDK runtime은 플랫폼별 단일 artifact 안에 포함한다.
 12. SDK와 Jackson/OkHttp/Kotlin 등 SDK runtime dependency package는 JARVIS 내부 namespace로 relocation해 Minecraft 플랫폼 classpath와 격리한다.
 13. Minecraft가 제공하는 Gson은 번들하지 않고 compile-only로 유지한다.
@@ -92,7 +92,7 @@ Embedded Brain은 별도의 session TTL store를 두지 않는다. 모델 대화
 
 ### Tool argument validation
 
-Remote protocol과 Embedded Luna function call이 같은 `ToolArgumentCodec`을 사용한다. unknown/missing field, UUID, range, selector shape 검증을 별도로 복제하지 않는다.
+`ToolSpec`이 field shape, UUID/range/selector 제약과 AI function schema metadata를 단일 소유한다. Remote protocol과 Embedded Luna function call은 같은 `ToolArgumentCodec` facade를 통해 `ToolSpec` validation을 사용하므로 unknown/missing field, UUID, range, selector shape 검증을 별도로 복제하지 않는다.
 
 ### Audit
 
