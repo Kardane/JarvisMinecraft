@@ -89,9 +89,31 @@ final class ModelConversationLoop {
         ReasoningLevel reasoningLevel,
         PromptContentSnapshot promptContent
     ) {
+        return run(
+            request,
+            budget,
+            routing,
+            reasoningLevel,
+            promptContent,
+            LunaStep.Usage.zero()
+        );
+    }
+
+    private CompletionStage<EmbeddedBrain.Reply> run(
+        EmbeddedBrain.ChatRequest request,
+        RequestBudget budget,
+        DeterministicRoutePolicy.RoutingDecision routing,
+        ReasoningLevel reasoningLevel,
+        PromptContentSnapshot promptContent,
+        LunaStep.Usage accumulatedUsage
+    ) {
         Objects.requireNonNull(
             promptContent,
             "promptContent"
+        );
+        Objects.requireNonNull(
+            accumulatedUsage,
+            "accumulatedUsage"
         );
         try {
             guard.assertRunning();
@@ -140,6 +162,7 @@ final class ModelConversationLoop {
                         routing,
                         reasoningLevel,
                         promptContent,
+                        accumulatedUsage,
                         effectiveRouting,
                         round,
                         lunaStarted,
@@ -157,6 +180,7 @@ final class ModelConversationLoop {
         DeterministicRoutePolicy.RoutingDecision routing,
         ReasoningLevel reasoningLevel,
         PromptContentSnapshot promptContent,
+        LunaStep.Usage accumulatedUsage,
         DeterministicRoutePolicy.RoutingDecision effectiveRouting,
         int round,
         Instant lunaStarted,
@@ -202,12 +226,15 @@ final class ModelConversationLoop {
             return CompletableFuture.completedFuture(
                 new EmbeddedBrain.Reply(
                     LUNA_FAILURE_TEXT,
-                    LunaStep.SessionState.CONTINUE
+                    LunaStep.SessionState.CONTINUE,
+                    accumulatedUsage
                 )
             );
         }
 
         LunaStep step = outcome.step();
+        LunaStep.Usage updatedUsage =
+            accumulatedUsage.plus(step.usage());
         if (step instanceof LunaStep.Final finalStep) {
             log.debug(
                 JarvisEvents.LUNA_ROUND_COMPLETED,
@@ -235,7 +262,8 @@ final class ModelConversationLoop {
             return CompletableFuture.completedFuture(
                 new EmbeddedBrain.Reply(
                     finalStep.text(),
-                    finalStep.sessionState()
+                    finalStep.sessionState(),
+                    updatedUsage
                 )
             );
         }
@@ -275,7 +303,8 @@ final class ModelConversationLoop {
                 budget,
                 routing,
                 reasoningLevel,
-                promptContent
+                promptContent,
+                updatedUsage
             )
         );
     }
