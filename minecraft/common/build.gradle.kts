@@ -103,10 +103,21 @@ val jarvisConfigVerification by tasks.registering(JavaExec::class) {
     )
 }
 
+val promptContentVerification by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "Runs configurable persona/knowledge loader and template verification."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set(
+        "io.github.kardane.jarvisminecraft.common.prompt.PromptContentVerificationMain"
+    )
+}
+
 tasks.named("check") {
     dependsOn(embeddedBrainVerification)
     dependsOn(embeddedBrainParityVerification)
     dependsOn(jarvisConfigVerification)
+    dependsOn(promptContentVerification)
 }
 
 val embeddedBrainLiveVerification by tasks.registering(JavaExec::class) {

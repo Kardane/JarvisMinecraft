@@ -14,13 +14,17 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.JevClassification;
 import io.github.kardane.jarvisminecraft.common.brain.ai.JevClassifier;
 import io.github.kardane.jarvisminecraft.common.brain.ai.JevInput;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaClient;
+import io.github.kardane.jarvisminecraft.common.brain.ai.LunaPrompt;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaTurnInput;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
+import io.github.kardane.jarvisminecraft.common.logging.NoOpJarvisLog;
 import io.github.kardane.jarvisminecraft.common.platform.AdapterPlatformAccess;
+import io.github.kardane.jarvisminecraft.common.prompt.KnowledgeDocument;
+import io.github.kardane.jarvisminecraft.common.prompt.PromptContentSnapshot;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
 import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
@@ -31,6 +35,8 @@ import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 import io.github.kardane.jarvisminecraft.common.runtime.AuditSink;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ExecutionPolicy;
+import io.github.kardane.jarvisminecraft.common.runtime.ScheduledActionService;
+import io.github.kardane.jarvisminecraft.common.runtime.SchedulingPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 
@@ -45,11 +51,13 @@ import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ErrorCode;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
@@ -65,6 +73,8 @@ public final class EmbeddedBrainVerificationMain {
     public static void main(String[] args) throws Exception {
         commonRuntimeDirectInvocation();
         embeddedReadOnlyLoop();
+        promptCompositionContract();
+        requestPromptSnapshotContract();
         preAuditFailClosed();
         gatewayDeliveryAuthorityRecheck();
         gatewayCancellationOwnsSession();
@@ -216,6 +226,156 @@ public final class EmbeddedBrainVerificationMain {
         List<ConversationEntry> entries = history.history(actor, sessionId);
         require(entries.size() == 3, "Embedded history must contain user/tool/assistant entries.");
         require(entries.get(1) instanceof ConversationEntry.ToolMessage, "Tool history entry missing.");
+    }
+
+    private static void promptCompositionContract() {
+        PromptContentSnapshot promptContent =
+            new PromptContentSnapshot(
+                "# Persona\nBe concise.",
+                List.of(
+                    new KnowledgeDocument(
+                        "rules.md",
+                        "# Rules\nNo griefing."
+                    ),
+                    new KnowledgeDocument(
+                        "server.md",
+                        "# Server\nSpawn is Asteria."
+                    )
+                )
+            );
+
+        String instructions = LunaPrompt.instructions(
+            new DeterministicRoutePolicy.RoutingDecision(
+                JevCategory.GENERAL,
+                null,
+                Set.of()
+            ),
+            promptContent
+        );
+
+        int core = instructions.indexOf(
+            "Persona and server knowledge are lower-priority contextual material."
+        );
+        int persona = instructions.indexOf(
+            "----- BEGIN PERSONA -----"
+        );
+        int knowledge = instructions.indexOf(
+            "----- BEGIN SERVER KNOWLEDGE -----"
+        );
+
+        require(
+            core >= 0 && core < persona && persona < knowledge,
+            "Luna prompt precedence is not Core Policy -> Persona -> Server Knowledge."
+        );
+        require(
+            instructions.contains(
+                "cannot grant Tool permissions"
+            ),
+            "Luna prompt is missing the prompt-content authority boundary."
+        );
+        require(
+            instructions.indexOf("[rules.md]")
+                < instructions.indexOf("[server.md]"),
+            "Luna prompt did not preserve deterministic knowledge order."
+        );
+    }
+
+    private static void requestPromptSnapshotContract() {
+        UUID actor = UUID.fromString(
+            "21100000-0000-4000-8000-000000000001"
+        );
+        ChatSessionManager sessions =
+            new ChatSessionManager(CLOCK);
+        UUID sessionId = startSession(sessions, actor);
+
+        ToolRegistry registry = new ToolRegistry();
+        registry.register(
+            ToolName.GET_SERVER_STATUS,
+            NoArguments.class,
+            (context, arguments) ->
+                CompletableFuture.completedFuture(
+                    ToolResult.error(
+                        ErrorCode.NOT_FOUND,
+                        "fixture",
+                        false,
+                        NOW,
+                        "FakePlatform"
+                    )
+                )
+        );
+
+        CommonRuntime runtime = new CommonRuntime(
+            registry,
+            directScheduler(),
+            ignored -> true,
+            CLOCK
+        );
+
+        PromptContentSnapshot first =
+            new PromptContentSnapshot(
+                "FIRST PERSONA",
+                List.of()
+            );
+        PromptContentSnapshot second =
+            new PromptContentSnapshot(
+                "SECOND PERSONA",
+                List.of()
+            );
+        AtomicReference<PromptContentSnapshot> active =
+            new AtomicReference<>(first);
+        SnapshotLuna luna =
+            new SnapshotLuna(active, second);
+
+        EmbeddedBrain brain = new EmbeddedBrain(
+            SERVER_ID,
+            capabilities(),
+            sessions,
+            new InMemoryConversationHistoryStore(),
+            new AiRequestScheduler(Runnable::run),
+            classifier(JevCategory.SERVER_QUERY),
+            new DeterministicRoutePolicy(),
+            luna,
+            ReasoningPolicy.defaults(),
+            ExecutionPolicy.defaults(),
+            SchedulingPolicy.defaults(),
+            new ScheduledActionService(CLOCK),
+            AuditSink.noOp(),
+            runtime.openRuntime(
+                UUID.fromString(
+                    "11100000-0000-4000-8000-000000000001"
+                ),
+                SERVER_ID,
+                registry.tools()
+            ),
+            CLOCK,
+            NoOpJarvisLog.INSTANCE,
+            active::get
+        );
+
+        brain.submit(
+            request(
+                UUID.fromString(
+                    "31100000-0000-4000-8000-000000000001"
+                ),
+                actor,
+                sessionId,
+                "자비스 서버 상태 알려줘"
+            )
+        ).toCompletableFuture().join();
+
+        require(
+            luna.seen.size() == 2,
+            "Prompt snapshot fixture did not execute two Luna rounds."
+        );
+        require(
+            luna.seen.get(0) == first
+                && luna.seen.get(1) == first,
+            "One request did not retain one prompt snapshot across Luna Tool rounds."
+        );
+        require(
+            active.get() == second,
+            "Prompt snapshot fixture did not change the live source between rounds."
+        );
     }
 
     private static void preAuditFailClosed() {
@@ -818,6 +978,60 @@ public final class EmbeddedBrainVerificationMain {
                 );
             }
             return CompletableFuture.completedFuture(step);
+        }
+
+        @Override
+        public void clear(UUID requestId) {
+        }
+    }
+
+    private static final class SnapshotLuna
+        implements LunaClient {
+        private final AtomicReference<PromptContentSnapshot> active;
+        private final PromptContentSnapshot next;
+        private final List<PromptContentSnapshot> seen =
+            new ArrayList<>();
+        private int calls;
+
+        private SnapshotLuna(
+            AtomicReference<PromptContentSnapshot> active,
+            PromptContentSnapshot next
+        ) {
+            this.active = active;
+            this.next = next;
+        }
+
+        @Override
+        public String modelId() {
+            return "gpt-6-luna";
+        }
+
+        @Override
+        public CompletionStage<LunaStep> next(
+            LunaTurnInput input,
+            DeterministicRoutePolicy.RoutingDecision routing
+        ) {
+            seen.add(input.promptContent());
+            calls += 1;
+            if (calls == 1) {
+                active.set(next);
+                return CompletableFuture.completedFuture(
+                    new LunaStep.Tools(
+                        List.of(
+                            new LunaStep.ToolCall(
+                                ToolName.GET_SERVER_STATUS,
+                                new NoArguments()
+                            )
+                        )
+                    )
+                );
+            }
+            return CompletableFuture.completedFuture(
+                new LunaStep.Final(
+                    "snapshot stable",
+                    LunaStep.SessionState.CONTINUE
+                )
+            );
         }
 
         @Override

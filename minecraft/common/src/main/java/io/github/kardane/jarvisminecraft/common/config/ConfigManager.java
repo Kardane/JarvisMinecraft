@@ -5,41 +5,93 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Supplier;
 
 public final class ConfigManager {
-    private final Supplier<JarvisConfig> loader;
-    private final AtomicReference<JarvisConfig> current;
+    private final Supplier<JarvisConfig> currentSource;
+    private final Supplier<ReloadResult> reloadOperation;
 
     public ConfigManager(Supplier<JarvisConfig> loader) {
-        this.loader = Objects.requireNonNull(loader, "loader");
-        this.current = new AtomicReference<>(
-            Objects.requireNonNull(loader.get(), "initial config")
+        Objects.requireNonNull(loader, "loader");
+        AtomicReference<JarvisConfig> state =
+            new AtomicReference<>(
+                Objects.requireNonNull(
+                    loader.get(),
+                    "initial config"
+                )
+            );
+        this.currentSource = state::get;
+        this.reloadOperation =
+            () -> reloadStandalone(loader, state);
+    }
+
+    private ConfigManager(
+        Supplier<JarvisConfig> currentSource,
+        Supplier<ReloadResult> reloadOperation
+    ) {
+        this.currentSource = Objects.requireNonNull(
+            currentSource,
+            "currentSource"
+        );
+        this.reloadOperation = Objects.requireNonNull(
+            reloadOperation,
+            "reloadOperation"
+        );
+    }
+
+    static ConfigManager managed(
+        Supplier<JarvisConfig> currentSource,
+        Supplier<ReloadResult> reloadOperation
+    ) {
+        return new ConfigManager(
+            currentSource,
+            reloadOperation
         );
     }
 
     public JarvisConfig current() {
-        return current.get();
+        return Objects.requireNonNull(
+            currentSource.get(),
+            "current config"
+        );
     }
 
     public synchronized ReloadResult reload() {
-        JarvisConfig previous = current.get();
+        return Objects.requireNonNull(
+            reloadOperation.get(),
+            "reload result"
+        );
+    }
+
+    private static ReloadResult reloadStandalone(
+        Supplier<JarvisConfig> loader,
+        AtomicReference<JarvisConfig> state
+    ) {
+        JarvisConfig previous = state.get();
         try {
             JarvisConfig next = Objects.requireNonNull(
                 loader.get(),
                 "reloaded config"
             );
-            current.set(next);
-            return ReloadResult.success(JarvisConfigSummary.from(next));
+            state.set(next);
+            return ReloadResult.success(
+                JarvisConfigSummary.from(next)
+            );
         } catch (RuntimeException failure) {
             return ReloadResult.failure(
                 JarvisConfigSummary.from(previous),
-                safeMessage(failure)
+                safeMessage(
+                    failure,
+                    "Runtime configuration reload failed."
+                )
             );
         }
     }
 
-    private String safeMessage(RuntimeException failure) {
+    static String safeMessage(
+        RuntimeException failure,
+        String fallback
+    ) {
         String message = failure.getMessage();
         if (message == null || message.isBlank()) {
-            return "Runtime configuration reload failed.";
+            return fallback;
         }
         return message;
     }
@@ -50,28 +102,44 @@ public final class ConfigManager {
         String error
     ) {
         public ReloadResult {
-            Objects.requireNonNull(activeConfig, "activeConfig");
+            Objects.requireNonNull(
+                activeConfig,
+                "activeConfig"
+            );
             if (success && error != null) {
                 throw new IllegalArgumentException(
                     "Successful reload cannot have an error."
                 );
             }
-            if (!success && (error == null || error.isBlank())) {
+            if (
+                !success
+                    && (error == null || error.isBlank())
+            ) {
                 throw new IllegalArgumentException(
                     "Failed reload requires an error."
                 );
             }
         }
 
-        static ReloadResult success(JarvisConfigSummary activeConfig) {
-            return new ReloadResult(true, activeConfig, null);
+        static ReloadResult success(
+            JarvisConfigSummary activeConfig
+        ) {
+            return new ReloadResult(
+                true,
+                activeConfig,
+                null
+            );
         }
 
         static ReloadResult failure(
             JarvisConfigSummary activeConfig,
             String error
         ) {
-            return new ReloadResult(false, activeConfig, error);
+            return new ReloadResult(
+                false,
+                activeConfig,
+                error
+            );
         }
     }
 }

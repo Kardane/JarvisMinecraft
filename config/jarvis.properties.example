@@ -24,6 +24,14 @@ jarvis.model.name=gpt-6-luna
 jarvis.model.reasoning.mode=AUTO
 jarvis.model.reasoning.fallback=MEDIUM
 
+# Optional operator-defined prompt context. Files remain under
+# config/jarvisminecraft/{persona.md,knowledge/*.md}.
+jarvis.personality.enabled=false
+jarvis.knowledge.enabled=false
+jarvis.knowledge.max-files=32
+jarvis.knowledge.max-file-bytes=32768
+jarvis.knowledge.max-total-bytes=131072
+
 # Legacy Minecraft ampersand codes are supported in the prefix only.
 # Example: jarvis.response.prefix=&5[JARVIS]&r 
 jarvis.response.prefix=[JARVIS] 

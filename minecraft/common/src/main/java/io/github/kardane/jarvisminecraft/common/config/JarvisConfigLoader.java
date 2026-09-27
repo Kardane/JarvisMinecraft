@@ -17,6 +17,8 @@ public final class JarvisConfigLoader {
         JarvisConfig.Proactive defaultProactive = defaultInteraction.proactive();
         JarvisConfig.Model defaultModel = defaults.model();
         JarvisConfig.Reasoning defaultReasoning = defaultModel.reasoning();
+        JarvisConfig.Personality defaultPersonality = defaults.personality();
+        JarvisConfig.Knowledge defaultKnowledge = defaults.knowledge();
         JarvisConfig.Response defaultResponse = defaults.response();
         JarvisConfig.WaitingMessage defaultWaiting =
             defaultResponse.waitingMessage();
@@ -94,6 +96,37 @@ public final class JarvisConfigLoader {
                     JarvisConfig.ReasoningMode.class,
                     defaultReasoning.fallback()
                 )
+            )
+        );
+
+        JarvisConfig.Personality personality = new JarvisConfig.Personality(
+            bool(
+                source,
+                "jarvis.personality.enabled",
+                defaultPersonality.enabled()
+            )
+        );
+
+        JarvisConfig.Knowledge knowledge = new JarvisConfig.Knowledge(
+            bool(
+                source,
+                "jarvis.knowledge.enabled",
+                defaultKnowledge.enabled()
+            ),
+            integer(
+                source,
+                "jarvis.knowledge.max-files",
+                defaultKnowledge.maxFiles()
+            ),
+            integer(
+                source,
+                "jarvis.knowledge.max-file-bytes",
+                defaultKnowledge.maxFileBytes()
+            ),
+            integer(
+                source,
+                "jarvis.knowledge.max-total-bytes",
+                defaultKnowledge.maxTotalBytes()
             )
         );
 
@@ -244,6 +277,8 @@ public final class JarvisConfigLoader {
         return new JarvisConfig(
             interaction,
             model,
+            personality,
+            knowledge,
             response,
             execution,
             scheduling,

@@ -12,6 +12,7 @@ import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.NoOpJarvisLog;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
+import io.github.kardane.jarvisminecraft.common.prompt.PromptContentSnapshot;
 import io.github.kardane.jarvisminecraft.common.runtime.AuditSink;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ExecutionPolicy;
@@ -30,6 +31,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.Supplier;
 
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ErrorCode;
 
@@ -44,6 +46,7 @@ public final class EmbeddedBrain {
     private final RequestPlanner planner;
     private final ToolExecutionCoordinator toolExecution;
     private final ModelConversationLoop modelLoop;
+    private final Supplier<PromptContentSnapshot> promptContent;
     private final Map<SessionKey, Set<UUID>> activeRequestIds =
         new HashMap<>();
 
@@ -168,6 +171,46 @@ public final class EmbeddedBrain {
         Clock clock,
         JarvisLog log
     ) {
+        this(
+            serverId,
+            capabilities,
+            sessions,
+            history,
+            scheduler,
+            jev,
+            routePolicy,
+            luna,
+            reasoningPolicy,
+            executionPolicy,
+            schedulingPolicy,
+            scheduledActions,
+            audit,
+            toolRuntime,
+            clock,
+            log,
+            PromptContentSnapshot::empty
+        );
+    }
+
+    public EmbeddedBrain(
+        String serverId,
+        List<Capability> capabilities,
+        ChatSessionManager sessions,
+        ConversationHistoryStore history,
+        AiRequestScheduler scheduler,
+        JevClassifier jev,
+        DeterministicRoutePolicy routePolicy,
+        LunaClient luna,
+        ReasoningPolicy reasoningPolicy,
+        ExecutionPolicy executionPolicy,
+        SchedulingPolicy schedulingPolicy,
+        ScheduledActionService scheduledActions,
+        AuditSink audit,
+        CommonRuntime.ExecutionRuntime toolRuntime,
+        Clock clock,
+        JarvisLog log,
+        Supplier<PromptContentSnapshot> promptContent
+    ) {
         if (serverId == null || serverId.isBlank()) {
             throw new IllegalArgumentException(
                 "serverId must not be blank."
@@ -221,6 +264,10 @@ public final class EmbeddedBrain {
             "clock"
         );
         Objects.requireNonNull(log, "log");
+        this.promptContent = Objects.requireNonNull(
+            promptContent,
+            "promptContent"
+        );
 
         this.guard = new BrainRuntimeGuard(
             sessions,
@@ -400,6 +447,12 @@ public final class EmbeddedBrain {
             );
             budget.assertLive(clock.instant());
 
+            PromptContentSnapshot requestPromptContent =
+                Objects.requireNonNull(
+                    promptContent.get(),
+                    "promptContent snapshot"
+                );
+
             history.append(
                 request.requesterUuid(),
                 request.sessionId(),
@@ -424,7 +477,8 @@ public final class EmbeddedBrain {
                     request,
                     budget,
                     plan.routing(),
-                    plan.reasoningLevel()
+                    plan.reasoningLevel(),
+                    requestPromptContent
                 )
             );
         } catch (RuntimeException failure) {

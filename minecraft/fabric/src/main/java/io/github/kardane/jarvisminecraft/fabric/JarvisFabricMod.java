@@ -7,6 +7,8 @@ import io.github.kardane.jarvisminecraft.common.brain.PackagingSmoke;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
+import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationManager;
+import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationReloadService;
 import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
@@ -73,6 +75,51 @@ public final class JarvisFabricMod implements ModInitializer {
                                     return 1;
                                 })
                         )
+                        .then(
+                            CommandManager.literal("reload")
+                                .executes(context -> {
+                                    RuntimeState current = runtime;
+                                    if (current == null) {
+                                        context.getSource().sendError(
+                                            Text.literal("JARVIS runtime is not running.")
+                                        );
+                                        return 0;
+                                    }
+                                    var source = context.getSource();
+                                    current.reloadService()
+                                        .reloadAsync()
+                                        .whenComplete((result, failure) ->
+                                            current.server().execute(() -> {
+                                                if (runtime != current) {
+                                                    return;
+                                                }
+                                                if (
+                                                    failure == null
+                                                        && result != null
+                                                        && result.success()
+                                                ) {
+                                                    source.sendFeedback(
+                                                        () -> Text.literal(
+                                                            "[JARVIS] Configuration reloaded."
+                                                        ),
+                                                        false
+                                                    );
+                                                    logReloadSuccess(result);
+                                                    return;
+                                                }
+                                                source.sendError(
+                                                    Text.literal(
+                                                        "[JARVIS] Reload failed; previous configuration remains active."
+                                                    )
+                                                );
+                                                LOGGER.warning(
+                                                    "JARVIS configuration reload failed; previous configuration remains active."
+                                                );
+                                            })
+                                        );
+                                    return 1;
+                                })
+                        )
                 )
         );
         ServerLifecycleEvents.SERVER_STOPPING.register(this::onServerStopping);
@@ -103,6 +150,23 @@ public final class JarvisFabricMod implements ModInitializer {
         });
     }
 
+    private void logReloadSuccess(
+        RuntimeConfigurationManager.ReloadResult result
+    ) {
+        LOGGER.info(
+            "JARVIS configuration reloaded: "
+                + result.activeConfig().toLogLine()
+                + ", personaPresent="
+                + result.activeContent().personaPresent()
+                + ", personaBytes="
+                + result.activeContent().personaBytes()
+                + ", knowledgeDocuments="
+                + result.activeContent().knowledgeDocuments()
+                + ", knowledgeBytes="
+                + result.activeContent().knowledgeBytes()
+        );
+    }
+
     private void onServerStarted(MinecraftServer server) {
         if (!SUPPORTED_MINECRAFT_VERSION.equals(server.getVersion())) {
             LOGGER.severe(
@@ -125,14 +189,21 @@ public final class JarvisFabricMod implements ModInitializer {
         Path dataDirectory = Path.of("config", "jarvisminecraft");
         Path runtimeConfigPath = dataDirectory.resolve("jarvis.properties");
 
+        final RuntimeConfigurationManager runtimeConfiguration;
         final ConfigManager configManager;
         final EmbeddedBrainSettings embeddedSettings;
         try {
-            configManager = new ConfigManager(
-                () -> JarvisConfigLoader.load(
-                    PropertiesJarvisConfigSource.load(runtimeConfigPath)
-                )
-            );
+            runtimeConfiguration =
+                new RuntimeConfigurationManager(
+                    dataDirectory,
+                    () -> JarvisConfigLoader.load(
+                        PropertiesJarvisConfigSource.load(
+                            runtimeConfigPath
+                        )
+                    )
+                );
+            configManager =
+                runtimeConfiguration.configManager();
             embeddedSettings = EmbeddedBrainSettings.resolve(
                 setting(
                     "jarvis.serverId",
@@ -194,7 +265,7 @@ public final class JarvisFabricMod implements ModInitializer {
             embeddedSettings.auditDirectory(),
             sessions,
             interactions,
-            configManager,
+            runtimeConfiguration,
             registry,
             commonRuntime,
             serverScheduler,
@@ -222,6 +293,10 @@ public final class JarvisFabricMod implements ModInitializer {
             server,
             brain,
             chat,
+            runtimeConfiguration,
+            new RuntimeConfigurationReloadService(
+                runtimeConfiguration
+            ),
             configManager
         );
         runtime = next;
@@ -229,7 +304,7 @@ public final class JarvisFabricMod implements ModInitializer {
 
         LOGGER.info(
             "JARVIS runtime policy config validated "
-                + "(interaction + proactive + reasoning + response + execution + scheduling policy active; admin commands pending): "
+                + "(interaction + proactive + reasoning + response + execution + scheduling policy active; /jm reload active): "
                 + JarvisConfigSummary.from(configManager.current()).toLogLine()
         );
         LOGGER.info(
@@ -268,9 +343,12 @@ public final class JarvisFabricMod implements ModInitializer {
         MinecraftServer server,
         BrainGateway brain,
         FabricChatController chat,
+        RuntimeConfigurationManager runtimeConfiguration,
+        RuntimeConfigurationReloadService reloadService,
         ConfigManager configManager
     ) {
         void close() {
+            reloadService.close();
             brain.stop();
         }
     }

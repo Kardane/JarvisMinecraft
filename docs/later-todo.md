@@ -4,10 +4,6 @@ This file lists only items that remain after the current Phase 1–8 and Operati
 
 ## Admin Commands
 
-- `/jm reload`
-  - reload runtime configuration
-  - keep the previous valid snapshot if parsing/validation fails
-  - emit operational logs for success and failure
 - `/jm test`
   - provide a diagnostic command for safely checking Provider/Jev/Luna/Tool boundaries
   - never print secrets or raw prompts

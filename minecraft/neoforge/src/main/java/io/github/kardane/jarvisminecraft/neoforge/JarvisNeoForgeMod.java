@@ -7,6 +7,8 @@ import io.github.kardane.jarvisminecraft.common.brain.PackagingSmoke;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
+import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationManager;
+import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationReloadService;
 import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
@@ -92,6 +94,68 @@ public final class JarvisNeoForgeMod {
                             return 1;
                         })
                 )
+                .then(
+                    Commands.literal("reload")
+                        .executes(context -> {
+                            RuntimeState current = runtime;
+                            if (current == null) {
+                                context.getSource().sendFailure(
+                                    Component.literal("JARVIS runtime is not running.")
+                                );
+                                return 0;
+                            }
+                            var source = context.getSource();
+                            current.reloadService()
+                                .reloadAsync()
+                                .whenComplete((result, failure) ->
+                                    current.server().execute(() -> {
+                                        if (runtime != current) {
+                                            return;
+                                        }
+                                        if (
+                                            failure == null
+                                                && result != null
+                                                && result.success()
+                                        ) {
+                                            source.sendSuccess(
+                                                () -> Component.literal(
+                                                    "[JARVIS] Configuration reloaded."
+                                                ),
+                                                false
+                                            );
+                                            logReloadSuccess(result);
+                                            return;
+                                        }
+                                        source.sendFailure(
+                                            Component.literal(
+                                                "[JARVIS] Reload failed; previous configuration remains active."
+                                            )
+                                        );
+                                        LOGGER.warning(
+                                            "JARVIS configuration reload failed; previous configuration remains active."
+                                        );
+                                    })
+                                );
+                            return 1;
+                        })
+                )
+        );
+    }
+
+    private void logReloadSuccess(
+        RuntimeConfigurationManager.ReloadResult result
+    ) {
+        LOGGER.info(
+            "JARVIS configuration reloaded: "
+                + result.activeConfig().toLogLine()
+                + ", personaPresent="
+                + result.activeContent().personaPresent()
+                + ", personaBytes="
+                + result.activeContent().personaBytes()
+                + ", knowledgeDocuments="
+                + result.activeContent().knowledgeDocuments()
+                + ", knowledgeBytes="
+                + result.activeContent().knowledgeBytes()
         );
     }
 
@@ -127,14 +191,21 @@ public final class JarvisNeoForgeMod {
         Path dataDirectory = Path.of("config", "jarvisminecraft");
         Path runtimeConfigPath = dataDirectory.resolve("jarvis.properties");
 
+        final RuntimeConfigurationManager runtimeConfiguration;
         final ConfigManager configManager;
         final EmbeddedBrainSettings embeddedSettings;
         try {
-            configManager = new ConfigManager(
-                () -> JarvisConfigLoader.load(
-                    PropertiesJarvisConfigSource.load(runtimeConfigPath)
-                )
-            );
+            runtimeConfiguration =
+                new RuntimeConfigurationManager(
+                    dataDirectory,
+                    () -> JarvisConfigLoader.load(
+                        PropertiesJarvisConfigSource.load(
+                            runtimeConfigPath
+                        )
+                    )
+                );
+            configManager =
+                runtimeConfiguration.configManager();
             embeddedSettings = EmbeddedBrainSettings.resolve(
                 setting(
                     "jarvis.serverId",
@@ -197,7 +268,7 @@ public final class JarvisNeoForgeMod {
             embeddedSettings.auditDirectory(),
             sessions,
             interactions,
-            configManager,
+            runtimeConfiguration,
             registry,
             commonRuntime,
             serverScheduler,
@@ -226,6 +297,10 @@ public final class JarvisNeoForgeMod {
             brain,
             chat,
             tickSampler,
+            runtimeConfiguration,
+            new RuntimeConfigurationReloadService(
+                runtimeConfiguration
+            ),
             configManager
         );
         runtime = next;
@@ -233,7 +308,7 @@ public final class JarvisNeoForgeMod {
         brain.start();
         LOGGER.info(
             "JARVIS runtime policy config validated "
-                + "(interaction + proactive + reasoning + response + execution + scheduling policy active; admin commands pending): "
+                + "(interaction + proactive + reasoning + response + execution + scheduling policy active; /jm reload active): "
                 + JarvisConfigSummary.from(configManager.current()).toLogLine()
         );
         LOGGER.info(
@@ -326,9 +401,12 @@ public final class JarvisNeoForgeMod {
         BrainGateway brain,
         NeoForgeChatController chat,
         NeoForgeTickSampler tickSampler,
+        RuntimeConfigurationManager runtimeConfiguration,
+        RuntimeConfigurationReloadService reloadService,
         ConfigManager configManager
     ) {
         void close() {
+            reloadService.close();
             brain.stop();
         }
     }

@@ -6,6 +6,7 @@ import java.util.Objects;
 import java.util.Set;
 
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLogLevel;
+import io.github.kardane.jarvisminecraft.common.prompt.PromptContentLoader;
 
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.Risk;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
@@ -13,6 +14,8 @@ import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolNam
 public record JarvisConfig(
     Interaction interaction,
     Model model,
+    Personality personality,
+    Knowledge knowledge,
     Response response,
     Execution execution,
     Scheduling scheduling,
@@ -21,10 +24,32 @@ public record JarvisConfig(
     public JarvisConfig {
         Objects.requireNonNull(interaction, "interaction");
         Objects.requireNonNull(model, "model");
+        Objects.requireNonNull(personality, "personality");
+        Objects.requireNonNull(knowledge, "knowledge");
         Objects.requireNonNull(response, "response");
         Objects.requireNonNull(execution, "execution");
         Objects.requireNonNull(scheduling, "scheduling");
         Objects.requireNonNull(logging, "logging");
+    }
+
+    public JarvisConfig(
+        Interaction interaction,
+        Model model,
+        Response response,
+        Execution execution,
+        Scheduling scheduling,
+        Logging logging
+    ) {
+        this(
+            interaction,
+            model,
+            Personality.defaults(),
+            Knowledge.defaults(),
+            response,
+            execution,
+            scheduling,
+            logging
+        );
     }
 
     public JarvisConfig(
@@ -37,6 +62,8 @@ public record JarvisConfig(
         this(
             interaction,
             model,
+            Personality.defaults(),
+            Knowledge.defaults(),
             response,
             execution,
             scheduling,
@@ -57,6 +84,8 @@ public record JarvisConfig(
                 "gpt-6-luna",
                 new Reasoning(ReasoningMode.AUTO, ReasoningMode.MEDIUM)
             ),
+            Personality.defaults(),
+            Knowledge.defaults(),
             new Response(
                 "[JARVIS] ",
                 new WaitingMessage(
@@ -224,6 +253,56 @@ public record JarvisConfig(
                     "model.reasoning.fallback must be a concrete reasoning level."
                 );
             }
+        }
+    }
+
+    public record Personality(
+        boolean enabled
+    ) {
+        public static Personality defaults() {
+            return new Personality(false);
+        }
+    }
+
+    public record Knowledge(
+        boolean enabled,
+        int maxFiles,
+        int maxFileBytes,
+        int maxTotalBytes
+    ) {
+        public Knowledge {
+            requireRange(
+                maxFiles,
+                1,
+                Integer.MAX_VALUE,
+                "knowledge.maxFiles"
+            );
+            requireRange(
+                maxFileBytes,
+                1,
+                Integer.MAX_VALUE,
+                "knowledge.maxFileBytes"
+            );
+            requireRange(
+                maxTotalBytes,
+                1,
+                Integer.MAX_VALUE,
+                "knowledge.maxTotalBytes"
+            );
+            if (maxFileBytes > maxTotalBytes) {
+                throw new IllegalArgumentException(
+                    "knowledge.maxFileBytes must not exceed knowledge.maxTotalBytes."
+                );
+            }
+        }
+
+        public static Knowledge defaults() {
+            return new Knowledge(
+                false,
+                PromptContentLoader.Limits.DEFAULT_KNOWLEDGE_MAX_FILES,
+                PromptContentLoader.Limits.DEFAULT_KNOWLEDGE_MAX_FILE_BYTES,
+                PromptContentLoader.Limits.DEFAULT_KNOWLEDGE_MAX_TOTAL_BYTES
+            );
         }
     }
 

@@ -1,17 +1,24 @@
 package io.github.kardane.jarvisminecraft.common.config;
 
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class JarvisConfigVerificationMain {
     private JarvisConfigVerificationMain() {
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws Exception {
         verifyDefaults();
         verifyPropertiesOverride();
         verifyInvalidConfigRejected();
+        verifyPromptContentBoundsRejected();
         verifyReloadFailureKeepsPreviousSnapshot();
+        verifyAtomicRuntimeReload();
+        verifyAsyncReloadService();
         System.out.println("JarvisConfig verification OK");
     }
 
@@ -42,6 +49,20 @@ public final class JarvisConfigVerificationMain {
             !config.scheduling().enabled(),
             "Scheduling must default to disabled."
         );
+        require(
+            !config.personality().enabled(),
+            "Custom personality must default to disabled."
+        );
+        require(
+            !config.knowledge().enabled(),
+            "Custom knowledge must default to disabled."
+        );
+        require(
+            config.knowledge().maxFiles() == 32
+                && config.knowledge().maxFileBytes() == 32 * 1024
+                && config.knowledge().maxTotalBytes() == 128 * 1024,
+            "Prompt-content limits must retain the documented defaults."
+        );
     }
 
     private static void verifyPropertiesOverride() {
@@ -53,6 +74,26 @@ public final class JarvisConfigVerificationMain {
         properties.setProperty(
             "jarvis.interaction.follow-up-seconds",
             "90"
+        );
+        properties.setProperty(
+            "jarvis.personality.enabled",
+            "true"
+        );
+        properties.setProperty(
+            "jarvis.knowledge.enabled",
+            "true"
+        );
+        properties.setProperty(
+            "jarvis.knowledge.max-files",
+            "12"
+        );
+        properties.setProperty(
+            "jarvis.knowledge.max-file-bytes",
+            "16384"
+        );
+        properties.setProperty(
+            "jarvis.knowledge.max-total-bytes",
+            "65536"
         );
         properties.setProperty(
             "jarvis.response.sound.enabled",
@@ -79,6 +120,17 @@ public final class JarvisConfigVerificationMain {
             config.response().sound().enabled(),
             "Properties boolean override failed."
         );
+        require(
+            config.personality().enabled(),
+            "Personality boolean override failed."
+        );
+        require(
+            config.knowledge().enabled()
+                && config.knowledge().maxFiles() == 12
+                && config.knowledge().maxFileBytes() == 16384
+                && config.knowledge().maxTotalBytes() == 65536,
+            "Knowledge bounds override failed."
+        );
     }
 
     private static void verifyInvalidConfigRejected() {
@@ -97,6 +149,50 @@ public final class JarvisConfigVerificationMain {
             rejected = true;
         }
         require(rejected, "Invalid config must fail validation.");
+    }
+
+    private static void verifyPromptContentBoundsRejected() {
+        Properties properties = new Properties();
+        properties.setProperty(
+            "jarvis.knowledge.max-files",
+            "0"
+        );
+
+        boolean rejected = false;
+        try {
+            JarvisConfigLoader.load(
+                PropertiesJarvisConfigSource.from(properties)
+            );
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        require(
+            rejected,
+            "Knowledge limits must remain positive."
+        );
+
+        Properties inconsistent = new Properties();
+        inconsistent.setProperty(
+            "jarvis.knowledge.max-file-bytes",
+            "32768"
+        );
+        inconsistent.setProperty(
+            "jarvis.knowledge.max-total-bytes",
+            "16384"
+        );
+
+        rejected = false;
+        try {
+            JarvisConfigLoader.load(
+                PropertiesJarvisConfigSource.from(inconsistent)
+            );
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        require(
+            rejected,
+            "Per-file knowledge limit must not exceed total knowledge limit."
+        );
     }
 
     private static void verifyReloadFailureKeepsPreviousSnapshot() {
@@ -118,6 +214,242 @@ public final class JarvisConfigVerificationMain {
         require(
             manager.current() == initial,
             "Failed reload must keep the previous immutable snapshot."
+        );
+    }
+
+    private static void verifyAtomicRuntimeReload()
+        throws Exception {
+        Path root = Files.createTempDirectory(
+            "jarvis-runtime-config-"
+        );
+        Files.writeString(
+            root.resolve("persona.md"),
+            "FIRST PERSONA",
+            StandardCharsets.UTF_8
+        );
+        Files.createDirectories(root.resolve("knowledge"));
+        Files.writeString(
+            root.resolve("knowledge").resolve("rules.md"),
+            "RULES",
+            StandardCharsets.UTF_8
+        );
+
+        AtomicBoolean failConfig =
+            new AtomicBoolean(false);
+        AtomicReference<JarvisConfig> candidate =
+            new AtomicReference<>(
+                JarvisConfig.defaults()
+            );
+
+        RuntimeConfigurationManager manager =
+            new RuntimeConfigurationManager(
+                root,
+                () -> {
+                    if (failConfig.get()) {
+                        throw new IllegalArgumentException(
+                            "synthetic invalid runtime config"
+                        );
+                    }
+                    return candidate.get();
+                }
+            );
+
+        RuntimeConfigurationManager.RuntimeSnapshot initial =
+            manager.current();
+        require(
+            initial.promptContent().persona().isEmpty()
+                && initial.promptContent()
+                    .knowledge()
+                    .isEmpty(),
+            "Disabled prompt content must remain absent at startup."
+        );
+
+        candidate.set(
+            promptConfig(
+                true,
+                true,
+                8,
+                16,
+                32
+            )
+        );
+        RuntimeConfigurationManager.ReloadResult success =
+            manager.reload();
+
+        require(
+            success.success(),
+            "Valid runtime config + prompt content must commit."
+        );
+        RuntimeConfigurationManager.RuntimeSnapshot active =
+            manager.current();
+        require(
+            active != initial,
+            "Successful reload must publish a new composite snapshot."
+        );
+        require(
+            active.config().personality().enabled()
+                && active.config().knowledge().enabled(),
+            "Successful reload did not publish prompt enablement."
+        );
+        require(
+            "FIRST PERSONA".equals(
+                active.promptContent().persona()
+            ),
+            "Successful reload did not publish persona content."
+        );
+        require(
+            active.promptContent().knowledge().size() == 1,
+            "Successful reload did not publish knowledge content."
+        );
+        require(
+            manager.configManager().current()
+                == active.config()
+                && manager.promptContentManager().current()
+                    == active.promptContent(),
+            "Managed views do not reference the same composite snapshot."
+        );
+
+        Files.writeString(
+            root.resolve("knowledge").resolve("rules.md"),
+            "TOO-LONG",
+            StandardCharsets.UTF_8
+        );
+        candidate.set(
+            promptConfig(
+                true,
+                true,
+                8,
+                4,
+                8
+            )
+        );
+
+        RuntimeConfigurationManager.ReloadResult
+            invalidPrompt = manager.reload();
+        require(
+            !invalidPrompt.success(),
+            "Invalid prompt content must reject the reload."
+        );
+        require(
+            manager.current() == active,
+            "Invalid prompt content partially replaced the active runtime snapshot."
+        );
+        require(
+            manager.configManager().current()
+                == active.config()
+                && manager.promptContentManager().current()
+                    == active.promptContent(),
+            "Invalid prompt content changed one managed view."
+        );
+
+        failConfig.set(true);
+        RuntimeConfigurationManager.ReloadResult
+            invalidConfig = manager.reload();
+        require(
+            !invalidConfig.success(),
+            "Invalid structured config must reject the reload."
+        );
+        require(
+            manager.current() == active,
+            "Invalid structured config partially replaced the active runtime snapshot."
+        );
+
+        RuntimeConfigurationManager.ReloadResult
+            repeatedFailure = manager.reload();
+        require(
+            !repeatedFailure.success()
+                && manager.current() == active,
+            "Repeated failed reloads corrupted the active runtime snapshot."
+        );
+    }
+
+    private static void verifyAsyncReloadService()
+        throws Exception {
+        Path root = Files.createTempDirectory(
+            "jarvis-runtime-reload-service-"
+        );
+        AtomicReference<String> loaderThread =
+            new AtomicReference<>();
+
+        RuntimeConfigurationManager manager =
+            new RuntimeConfigurationManager(
+                root,
+                () -> {
+                    loaderThread.set(
+                        Thread.currentThread().getName()
+                    );
+                    return JarvisConfig.defaults();
+                }
+            );
+
+        RuntimeConfigurationReloadService service =
+            new RuntimeConfigurationReloadService(manager);
+        String callerThread =
+            Thread.currentThread().getName();
+
+        RuntimeConfigurationManager.ReloadResult result =
+            service.reloadAsync()
+                .toCompletableFuture()
+                .join();
+
+        require(
+            result.success(),
+            "Asynchronous runtime reload must complete successfully."
+        );
+        require(
+            !callerThread.equals(loaderThread.get())
+                && "jarvis-config-reload".equals(
+                    loaderThread.get()
+                ),
+            "Runtime reload file/config loading must execute off the caller thread."
+        );
+
+        service.close();
+
+        boolean rejected = false;
+        try {
+            service.reloadAsync()
+                .toCompletableFuture()
+                .join();
+        } catch (RuntimeException expected) {
+            rejected = true;
+        }
+        require(
+            rejected,
+            "Closed runtime reload service must reject new reloads."
+        );
+    }
+
+    private static JarvisConfig promptConfig(
+        boolean personalityEnabled,
+        boolean knowledgeEnabled,
+        int maxFiles,
+        int maxFileBytes,
+        int maxTotalBytes
+    ) {
+        Properties properties = new Properties();
+        properties.setProperty(
+            "jarvis.personality.enabled",
+            Boolean.toString(personalityEnabled)
+        );
+        properties.setProperty(
+            "jarvis.knowledge.enabled",
+            Boolean.toString(knowledgeEnabled)
+        );
+        properties.setProperty(
+            "jarvis.knowledge.max-files",
+            Integer.toString(maxFiles)
+        );
+        properties.setProperty(
+            "jarvis.knowledge.max-file-bytes",
+            Integer.toString(maxFileBytes)
+        );
+        properties.setProperty(
+            "jarvis.knowledge.max-total-bytes",
+            Integer.toString(maxTotalBytes)
+        );
+        return JarvisConfigLoader.load(
+            PropertiesJarvisConfigSource.from(properties)
         );
     }
 

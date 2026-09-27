@@ -8,6 +8,8 @@ import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
+import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationManager;
+import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationReloadService;
 import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
@@ -24,6 +26,7 @@ import io.github.kardane.jarvisminecraft.paper.platform.PaperServerScheduler;
 import io.github.kardane.jarvisminecraft.paper.integrations.IntegrationRegistry;
 import io.github.kardane.jarvisminecraft.paper.logging.PaperJarvisLog;
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.time.Clock;
@@ -37,6 +40,8 @@ public final class JarvisPaperPlugin extends JavaPlugin {
     private static final String ADAPTER_VERSION = "0.1.0-dev";
 
     private BrainGateway brain;
+    private RuntimeConfigurationManager runtimeConfiguration;
+    private RuntimeConfigurationReloadService reloadService;
     private ConfigManager configManager;
     private ChatSessionManager sessions;
     private InteractionCoordinator interactions;
@@ -64,10 +69,17 @@ public final class JarvisPaperPlugin extends JavaPlugin {
 
         saveDefaultConfig();
 
+        final RuntimeConfigurationManager loadedRuntimeConfiguration;
         final ConfigManager loadedConfigManager;
         final EmbeddedBrainSettings embeddedSettings;
         try {
-            loadedConfigManager = new ConfigManager(this::loadRuntimeConfig);
+            loadedRuntimeConfiguration =
+                new RuntimeConfigurationManager(
+                    getDataFolder().toPath(),
+                    this::loadRuntimeConfig
+                );
+            loadedConfigManager =
+                loadedRuntimeConfiguration.configManager();
             embeddedSettings = EmbeddedBrainSettings.resolve(
                 setting(
                     "jarvis.serverId",
@@ -96,6 +108,11 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             return;
         }
 
+        runtimeConfiguration = loadedRuntimeConfiguration;
+        reloadService =
+            new RuntimeConfigurationReloadService(
+                runtimeConfiguration
+            );
         configManager = loadedConfigManager;
         JarvisLog operationalLog = new ConfiguredJarvisLog(
             configManager,
@@ -129,7 +146,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             embeddedSettings.auditDirectory(),
             sessions,
             interactions,
-            configManager,
+            runtimeConfiguration,
             registry,
             commonRuntime,
             serverScheduler,
@@ -141,12 +158,44 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         var statusCommand = getCommand("jm");
         if (statusCommand != null) {
             statusCommand.setExecutor((sender, command, label, args) -> {
-                if (args.length != 1 || !"status".equalsIgnoreCase(args[0])) {
-                    sender.sendMessage("/jm status");
+                if (args.length != 1) {
+                    sender.sendMessage("/jm <status|reload>");
                     return true;
                 }
-                JarvisStatusFormatter.lines(brain.status())
-                    .forEach(sender::sendMessage);
+                if ("status".equalsIgnoreCase(args[0])) {
+                    JarvisStatusFormatter.lines(brain.status())
+                        .forEach(sender::sendMessage);
+                    return true;
+                }
+                if ("reload".equalsIgnoreCase(args[0])) {
+                    if (
+                        !sender.hasPermission(
+                            "jarvisminecraft.reload"
+                        )
+                    ) {
+                        sender.sendMessage(
+                            "You do not have permission to reload JARVIS."
+                        );
+                        return true;
+                    }
+                    reloadService.reloadAsync()
+                        .whenComplete((result, failure) ->
+                            serverScheduler.submit(() -> {
+                                if (isEnabled()) {
+                                    finishReload(
+                                        sender,
+                                        result,
+                                        failure
+                                    );
+                                }
+                                return java.util.concurrent.CompletableFuture.completedFuture(
+                                    null
+                                );
+                            })
+                        );
+                    return true;
+                }
+                sender.sendMessage("/jm <status|reload>");
                 return true;
             });
         }
@@ -172,7 +221,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         brain.start();
         getLogger().info(
             "JARVIS runtime policy config validated "
-                + "(interaction + proactive + reasoning + response + execution + scheduling policy active; admin commands pending): "
+                + "(interaction + proactive + reasoning + response + execution + scheduling policy active; /jm reload active): "
                 + JarvisConfigSummary.from(configManager.current()).toLogLine()
         );
         getLogger().info(
@@ -193,7 +242,54 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             integrations = null;
         }
         interactions = null;
+        if (reloadService != null) {
+            reloadService.close();
+            reloadService = null;
+        }
         configManager = null;
+        runtimeConfiguration = null;
+    }
+
+    private void finishReload(
+        CommandSender sender,
+        RuntimeConfigurationManager.ReloadResult result,
+        Throwable failure
+    ) {
+        if (
+            failure == null
+                && result != null
+                && result.success()
+        ) {
+            sender.sendMessage(
+                "[JARVIS] Configuration reloaded."
+            );
+            logReloadSuccess(result);
+            return;
+        }
+
+        sender.sendMessage(
+            "[JARVIS] Reload failed; previous configuration remains active."
+        );
+        getLogger().warning(
+            "JARVIS configuration reload failed; previous configuration remains active."
+        );
+    }
+
+    private void logReloadSuccess(
+        RuntimeConfigurationManager.ReloadResult result
+    ) {
+        getLogger().info(
+            "JARVIS configuration reloaded: "
+                + result.activeConfig().toLogLine()
+                + ", personaPresent="
+                + result.activeContent().personaPresent()
+                + ", personaBytes="
+                + result.activeContent().personaBytes()
+                + ", knowledgeDocuments="
+                + result.activeContent().knowledgeDocuments()
+                + ", knowledgeBytes="
+                + result.activeContent().knowledgeBytes()
+        );
     }
 
     private JarvisConfig loadRuntimeConfig() {
