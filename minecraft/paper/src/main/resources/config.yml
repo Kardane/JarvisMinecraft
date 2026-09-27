@@ -35,6 +35,17 @@ jarvis:
       mode: AUTO
       fallback: MEDIUM
 
+  # User prompt content remains disabled by default for backward compatibility.
+  # Phase P3 will wire these validated settings into Luna prompt composition.
+  personality:
+    enabled: false
+
+  knowledge:
+    enabled: false
+    max-files: 32
+    max-file-bytes: 32768
+    max-total-bytes: 131072
+
   response:
     # Legacy Minecraft ampersand codes are supported in the prefix only.
     # Example: "&5[JARVIS]&r "
