@@ -145,6 +145,13 @@ final class GatewayRequestCoordinator {
 
         processing.whenComplete((reply, failure) -> {
             progress.complete();
+            long latencyMillis = Math.max(
+                0L,
+                Duration.between(
+                    request.receivedAt(),
+                    clock.instant()
+                ).toMillis()
+            );
             if (failure == null) {
                 log.info(
                     JarvisEvents.REQUEST_COMPLETED,
@@ -153,20 +160,15 @@ final class GatewayRequestCoordinator {
                         "sessionId", request.sessionId(),
                         "requesterUuid", request.requesterUuid(),
                         "origin", request.mode(),
-                        "latencyMs", Math.max(
-                            0L,
-                            Duration.between(
-                                request.receivedAt(),
-                                clock.instant()
-                            ).toMillis()
-                        )
+                        "latencyMs", latencyMillis
                     )
                 );
                 presenter.deliverReply(
                     requesterUuid,
                     sessionId,
                     reply,
-                    responseConfig
+                    responseConfig,
+                    latencyMillis
                 );
             } else {
                 logFailure(request, failure);
@@ -174,7 +176,8 @@ final class GatewayRequestCoordinator {
                     requesterUuid,
                     sessionId,
                     failure,
-                    responseConfig
+                    responseConfig,
+                    latencyMillis
                 );
             }
         });
