@@ -1516,6 +1516,183 @@ public final class EmbeddedBrain {
         );
     }
 
+    private void logToolDenied(
+        ChatRequest request,
+        ToolName tool,
+        ExecutionPolicy.DenialReason reason,
+        ExecutionPolicy.DenialReason policyReason
+    ) {
+        Map<String, Object> fields = JarvisFields.of(
+            "requestId", request.requestId(),
+            "requesterUuid", request.requesterUuid(),
+            "origin", request.mode(),
+            "tool", tool.wireName(),
+            "reason", reason,
+            "policyReason", policyReason,
+            "executionMode", executionPolicy.currentMode()
+        );
+        if (tool.stateChanging()) {
+            log.warn(JarvisEvents.TOOL_DENIED, fields);
+        } else {
+            log.debug(JarvisEvents.TOOL_DENIED, fields);
+        }
+    }
+
+    private void logToolStarted(
+        ChatRequest request,
+        ToolName tool,
+        UUID toolCallId,
+        UUID actionId
+    ) {
+        log.debug(
+            JarvisEvents.TOOL_STARTED,
+            JarvisFields.of(
+                "requestId", request.requestId(),
+                "requesterUuid", request.requesterUuid(),
+                "tool", tool.wireName(),
+                "toolCallId", toolCallId,
+                "actionId", actionId,
+                "risk", tool.risk()
+            )
+        );
+    }
+
+    private void logToolCompleted(
+        ChatRequest request,
+        ToolName tool,
+        UUID toolCallId,
+        UUID actionId,
+        ToolResult result,
+        long latency
+    ) {
+        ErrorCode errorCode = toolErrorCode(result);
+        log.info(
+            JarvisEvents.TOOL_COMPLETED,
+            JarvisFields.of(
+                "requestId", request.requestId(),
+                "requesterUuid", request.requesterUuid(),
+                "tool", tool.wireName(),
+                "toolCallId", toolCallId,
+                "actionId", actionId,
+                "risk", tool.risk(),
+                "outcome", result.status(),
+                "source", result.source(),
+                "errorCode", errorCode,
+                "latencyMs", latency
+            )
+        );
+        if (errorCode == ErrorCode.OUTCOME_UNKNOWN) {
+            log.warn(
+                JarvisEvents.TOOL_OUTCOME_UNKNOWN,
+                JarvisFields.of(
+                    "requestId", request.requestId(),
+                    "requesterUuid", request.requesterUuid(),
+                    "tool", tool.wireName(),
+                    "toolCallId", toolCallId,
+                    "actionId", actionId
+                )
+            );
+        }
+    }
+
+    private ErrorCode toolErrorCode(ToolResult result) {
+        return result.error() == null
+            ? null
+            : result.error().code();
+    }
+
+    private String scheduledAbortReason(
+        ChatRequest origin,
+        ScheduleActionArguments schedule
+    ) {
+        if (stopped) {
+            return "SERVER_STOPPING";
+        }
+        if (!schedulingPolicy.stillAllowed(schedule)) {
+            return "SCHEDULING_DISABLED";
+        }
+        if (
+            !toolRuntime.activeTools().contains(
+                schedule.tool()
+            )
+        ) {
+            return "TOOL_INACTIVE";
+        }
+        ExecutionPolicy.Decision decision =
+            executionPolicy.evaluate(
+                schedule.tool(),
+                origin.toolsAllowed(),
+                "SCHEDULED"
+            );
+        if (!decision.allowed()) {
+            return decision.reason()
+                    == ExecutionPolicy.DenialReason.NO_REQUESTER_AUTHORITY
+                ? "AUTHORITY_REVOKED"
+                : "EXECUTION_POLICY_REVOKED";
+        }
+        return null;
+    }
+
+    private String scheduleResultAbortReason(
+        ToolResult result
+    ) {
+        if (
+            result.status()
+                == io.github.kardane.jarvisminecraft.common.protocol.Protocol.ResultStatus.OK
+                || result.status()
+                    == io.github.kardane.jarvisminecraft.common.protocol.Protocol.ResultStatus.EMPTY
+        ) {
+            return null;
+        }
+        ErrorCode code = toolErrorCode(result);
+        if (code == null) {
+            return "TOOL_FAILED";
+        }
+        return switch (code) {
+            case UNAUTHORIZED -> "AUTHORITY_REVOKED";
+            case TIMEOUT -> "TIMEOUT";
+            case OUTCOME_UNKNOWN -> "OUTCOME_UNKNOWN";
+            case CANCELLED -> "CANCELLED";
+            default -> "TOOL_FAILED";
+        };
+    }
+
+    private String scheduleFailureReason(
+        Throwable failure
+    ) {
+        Throwable cause = unwrap(failure);
+        if (cause instanceof ProtocolException protocol) {
+            return switch (protocol.code()) {
+                case UNAUTHORIZED -> "AUTHORITY_REVOKED";
+                case TIMEOUT -> "TIMEOUT";
+                case OUTCOME_UNKNOWN -> "OUTCOME_UNKNOWN";
+                case CANCELLED -> "CANCELLED";
+                case INTERNAL -> "AUDIT_FAILURE";
+                default -> "TOOL_FAILED";
+            };
+        }
+        return "TOOL_FAILED";
+    }
+
+    private void logScheduleAborted(
+        UUID scheduleId,
+        UUID requesterUuid,
+        ToolName tool,
+        int runIndex,
+        String reason
+    ) {
+        log.warn(
+            JarvisEvents.SCHEDULE_ABORTED,
+            JarvisFields.of(
+                "scheduleId", scheduleId,
+                "requesterUuid", requesterUuid,
+                "tool", tool.wireName(),
+                "runIndex", runIndex,
+                "reason", reason
+            )
+        );
+    }
+
     private void logPlanning(
         ChatRequest request,
         DeterministicRoutePolicy.RoutingDecision routing,
