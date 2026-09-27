@@ -18,6 +18,7 @@ public final class JarvisConfigVerificationMain {
         verifyPromptContentBoundsRejected();
         verifyReloadFailureKeepsPreviousSnapshot();
         verifyAtomicRuntimeReload();
+        verifyAsyncReloadService();
         System.out.println("JarvisConfig verification OK");
     }
 
@@ -359,6 +360,63 @@ public final class JarvisConfigVerificationMain {
             !repeatedFailure.success()
                 && manager.current() == active,
             "Repeated failed reloads corrupted the active runtime snapshot."
+        );
+    }
+
+    private static void verifyAsyncReloadService()
+        throws Exception {
+        Path root = Files.createTempDirectory(
+            "jarvis-runtime-reload-service-"
+        );
+        AtomicReference<String> loaderThread =
+            new AtomicReference<>();
+
+        RuntimeConfigurationManager manager =
+            new RuntimeConfigurationManager(
+                root,
+                () -> {
+                    loaderThread.set(
+                        Thread.currentThread().getName()
+                    );
+                    return JarvisConfig.defaults();
+                }
+            );
+
+        RuntimeConfigurationReloadService service =
+            new RuntimeConfigurationReloadService(manager);
+        String callerThread =
+            Thread.currentThread().getName();
+
+        RuntimeConfigurationManager.ReloadResult result =
+            service.reloadAsync()
+                .toCompletableFuture()
+                .join();
+
+        require(
+            result.success(),
+            "Asynchronous runtime reload must complete successfully."
+        );
+        require(
+            !callerThread.equals(loaderThread.get())
+                && "jarvis-config-reload".equals(
+                    loaderThread.get()
+                ),
+            "Runtime reload file/config loading must execute off the caller thread."
+        );
+
+        service.close();
+
+        boolean rejected = false;
+        try {
+            service.reloadAsync()
+                .toCompletableFuture()
+                .join();
+        } catch (RuntimeException expected) {
+            rejected = true;
+        }
+        require(
+            rejected,
+            "Closed runtime reload service must reject new reloads."
         );
     }
 
