@@ -122,12 +122,6 @@ public final class FabricChatController {
                 yield true;
             }
             case FORWARD -> {
-                if (decision.started()) {
-                    platform.sendPublicPlain(
-                        sessionRules(decision.followUpSeconds())
-                    );
-                }
-
                 brain.submitChat(
                     requesterUuid,
                     sender.getGameProfile().getName(),
@@ -201,10 +195,4 @@ public final class FabricChatController {
             .orElse(false);
     }
 
-    private String sessionRules(int followUpSeconds) {
-        return "대화를 시작합니다. "
-            + followUpSeconds
-            + "초 동안 후속 대화가 이어집니다. "
-            + "'대화 끝'으로 종료하고, '!내용'은 이번 메시지만 일반 채팅으로 보냅니다.";
-    }
 }
