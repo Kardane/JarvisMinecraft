@@ -1,7 +1,7 @@
 # Configurable Persona and Knowledge Implementation Plan
 
-Last updated: 2026-09-27  
-Status: Proposed  
+Last updated: 2026-09-28  
+Status: Implemented (P1-P6)  
 Scope: User-configurable JARVIS personality and server knowledge loaded from the platform configuration directory.
 
 ## 1. Goal
@@ -328,6 +328,7 @@ Validation rules:
 - reject files larger than configured limits
 - reject total content above the configured aggregate limit
 - ignore non-`.md` entries in `knowledge/`
+- ignore `knowledge/README.md`; it is operator guidance, not model context
 - ignore subdirectories in the first version
 - sort knowledge files by normalized filename before loading
 - do not recursively traverse the filesystem
@@ -579,7 +580,8 @@ Do not place secrets, API keys, passwords, private player data, or
 instructions intended to override JARVIS safety or Tool policy here.
 ```
 
-Do not overwrite user-edited files on upgrade.
+The generated `knowledge/README.md` is operator guidance and is excluded from
+model context. Do not overwrite user-edited files on upgrade.
 
 ## 17. Platform Integration
 
@@ -726,7 +728,13 @@ on Paper, Fabric, and NeoForge.
 
 ### Phase P6 — Documentation and Verification Assets
 
-Update the maintained docs and deterministic verification fixtures/tasks.
+Completed:
+
+- maintained architecture/operations/testing documentation updated
+- `/jm reload` removed from later TODO
+- Fabric/NeoForge properties example updated
+- first-start `persona.md` and `knowledge/README.md` templates added
+- `promptContentVerification` deterministic Gradle task added
 
 ## 21. Acceptance Criteria
 
