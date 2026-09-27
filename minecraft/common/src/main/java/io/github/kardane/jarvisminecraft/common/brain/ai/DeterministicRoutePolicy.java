@@ -48,7 +48,10 @@ public final class DeterministicRoutePolicy {
             EnumSet.of(
                 ToolName.GET_PLAYER,
                 ToolName.GET_PLAYER_LOCATION,
-                ToolName.TELEPORT_STAFF
+                ToolName.GET_WORLD_INFO,
+                ToolName.TELEPORT_STAFF,
+                ToolName.WEATHER_SET,
+                ToolName.TIME_SET
             )
         );
         routes.put(JevCategory.GENERAL, EnumSet.noneOf(ToolName.class));

@@ -19,6 +19,10 @@ import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.PlayerUuidAr
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ServerStatusData;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.TeleportArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.TeleportData;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.TimeSetArguments;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.TimeSetData;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WeatherSetArguments;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WeatherSetData;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WorldInfoArguments;
@@ -98,6 +102,20 @@ public final class StandardMinecraftToolService {
             ToolName.TELEPORT_STAFF,
             TeleportArguments.class,
             this::teleportStaff
+        );
+        registry.register(
+            ToolName.WEATHER_SET,
+            WeatherSetArguments.class,
+            (context, arguments) -> completed(
+                weatherSet(context, arguments)
+            )
+        );
+        registry.register(
+            ToolName.TIME_SET,
+            TimeSetArguments.class,
+            (context, arguments) -> completed(
+                timeSet(context, arguments)
+            )
         );
     }
 
@@ -281,6 +299,106 @@ public final class StandardMinecraftToolService {
                     false
                 );
             });
+    }
+
+    private ToolResult weatherSet(
+        ToolExecutionContext context,
+        WeatherSetArguments arguments
+    ) {
+        if (!platform.isOnlineOperator(context.requesterUuid())) {
+            return error(
+                ErrorCode.UNAUTHORIZED,
+                "Requester is no longer an online operator.",
+                false
+            );
+        }
+
+        Optional<StandardPlatformAccess.WeatherMutationSnapshot> changed =
+            platform.setWeather(
+                arguments.worldId(),
+                arguments.weather(),
+                arguments.durationSeconds()
+            );
+        if (changed.isEmpty()) {
+            return error(
+                ErrorCode.NOT_FOUND,
+                "Loaded world was not found.",
+                false
+            );
+        }
+
+        StandardPlatformAccess.WeatherMutationSnapshot value =
+            changed.get();
+        if (!value.completed()) {
+            return error(
+                ErrorCode.CANCELLED,
+                source + " weather change was not completed.",
+                false
+            );
+        }
+
+        Instant observedAt = clock.instant();
+        return result(
+            ResultStatus.OK,
+            new WeatherSetData(
+                value.worldId(),
+                value.weather(),
+                value.durationSeconds(),
+                true
+            ),
+            null,
+            observedAt,
+            false
+        );
+    }
+
+    private ToolResult timeSet(
+        ToolExecutionContext context,
+        TimeSetArguments arguments
+    ) {
+        if (!platform.isOnlineOperator(context.requesterUuid())) {
+            return error(
+                ErrorCode.UNAUTHORIZED,
+                "Requester is no longer an online operator.",
+                false
+            );
+        }
+
+        Optional<StandardPlatformAccess.TimeMutationSnapshot> changed =
+            platform.setTimeOfDay(
+                arguments.worldId(),
+                arguments.timeOfDay()
+            );
+        if (changed.isEmpty()) {
+            return error(
+                ErrorCode.NOT_FOUND,
+                "Loaded world was not found.",
+                false
+            );
+        }
+
+        StandardPlatformAccess.TimeMutationSnapshot value =
+            changed.get();
+        if (!value.completed()) {
+            return error(
+                ErrorCode.CANCELLED,
+                source + " time change was not completed.",
+                false
+            );
+        }
+
+        Instant observedAt = clock.instant();
+        return result(
+            ResultStatus.OK,
+            new TimeSetData(
+                value.worldId(),
+                value.timeOfDay(),
+                true
+            ),
+            null,
+            observedAt,
+            false
+        );
     }
 
     private Metric metric(

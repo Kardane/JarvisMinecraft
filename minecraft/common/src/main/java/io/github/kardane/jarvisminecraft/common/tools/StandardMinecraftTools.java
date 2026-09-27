@@ -17,7 +17,9 @@ public final class StandardMinecraftTools {
             ToolName.GET_PLAYER_LOCATION,
             ToolName.GET_NEARBY_PLAYERS,
             ToolName.GET_WORLD_INFO,
-            ToolName.TELEPORT_STAFF
+            ToolName.TELEPORT_STAFF,
+            ToolName.WEATHER_SET,
+            ToolName.TIME_SET
         )
     );
 
@@ -35,7 +37,9 @@ public final class StandardMinecraftTools {
             capability("player.location", source, version),
             capability("player.nearby", source, version),
             capability("world.info", source, version),
-            capability("staff.self_teleport", source, version)
+            capability("staff.self_teleport", source, version),
+            capability("world.weather.set", source, version),
+            capability("world.time.set", source, version)
         );
     }
 

@@ -1,5 +1,7 @@
 package io.github.kardane.jarvisminecraft.common.platform;
 
+import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WeatherType;
+
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -19,6 +21,17 @@ public interface StandardPlatformAccess extends AdapterPlatformAccess {
     List<NearbyPlayerSnapshot> nearbyPlayers(LocationSnapshot center, double radius, int limit);
 
     CompletionStage<TeleportSnapshot> teleportRequesterTo(UUID requesterUuid, UUID targetPlayerUuid);
+
+    Optional<WeatherMutationSnapshot> setWeather(
+        String worldId,
+        WeatherType weather,
+        int durationSeconds
+    );
+
+    Optional<TimeMutationSnapshot> setTimeOfDay(
+        String worldId,
+        int timeOfDay
+    );
 
     record PlayerSnapshot(UUID uuid, String name, boolean online, LocationSnapshot location) {}
 
@@ -55,6 +68,19 @@ public interface StandardPlatformAccess extends AdapterPlatformAccess {
         UUID targetPlayerUuid,
         String fromWorldId,
         String toWorldId,
+        boolean completed
+    ) {}
+
+    record WeatherMutationSnapshot(
+        String worldId,
+        WeatherType weather,
+        int durationSeconds,
+        boolean completed
+    ) {}
+
+    record TimeMutationSnapshot(
+        String worldId,
+        int timeOfDay,
         boolean completed
     ) {}
 }

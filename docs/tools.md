@@ -35,6 +35,17 @@ Brain이 임의 Tool 이름을 생성해도 Adapter는 실행하지 않는다.
 | get_world_info | world.info | 읽기 | READ_ONLY |
 | teleport_staff | staff.self_teleport | 변경 | LOW |
 
+### Phase 6 structured actions
+
+| Tool | Capability | 변경 여부 | 위험도 |
+|---|---|---:|---|
+| weather_set | world.weather.set | 변경 | LOW |
+| time_set | world.time.set | 변경 | LOW |
+
+두 Tool은 raw console command를 실행하지 않는다. 현재 로드된 world 한 개에 대해
+플랫폼의 직접 API만 호출하며, execution policy allowlist와 current online OP
+재검증을 모두 통과해야 한다.
+
 ### v0.1.1
 
 | Tool | Capability | Provider | 변경 여부 |
@@ -230,6 +241,49 @@ top-level actionId 필수.
 플랫폼 teleport API가 취소/실패하면 성공 응답을 만들지 않는다. 실제 완료를 확인한 뒤 completed=true를 반환한다.
 
 timeout/ACK 손실로 결과가 불명확하면 OUTCOME_UNKNOWN이며 자동 재실행하지 않는다.
+
+## 10.1 weather_set — Phase 6
+
+입력:
+
+~~~json
+{
+  "worldId": "world",
+  "weather": "CLEAR",
+  "durationSeconds": 600
+}
+~~~
+
+제약:
+
+- worldId는 현재 로드된 world만 허용한다.
+- weather는 `CLEAR / RAIN / THUNDER` 중 하나다.
+- durationSeconds는 1~3600이다.
+- requester는 실행 직전에도 online OP여야 한다.
+- 명시적인 날씨 변경 요청에서만 제안한다.
+- 구현은 platform weather API를 직접 사용하고 command 문자열을 만들지 않는다.
+- 성공 결과는 worldId, 적용 weather, durationSeconds, completed=true를 포함한다.
+
+## 10.2 time_set — Phase 6
+
+입력:
+
+~~~json
+{
+  "worldId": "world",
+  "timeOfDay": 6000
+}
+~~~
+
+제약:
+
+- worldId는 현재 로드된 world만 허용한다.
+- timeOfDay는 0~23999다.
+- 현재 day count를 유지한 채 해당 world의 time-of-day만 맞춘다.
+- requester는 실행 직전에도 online OP여야 한다.
+- 명시적인 시간 변경 요청에서만 제안한다.
+- 구현은 platform world time API를 직접 사용하고 command 문자열을 만들지 않는다.
+- 성공 결과는 worldId, 실제 적용 timeOfDay, completed=true를 포함한다.
 
 ## 11. lookup_area_history — v0.1.1
 
