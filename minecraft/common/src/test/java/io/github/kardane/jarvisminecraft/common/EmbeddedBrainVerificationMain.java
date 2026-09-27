@@ -17,15 +17,19 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.LunaClient;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaTurnInput;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
+import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.platform.AdapterPlatformAccess;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
+import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.NoArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.TeleportArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.TeleportData;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 import io.github.kardane.jarvisminecraft.common.runtime.AuditSink;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
+import io.github.kardane.jarvisminecraft.common.runtime.ExecutionPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 
@@ -248,6 +252,28 @@ public final class EmbeddedBrainVerificationMain {
             CLOCK
         );
         RecordingAudit audit = new RecordingAudit(false);
+        JarvisConfig defaults = JarvisConfig.defaults();
+        ExecutionPolicy executionPolicy = new ExecutionPolicy(
+            new ConfigManager(() -> new JarvisConfig(
+                defaults.interaction(),
+                defaults.model(),
+                defaults.response(),
+                new JarvisConfig.Execution(
+                    JarvisConfig.ExecutionMode.EXECUTE_LITE,
+                    JarvisConfig.ExecutionActors.OP,
+                    new JarvisConfig.ToolFilter(
+                        List.of(ToolName.TELEPORT_STAFF.wireName()),
+                        List.of()
+                    ),
+                    defaults.execution().full()
+                ),
+                defaults.scheduling()
+            ))
+        );
+        require(
+            executionPolicy.allows(ToolName.TELEPORT_STAFF, true, "DIRECT"),
+            "Test fixture must permit teleport_staff to reach the pre-execution audit."
+        );
         SequenceLuna luna = new SequenceLuna(
             new LunaStep.Tools(
                 List.of(
@@ -268,6 +294,8 @@ public final class EmbeddedBrainVerificationMain {
             classifier(JevCategory.ACTION_REQUEST),
             new DeterministicRoutePolicy(),
             luna,
+            ReasoningPolicy.defaults(),
+            executionPolicy,
             audit,
             runtime.openRuntime(
                 UUID.fromString("12000000-0000-4000-8000-000000000001"),

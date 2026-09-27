@@ -15,13 +15,18 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.LunaClient;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaTurnInput;
 import io.github.kardane.jarvisminecraft.common.brain.ai.OpenAiLunaClient;
+import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningLevel;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
+import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.platform.StandardPlatformAccess;
 import io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
+import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolArgumentCodec;
 import io.github.kardane.jarvisminecraft.common.runtime.AuditSink;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
+import io.github.kardane.jarvisminecraft.common.runtime.ExecutionPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftToolService;
@@ -90,6 +95,25 @@ public final class EmbeddedBrainLiveVerificationMain {
 
         AsyncJsonlAuditSink auditSink = new AsyncJsonlAuditSink(auditDir, CLOCK);
         DeterministicRoutePolicy routePolicy = new DeterministicRoutePolicy();
+        JarvisConfig defaults = JarvisConfig.defaults();
+        JarvisConfig liveConfig = new JarvisConfig(
+            defaults.interaction(),
+            defaults.model(),
+            defaults.response(),
+            new JarvisConfig.Execution(
+                JarvisConfig.ExecutionMode.EXECUTE_LITE,
+                JarvisConfig.ExecutionActors.OP,
+                new JarvisConfig.ToolFilter(
+                    List.of(ToolName.TELEPORT_STAFF.wireName()),
+                    List.of()
+                ),
+                defaults.execution().full()
+            ),
+            defaults.scheduling()
+        );
+        ExecutionPolicy executionPolicy = new ExecutionPolicy(
+            new ConfigManager(() -> liveConfig)
+        );
 
         CommonRuntime.ExecutionRuntime executionRuntime = runtime.openRuntime(
             UUID.randomUUID(),
@@ -106,6 +130,8 @@ public final class EmbeddedBrainLiveVerificationMain {
             jev,
             routePolicy,
             luna,
+            ReasoningPolicy.defaults(),
+            executionPolicy,
             auditSink,
             executionRuntime,
             CLOCK
@@ -127,7 +153,11 @@ public final class EmbeddedBrainLiveVerificationMain {
             System.out.println("\n--- [E11 Scenario 2: Self Teleport Action] ---");
             runScenario2(gateway, sessions, platform, jev, luna);
 
+            System.out.println("\n--- [E11 Scenario 3: General Greeting] ---");
+            runScenario3(gateway, sessions, platform, jev, luna);
+
             gateway.stop();
+            luna.close();
             auditSink.closeAsync().toCompletableFuture().join();
 
             System.out.println("\n--- [Audit Verification] ---");
@@ -138,6 +168,7 @@ public final class EmbeddedBrainLiveVerificationMain {
             System.out.println("==================================================");
         } finally {
             gateway.stop();
+            luna.close();
             auditSink.closeAsync().toCompletableFuture().join();
         }
     }
@@ -169,7 +200,7 @@ public final class EmbeddedBrainLiveVerificationMain {
         ).toCompletableFuture().join();
         require(accepted, "Scenario 1 chat submission rejected");
 
-        waitForMessages(platform, 1, Duration.ofSeconds(30));
+        waitForFinalResponse(luna, platform, Duration.ofSeconds(90));
         Duration elapsed = Duration.between(start, Instant.now());
         System.out.println("Scenario 1 finished in " + elapsed.toMillis() + " ms");
 
@@ -225,7 +256,7 @@ public final class EmbeddedBrainLiveVerificationMain {
         ).toCompletableFuture().join();
         require(accepted, "Scenario 2 chat submission rejected");
 
-        waitForMessages(platform, 1, Duration.ofSeconds(30));
+        waitForFinalResponse(luna, platform, Duration.ofSeconds(90));
         Duration elapsed = Duration.between(start, Instant.now());
         System.out.println("Scenario 2 finished in " + elapsed.toMillis() + " ms");
 
@@ -272,20 +303,102 @@ public final class EmbeddedBrainLiveVerificationMain {
         System.out.println("Audit records verified: correct events present, secret masking confirmed.");
     }
 
-    private static void waitForMessages(LivePlatform platform, int expectedCount, Duration timeout) {
+    private static void runScenario3(
+        EmbeddedBrainGateway gateway,
+        ChatSessionManager sessions,
+        LivePlatform platform,
+        LoggingJevClassifier jev,
+        LoggingLunaClient luna
+    ) {
+        UUID actor = UUID.fromString("21000000-0000-4000-8000-000000000001");
+        String greeting = "자비스 안녕";
+        ChatSessionManager.Decision decision = sessions.accept(actor, true, greeting);
+        require(decision.kind() == ChatSessionManager.Kind.FORWARD, "Scenario 3 session not started");
+        UUID sessionId = decision.sessionId();
+
+        platform.clearMessages();
+        jev.reset();
+        luna.reset();
+
+        Instant start = Instant.now();
+        System.out.println("Submitting Scenario 3: '자비스 안녕'");
+        boolean accepted = gateway.submitChat(
+            actor,
+            "Operator",
+            sessionId,
+            "DIRECT",
+            greeting
+        ).toCompletableFuture().join();
+        require(accepted, "Scenario 3 chat submission rejected");
+
+        waitForFinalResponse(luna, platform, Duration.ofSeconds(90));
+        Duration elapsed = Duration.between(start, Instant.now());
+        System.out.println("Scenario 3 finished in " + elapsed.toMillis() + " ms");
+
+        JevClassification classification = jev.lastClassification();
+        require(classification != null, "Jev was not called in Scenario 3");
+        System.out.println(
+            "Jev classified: " + classification.category()
+                + " (reasoning=" + classification.reasoning() + ")"
+        );
+        require(
+            classification.category() == JevCategory.GENERAL,
+            "Expected GENERAL but got " + classification.category()
+        );
+        require(
+            classification.reasoning() == ReasoningLevel.NONE,
+            "Expected NONE reasoning for a greeting but got " + classification.reasoning()
+        );
+
+        List<LunaStep> steps = luna.recordedSteps();
+        require(!steps.isEmpty(), "Luna was not called in Scenario 3");
+        require(
+            steps.stream().noneMatch(LunaStep.Tools.class::isInstance),
+            "Luna proposed a Tool for a simple greeting"
+        );
+
+        String finalReply = platform.lastMessage();
+        System.out.println("Final reply delivered to user: " + finalReply);
+        require(finalReply != null && !finalReply.isBlank(), "No reply message delivered to user");
+    }
+
+    private static void waitForFinalResponse(
+        LoggingLunaClient luna,
+        LivePlatform platform,
+        Duration timeout
+    ) {
         Instant deadline = Instant.now().plus(timeout);
         while (Instant.now().isBefore(deadline)) {
-            if (platform.messages().size() >= expectedCount) {
+            String failureType = luna.failureType();
+            if (failureType != null) {
+                throw new AssertionError("Luna HTTP turn failed: " + failureType);
+            }
+
+            List<LunaStep> steps = luna.recordedSteps();
+            if (
+                !steps.isEmpty()
+                    && steps.get(steps.size() - 1) instanceof LunaStep.Final finalStep
+                    && platform.messages().stream().anyMatch(message -> message.contains(finalStep.text()))
+            ) {
                 return;
             }
             try {
-                Thread.sleep(100);
+                Thread.sleep(50);
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 throw new RuntimeException(e);
             }
         }
-        throw new AssertionError("Timed out waiting for " + expectedCount + " messages. Got: " + platform.messages().size());
+        List<LunaStep> steps = luna.recordedSteps();
+        String lastStep = steps.isEmpty()
+            ? "none"
+            : steps.get(steps.size() - 1).getClass().getSimpleName();
+        throw new AssertionError(
+            "Timed out waiting for a final Luna response broadcast. Last Luna step: "
+                + lastStep
+                + "; delivered messages: "
+                + platform.messages().size()
+        );
     }
 
     private static ApiKeys loadApiKeys() {
@@ -394,6 +507,7 @@ public final class EmbeddedBrainLiveVerificationMain {
     private static final class LoggingLunaClient implements LunaClient {
         private final LunaClient delegate;
         private final List<LunaStep> steps = new ArrayList<>();
+        private final AtomicReference<String> failureType = new AtomicReference<>();
 
         private LoggingLunaClient(LunaClient delegate) {
             this.delegate = Objects.requireNonNull(delegate);
@@ -410,7 +524,19 @@ public final class EmbeddedBrainLiveVerificationMain {
             DeterministicRoutePolicy.RoutingDecision routing
         ) {
             Instant start = Instant.now();
-            return delegate.next(input, routing).thenApply(step -> {
+            return delegate.next(input, routing)
+                .whenComplete((step, failure) -> {
+                    if (failure != null) {
+                        Throwable root = failure;
+                        while (root.getCause() != null) {
+                            root = root.getCause();
+                        }
+                        String type = root.getClass().getSimpleName();
+                        failureType.compareAndSet(null, type);
+                        System.out.println("  [Luna HTTP] Turn failed: " + type);
+                    }
+                })
+                .thenApply(step -> {
                 long duration = Duration.between(start, Instant.now()).toMillis();
                 if (step instanceof LunaStep.Tools tools) {
                     System.out.println("  [Luna HTTP] Turn took " + duration + " ms -> Tools proposed (" + tools.calls().size() + "): "
@@ -430,6 +556,11 @@ public final class EmbeddedBrainLiveVerificationMain {
             delegate.clear(requestId);
         }
 
+        @Override
+        public void close() {
+            delegate.close();
+        }
+
         public List<LunaStep> recordedSteps() {
             synchronized (steps) {
                 return new ArrayList<>(steps);
@@ -440,6 +571,11 @@ public final class EmbeddedBrainLiveVerificationMain {
             synchronized (steps) {
                 steps.clear();
             }
+            failureType.set(null);
+        }
+
+        public String failureType() {
+            return failureType.get();
         }
     }
 

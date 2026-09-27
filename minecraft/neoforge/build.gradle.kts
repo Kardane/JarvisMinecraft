@@ -5,6 +5,14 @@ plugins {
     id("net.neoforged.moddev")
 }
 
+dependencyLocking {
+    if (System.getProperty("os.name").startsWith("Windows", ignoreCase = true)) {
+        // The committed lock includes this Linux-only NeoForge runtime module.
+        // Keep strict lock validation on Linux, where CI resolves the module.
+        ignoredDependencies.add("io.netty:netty-transport-native-epoll")
+    }
+}
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)

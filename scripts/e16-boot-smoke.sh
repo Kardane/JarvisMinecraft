@@ -32,9 +32,45 @@ white-list=false
 motd=JARVIS E16 clean boot
 EOF
 
+is_windows_bash() {
+  [[ "${OSTYPE:-}" == msys* || "${OSTYPE:-}" == cygwin* ]]
+}
+
+run_python3() {
+  if is_windows_bash; then
+    python "$@"
+  else
+    python3 "$@"
+  fi
+}
+
 download() {
   local url="$1"
   local target="$2"
+  if is_windows_bash; then
+    local windows_target
+    windows_target="$(cygpath -w "$target")"
+    run_python3 - "$url" "$windows_target" "$USER_AGENT" <<'PY'
+import shutil
+import sys
+import time
+import urllib.request
+
+url, target, user_agent = sys.argv[1:]
+request = urllib.request.Request(url, headers={"User-Agent": user_agent})
+for attempt in range(4):
+    try:
+        with urllib.request.urlopen(request, timeout=120) as response, open(target, "wb") as destination:
+            shutil.copyfileobj(response, destination)
+        break
+    except Exception:
+        if attempt == 3:
+            raise
+        time.sleep(2)
+PY
+    return
+  fi
+
   curl --fail --location --silent --show-error \
     --retry 3 --retry-delay 2 \
     -H "User-Agent: $USER_AGENT" \
@@ -42,7 +78,7 @@ download() {
 }
 
 paper_url() {
-  python3 - "$USER_AGENT" <<'PY'
+  run_python3 - "$USER_AGENT" <<'PY'
 import json
 import sys
 import urllib.request
@@ -66,7 +102,7 @@ PY
 }
 
 fabric_installer_version() {
-  python3 - "$USER_AGENT" <<'PY'
+  run_python3 - "$USER_AGENT" <<'PY'
 import json
 import sys
 import urllib.request
@@ -189,13 +225,24 @@ case "$PLATFORM" in
 
     mkdir -p "$RUN_ROOT/mods"
     cp "$ARTIFACT" "$RUN_ROOT/mods/jarvisminecraft-neoforge.jar"
+    MARKER_ARGUMENT="$MARKER"
+    if [[ "${OSTYPE:-}" == msys* || "${OSTYPE:-}" == cygwin* ]]; then
+      MARKER_ARGUMENT="$(cygpath -m "$MARKER")"
+    fi
     cat > "$RUN_ROOT/user_jvm_args.txt" <<EOF
 -Xms512M
 -Xmx1024M
 -Djarvis.e16BootSmoke=true
--Djarvis.e16BootMarker=$MARKER
+-Djarvis.e16BootMarker=$MARKER_ARGUMENT
 EOF
 
-    run_server bash run.sh nogui
+    if [[ "${OSTYPE:-}" == msys* || "${OSTYPE:-}" == cygwin* ]]; then
+      run_server java \
+        @user_jvm_args.txt \
+        @libraries/net/neoforged/neoforge/21.8.52/win_args.txt \
+        nogui
+    else
+      run_server bash run.sh nogui
+    fi
     ;;
 esac
