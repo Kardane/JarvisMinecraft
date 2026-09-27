@@ -55,6 +55,24 @@ final class EmbeddedBrainBootstrap {
         Objects.requireNonNull(clock, "clock");
         Objects.requireNonNull(log, "log");
 
+        JarvisConfig initialConfig = configManager.current();
+        PromptContentLoader.Limits promptLimits =
+            new PromptContentLoader.Limits(
+                PromptContentLoader.Limits.DEFAULT_PERSONA_MAX_BYTES,
+                initialConfig.knowledge().maxFiles(),
+                initialConfig.knowledge().maxFileBytes(),
+                initialConfig.knowledge().maxTotalBytes()
+            );
+        PromptContentManager promptContent =
+            new PromptContentManager(
+                new PromptContentLoader(
+                    promptContentRoot(auditDirectory),
+                    initialConfig.personality().enabled(),
+                    initialConfig.knowledge().enabled(),
+                    promptLimits
+                )
+            );
+
         ExecutorService aiExecutor = Executors.newFixedThreadPool(
             AiRequestScheduler.DEFAULT_MAX_CONCURRENT,
             runnable -> {
@@ -73,24 +91,6 @@ final class EmbeddedBrainBootstrap {
             openAiApiKey,
             new ToolArgumentCodec()
         );
-
-        JarvisConfig initialConfig = configManager.current();
-        PromptContentLoader.Limits promptLimits =
-            new PromptContentLoader.Limits(
-                PromptContentLoader.Limits.DEFAULT_PERSONA_MAX_BYTES,
-                initialConfig.knowledge().maxFiles(),
-                initialConfig.knowledge().maxFileBytes(),
-                initialConfig.knowledge().maxTotalBytes()
-            );
-        PromptContentManager promptContent =
-            new PromptContentManager(
-                new PromptContentLoader(
-                    promptContentRoot(auditDirectory),
-                    initialConfig.personality().enabled(),
-                    initialConfig.knowledge().enabled(),
-                    promptLimits
-                )
-            );
 
         try {
             EmbeddedBrain brain = new EmbeddedBrain(
