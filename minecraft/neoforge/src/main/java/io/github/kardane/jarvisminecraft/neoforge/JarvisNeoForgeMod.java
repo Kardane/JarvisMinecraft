@@ -7,6 +7,9 @@ import io.github.kardane.jarvisminecraft.common.brain.PackagingSmoke;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
+import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
 import io.github.kardane.jarvisminecraft.common.config.PropertiesJarvisConfigSource;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
@@ -15,17 +18,21 @@ import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftTools;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
 import io.github.kardane.jarvisminecraft.neoforge.chat.NeoForgeChatController;
+import io.github.kardane.jarvisminecraft.neoforge.logging.NeoForgeJarvisLog;
 import io.github.kardane.jarvisminecraft.neoforge.platform.MinecraftNeoForgePlatformAccess;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAccess;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgeServerScheduler;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgeTickSampler;
 import io.github.kardane.jarvisminecraft.neoforge.tools.NeoForgeToolService;
 import net.minecraft.SharedConstants;
+import net.minecraft.commands.Commands;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.neoforge.common.NeoForge;
+import net.neoforged.neoforge.event.RegisterCommandsEvent;
 import net.neoforged.neoforge.event.ServerChatEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStartedEvent;
@@ -52,11 +59,40 @@ public final class JarvisNeoForgeMod {
 
     public JarvisNeoForgeMod() {
         NeoForge.EVENT_BUS.addListener(this::onServerStarted);
+        NeoForge.EVENT_BUS.addListener(this::onRegisterCommands);
         NeoForge.EVENT_BUS.addListener(this::onServerStopping);
         NeoForge.EVENT_BUS.addListener(this::onChat);
         NeoForge.EVENT_BUS.addListener(this::onPlayerLoggedOut);
         NeoForge.EVENT_BUS.addListener(this::onServerTickPre);
         NeoForge.EVENT_BUS.addListener(this::onServerTickPost);
+    }
+
+    private void onRegisterCommands(RegisterCommandsEvent event) {
+        event.getDispatcher().register(
+            Commands.literal("jm")
+                .requires(source -> source.hasPermission(2))
+                .then(
+                    Commands.literal("status")
+                        .executes(context -> {
+                            RuntimeState current = runtime;
+                            if (current == null) {
+                                context.getSource().sendFailure(
+                                    Component.literal("JARVIS runtime is not running.")
+                                );
+                                return 0;
+                            }
+                            JarvisStatusFormatter.lines(
+                                current.brain().status()
+                            ).forEach(line ->
+                                context.getSource().sendSuccess(
+                                    () -> Component.literal(line),
+                                    false
+                                )
+                            );
+                            return 1;
+                        })
+                )
+        );
     }
 
     private void onServerStarted(ServerStartedEvent event) {
@@ -126,6 +162,10 @@ public final class JarvisNeoForgeMod {
             return;
         }
 
+        JarvisLog operationalLog = new ConfiguredJarvisLog(
+            configManager,
+            new NeoForgeJarvisLog(LOGGER)
+        );
         Clock clock = Clock.systemUTC();
         NeoForgeTickSampler tickSampler = new NeoForgeTickSampler();
         NeoForgePlatformAccess platform =
@@ -162,7 +202,8 @@ public final class JarvisNeoForgeMod {
             commonRuntime,
             serverScheduler,
             platform,
-            clock
+            clock,
+            operationalLog
         );
 
         NeoForgeChatController chat = new NeoForgeChatController(

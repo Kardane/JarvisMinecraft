@@ -23,6 +23,7 @@ public final class JarvisConfigLoader {
         JarvisConfig.Sound defaultSound = defaultResponse.sound();
         JarvisConfig.Execution defaultExecution = defaults.execution();
         JarvisConfig.Scheduling defaultScheduling = defaults.scheduling();
+        JarvisConfig.Logging defaultLogging = defaults.logging();
 
         JarvisConfig.Interaction interaction = new JarvisConfig.Interaction(
             enumValue(
@@ -196,12 +197,57 @@ public final class JarvisConfigLoader {
             )
         );
 
+        JarvisConfig.Logging logging = new JarvisConfig.Logging(
+            enumValue(
+                source,
+                "jarvis.logging.level",
+                io.github.kardane.jarvisminecraft.common.logging.JarvisLogLevel.class,
+                defaultLogging.level()
+            ),
+            bool(
+                source,
+                "jarvis.logging.console.enabled",
+                defaultLogging.consoleEnabled()
+            ),
+            bool(
+                source,
+                "jarvis.logging.request.lifecycle",
+                defaultLogging.requestLifecycle()
+            ),
+            bool(
+                source,
+                "jarvis.logging.ai.jev",
+                defaultLogging.aiJev()
+            ),
+            bool(
+                source,
+                "jarvis.logging.ai.luna",
+                defaultLogging.aiLuna()
+            ),
+            bool(
+                source,
+                "jarvis.logging.tool.lifecycle",
+                defaultLogging.toolLifecycle()
+            ),
+            bool(
+                source,
+                "jarvis.logging.proactive.decisions",
+                defaultLogging.proactiveDecisions()
+            ),
+            integer(
+                source,
+                "jarvis.logging.health.interval-seconds",
+                defaultLogging.healthIntervalSeconds()
+            )
+        );
+
         return new JarvisConfig(
             interaction,
             model,
             response,
             execution,
-            scheduling
+            scheduling,
+            logging
         );
     }
 

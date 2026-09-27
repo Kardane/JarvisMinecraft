@@ -16,6 +16,10 @@ import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
 import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisEvents;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisFields;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.NoOpJarvisLog;
 import io.github.kardane.jarvisminecraft.common.platform.AdapterPlatformAccess;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
@@ -33,6 +37,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -40,6 +45,7 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.CancelReason;
@@ -59,6 +65,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     private final LunaClient ownedLuna;
     private final AsyncJsonlAuditSink ownedAudit;
     private final ExecutorService ownedAiExecutor;
+    private final JarvisLog log;
     private final AmbientConversationTracker ambientTracker =
         new AmbientConversationTracker();
     private final AtomicBoolean proactiveInFlight =
@@ -68,6 +75,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     private boolean stopped;
     private Instant proactiveCooldownUntil = Instant.EPOCH;
     private Instant proactiveClassificationAfter = Instant.EPOCH;
+    private volatile AsyncJsonlAuditSink.Status lastAuditStatus;
+    private volatile String lastAuditErrorCode;
 
     public EmbeddedBrainGateway(
         EmbeddedBrain brain,
@@ -90,7 +99,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             clock,
             null,
             null,
-            null
+            null,
+            NoOpJarvisLog.INSTANCE
         );
     }
 
@@ -113,7 +123,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             clock,
             null,
             null,
-            null
+            null,
+            NoOpJarvisLog.INSTANCE
         );
     }
 
@@ -128,7 +139,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         Clock clock,
         LunaClient ownedLuna,
         AsyncJsonlAuditSink ownedAudit,
-        ExecutorService ownedAiExecutor
+        ExecutorService ownedAiExecutor,
+        JarvisLog log
     ) {
         this.brain = Objects.requireNonNull(brain, "brain");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
@@ -153,6 +165,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         this.ownedLuna = ownedLuna;
         this.ownedAudit = ownedAudit;
         this.ownedAiExecutor = ownedAiExecutor;
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     public static EmbeddedBrainGateway live(
@@ -233,7 +246,42 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         AdapterPlatformAccess platform,
         Clock clock
     ) {
+        return live(
+            serverId,
+            capabilities,
+            openAiApiKey,
+            typesafeApiKey,
+            auditDirectory,
+            sessions,
+            interactions,
+            configManager,
+            registry,
+            commonRuntime,
+            serverScheduler,
+            platform,
+            clock,
+            NoOpJarvisLog.INSTANCE
+        );
+    }
+
+    public static EmbeddedBrainGateway live(
+        String serverId,
+        List<Capability> capabilities,
+        String openAiApiKey,
+        String typesafeApiKey,
+        Path auditDirectory,
+        ChatSessionManager sessions,
+        InteractionCoordinator interactions,
+        ConfigManager configManager,
+        ToolRegistry registry,
+        CommonRuntime commonRuntime,
+        ServerScheduler serverScheduler,
+        AdapterPlatformAccess platform,
+        Clock clock,
+        JarvisLog log
+    ) {
         Objects.requireNonNull(configManager, "configManager");
+        Objects.requireNonNull(log, "log");
         Objects.requireNonNull(registry, "registry");
         Objects.requireNonNull(commonRuntime, "commonRuntime");
 
@@ -282,7 +330,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 serverId,
                 registry.tools()
             ),
-            clock
+            clock,
+            log
         );
 
         return new EmbeddedBrainGateway(
@@ -296,7 +345,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             clock,
             luna,
             audit,
-            aiExecutor
+            aiExecutor,
+            log
         );
     }
 
@@ -308,6 +358,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             );
         }
         started = true;
+        scheduleAuditHealthPoll();
     }
 
     @Override
@@ -328,6 +379,39 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         if (ownedAudit != null) {
             ownedAudit.closeAsync();
         }
+    }
+
+    @Override
+    public StatusSnapshot status() {
+        JarvisConfig current = configManager.current();
+        AiRequestScheduler.Snapshot scheduler =
+            brain.schedulerSnapshot();
+        AuditHealth auditHealth = ownedAudit == null
+            ? AuditHealth.unavailable()
+            : toAuditHealth(ownedAudit.health());
+
+        String runtimeState;
+        synchronized (this) {
+            runtimeState = stopped
+                ? "STOPPED"
+                : started
+                    ? "RUNNING"
+                    : "STARTING";
+        }
+
+        return new StatusSnapshot(
+            runtimeState,
+            current.interaction().mode().name(),
+            current.interaction().audience().mode().name(),
+            current.execution().mode().name(),
+            current.scheduling().enabled(),
+            scheduler.queuedTotal(),
+            scheduler.maxQueuedTotal(),
+            scheduler.activeRequests(),
+            scheduler.maxConcurrent(),
+            proactiveInFlight.get(),
+            auditHealth
+        );
     }
 
     @Override
@@ -377,6 +461,16 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             currentPlayer.operator()
         );
 
+        log.debug(
+            JarvisEvents.REQUEST_ACCEPTED,
+            JarvisFields.of(
+                "requestId", request.requestId(),
+                "sessionId", sessionId,
+                "requesterUuid", requesterUuid,
+                "origin", mode
+            )
+        );
+
         JarvisConfig.Response responseConfig =
             configManager.current().response();
 
@@ -384,6 +478,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         try {
             processing = brain.submit(request);
         } catch (RuntimeException failure) {
+            logRequestFailure(request, failure);
             return CompletableFuture.completedFuture(false);
         }
 
@@ -400,6 +495,22 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         processing.whenComplete((reply, failure) -> {
             progress.complete();
             if (failure == null) {
+                log.info(
+                    JarvisEvents.REQUEST_COMPLETED,
+                    JarvisFields.of(
+                        "requestId", request.requestId(),
+                        "sessionId", request.sessionId(),
+                        "requesterUuid", request.requesterUuid(),
+                        "origin", request.mode(),
+                        "latencyMs", Math.max(
+                            0L,
+                            Duration.between(
+                                request.receivedAt(),
+                                clock.instant()
+                            ).toMillis()
+                        )
+                    )
+                );
                 deliverReply(
                     requesterUuid,
                     sessionId,
@@ -407,6 +518,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                     responseConfig
                 );
             } else {
+                logRequestFailure(request, failure);
                 deliverFailure(
                     requesterUuid,
                     sessionId,
@@ -455,6 +567,12 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 || !interactions.isAuthorized(current)
                 || sessions.activeSession(requesterUuid).isPresent()
         ) {
+            logProactiveIgnored(
+                requesterUuid,
+                "ACTOR_INELIGIBLE",
+                null,
+                null
+            );
             return CompletableFuture.completedFuture(false);
         }
 
@@ -467,12 +585,22 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         );
 
         synchronized (this) {
-            if (
-                now.isBefore(proactiveCooldownUntil)
-                    || now.isBefore(
-                        proactiveClassificationAfter
-                    )
-            ) {
+            if (now.isBefore(proactiveCooldownUntil)) {
+                logProactiveIgnored(
+                    requesterUuid,
+                    "COOLDOWN",
+                    null,
+                    null
+                );
+                return CompletableFuture.completedFuture(false);
+            }
+            if (now.isBefore(proactiveClassificationAfter)) {
+                logProactiveIgnored(
+                    requesterUuid,
+                    "CLASSIFICATION_INTERVAL",
+                    null,
+                    null
+                );
                 return CompletableFuture.completedFuture(false);
             }
             proactiveClassificationAfter =
@@ -480,6 +608,12 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         }
 
         if (!proactiveInFlight.compareAndSet(false, true)) {
+            logProactiveIgnored(
+                requesterUuid,
+                "IN_FLIGHT_LIMIT",
+                null,
+                null
+            );
             return CompletableFuture.completedFuture(false);
         }
 
@@ -487,6 +621,14 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             ambientTracker.snapshot(
                 interaction.proactive().contextMessages()
             );
+
+        log.debug(
+            JarvisEvents.PROACTIVE_CANDIDATE,
+            JarvisFields.of(
+                "requesterUuid", requesterUuid,
+                "contextMessages", context.size()
+            )
+        );
 
         CompletionStage<io.github.kardane.jarvisminecraft.common.brain.ai.JevClassification>
             classification;
@@ -497,22 +639,50 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             );
         } catch (RuntimeException failure) {
             proactiveInFlight.set(false);
+            logProactiveFailure(
+                requesterUuid,
+                proactiveFailureReason(failure)
+            );
             return CompletableFuture.completedFuture(false);
         }
 
         CompletableFuture<Boolean> accepted =
             new CompletableFuture<>();
         classification.whenComplete((decision, failure) -> {
+            if (failure != null) {
+                proactiveInFlight.set(false);
+                logProactiveFailure(
+                    requesterUuid,
+                    proactiveFailureReason(failure)
+                );
+                accepted.complete(false);
+                return;
+            }
             if (
-                failure != null
-                    || decision == null
+                decision == null
                     || !JdkJevClassifier.MODEL.equals(
                         decision.model()
                     )
-                    || decision.engagement()
-                        != JevEngagement.START_CONVERSATION
             ) {
                 proactiveInFlight.set(false);
+                logProactiveFailure(
+                    requesterUuid,
+                    "JEV_INVALID_OUTPUT"
+                );
+                accepted.complete(false);
+                return;
+            }
+            if (
+                decision.engagement()
+                    != JevEngagement.START_CONVERSATION
+            ) {
+                proactiveInFlight.set(false);
+                logProactiveIgnored(
+                    requesterUuid,
+                    "JEV_IGNORE",
+                    decision.engagementConfidence(),
+                    null
+                );
                 accepted.complete(false);
                 return;
             }
@@ -553,6 +723,10 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             });
         } catch (RuntimeException failure) {
             proactiveInFlight.set(false);
+            logProactiveFailure(
+                requesterUuid,
+                "ACTIVATION_SCHEDULER_FAILED"
+            );
             accepted.complete(false);
         }
     }
@@ -577,16 +751,38 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         if (
             interaction.mode()
                 != JarvisConfig.InteractionMode.ACTIVE
-                || engagementConfidence
-                    < interaction.proactive()
-                        .confidenceThreshold()
         ) {
+            logProactiveIgnored(
+                requesterUuid,
+                "MODE_CHANGED",
+                engagementConfidence,
+                null
+            );
+            return false;
+        }
+        if (
+            engagementConfidence
+                < interaction.proactive()
+                    .confidenceThreshold()
+        ) {
+            logProactiveIgnored(
+                requesterUuid,
+                "CONFIDENCE_BELOW_THRESHOLD",
+                engagementConfidence,
+                interaction.proactive().confidenceThreshold()
+            );
             return false;
         }
 
         Instant now = clock.instant();
         synchronized (this) {
             if (now.isBefore(proactiveCooldownUntil)) {
+                logProactiveIgnored(
+                    requesterUuid,
+                    "COOLDOWN",
+                    engagementConfidence,
+                    null
+                );
                 return false;
             }
         }
@@ -599,6 +795,12 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 || !interactions.isAuthorized(current)
                 || sessions.activeSession(requesterUuid).isPresent()
         ) {
+            logProactiveIgnored(
+                requesterUuid,
+                "ACTOR_INELIGIBLE",
+                engagementConfidence,
+                null
+            );
             return false;
         }
 
@@ -613,6 +815,14 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 interaction.proactive().cooldownSeconds()
             );
         }
+        log.info(
+            JarvisEvents.PROACTIVE_ACCEPTED,
+            JarvisFields.of(
+                "requesterUuid", requesterUuid,
+                "sessionId", sessionId,
+                "confidence", engagementConfidence
+            )
+        );
 
         String proactiveText =
             AmbientConversationTracker.promptContext(
@@ -629,6 +839,12 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 failure != null
                     || !Boolean.TRUE.equals(sent)
             ) {
+                logProactiveFailure(
+                    requesterUuid,
+                    failure == null
+                        ? "REQUEST_REJECTED"
+                        : proactiveFailureReason(failure)
+                );
                 sessions.end(requesterUuid, sessionId);
                 brain.cancelSession(
                     requesterUuid,
@@ -659,6 +875,179 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         Objects.requireNonNull(reason, "reason");
         sessions.end(requesterUuid, sessionId);
         brain.cancelSession(requesterUuid, sessionId);
+    }
+
+    private void scheduleAuditHealthPoll() {
+        if (
+            ownedAudit == null
+                || ownedAiExecutor == null
+        ) {
+            return;
+        }
+        int intervalSeconds =
+            configManager.current()
+                .logging()
+                .healthIntervalSeconds();
+        try {
+            CompletableFuture.delayedExecutor(
+                intervalSeconds,
+                TimeUnit.SECONDS,
+                ownedAiExecutor
+            ).execute(() -> {
+                synchronized (this) {
+                    if (stopped) {
+                        return;
+                    }
+                }
+                reportAuditHealth();
+                scheduleAuditHealthPoll();
+            });
+        } catch (RuntimeException ignored) {
+            // Operational health reporting must not change runtime behavior.
+        }
+    }
+
+    private void reportAuditHealth() {
+        if (ownedAudit == null) {
+            return;
+        }
+        AsyncJsonlAuditSink.Health health =
+            ownedAudit.health();
+        AsyncJsonlAuditSink.Status previous =
+            lastAuditStatus;
+        String previousError = lastAuditErrorCode;
+        lastAuditStatus = health.status();
+        lastAuditErrorCode = health.lastErrorCode();
+
+        if (
+            previous == health.status()
+                && Objects.equals(
+                    previousError,
+                    health.lastErrorCode()
+                )
+        ) {
+            return;
+        }
+
+        Map<String, Object> fields = JarvisFields.of(
+            "queueDepth", health.queueDepth(),
+            "maxQueue", health.maxQueue(),
+            "rejectedRecords", health.rejectedRecords(),
+            "writable", health.writable(),
+            "lastErrorCode", health.lastErrorCode()
+        );
+        switch (health.status()) {
+            case HEALTHY -> {
+                if (
+                    previous != null
+                        && previous
+                            != AsyncJsonlAuditSink.Status.HEALTHY
+                ) {
+                    log.info(
+                        JarvisEvents.AUDIT_RECOVERED,
+                        fields
+                    );
+                }
+            }
+            case DEGRADED -> log.warn(
+                JarvisEvents.AUDIT_DEGRADED,
+                fields
+            );
+            case UNHEALTHY -> log.error(
+                JarvisEvents.AUDIT_UNHEALTHY,
+                null,
+                fields
+            );
+        }
+    }
+
+    private AuditHealth toAuditHealth(
+        AsyncJsonlAuditSink.Health health
+    ) {
+        return new AuditHealth(
+            health.status().name(),
+            health.writable(),
+            health.closed(),
+            health.queueDepth(),
+            health.maxQueue(),
+            health.rejectedRecords(),
+            health.lastSuccessfulWriteAt(),
+            health.lastErrorAt(),
+            health.lastErrorCode(),
+            health.totalBytes(),
+            health.fileCount()
+        );
+    }
+
+    private void logProactiveIgnored(
+        UUID requesterUuid,
+        String reason,
+        Double confidence,
+        Double threshold
+    ) {
+        log.debug(
+            JarvisEvents.PROACTIVE_IGNORED,
+            JarvisFields.of(
+                "requesterUuid", requesterUuid,
+                "reason", reason,
+                "confidence", confidence,
+                "threshold", threshold
+            )
+        );
+    }
+
+    private void logProactiveFailure(
+        UUID requesterUuid,
+        String reason
+    ) {
+        log.warn(
+            JarvisEvents.PROACTIVE_FAILED,
+            JarvisFields.of(
+                "requesterUuid", requesterUuid,
+                "reason", reason
+            )
+        );
+    }
+
+    private String proactiveFailureReason(
+        Throwable failure
+    ) {
+        Throwable cause = unwrap(failure);
+        if (
+            cause instanceof ProtocolException protocol
+                && protocol.code() == ErrorCode.TIMEOUT
+        ) {
+            return "JEV_TIMEOUT";
+        }
+        return "JEV_FAILED";
+    }
+
+    private void logRequestFailure(
+        EmbeddedBrain.ChatRequest request,
+        Throwable failure
+    ) {
+        Throwable cause = unwrap(failure);
+        ErrorCode code = cause instanceof ProtocolException protocol
+            ? protocol.code()
+            : ErrorCode.INTERNAL;
+        log.warn(
+            JarvisEvents.REQUEST_FAILED,
+            JarvisFields.of(
+                "requestId", request.requestId(),
+                "sessionId", request.sessionId(),
+                "requesterUuid", request.requesterUuid(),
+                "origin", request.mode(),
+                "errorCode", code,
+                "errorClass", cause.getClass().getSimpleName(),
+                "latencyMs", Math.max(
+                    0L,
+                    Duration.between(
+                        request.receivedAt(),
+                        clock.instant()
+                    ).toMillis()
+                )
+            )
+        );
     }
 
     private void deliverReply(

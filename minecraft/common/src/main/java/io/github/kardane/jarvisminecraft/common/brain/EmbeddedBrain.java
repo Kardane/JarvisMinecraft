@@ -13,6 +13,10 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningLevel;
 import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
 import io.github.kardane.jarvisminecraft.common.chat.AmbientChatMessage;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisEvents;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisFields;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.NoOpJarvisLog;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.CancelScheduledActionArguments;
@@ -68,6 +72,7 @@ public final class EmbeddedBrain {
     private final AuditSink audit;
     private final CommonRuntime.ExecutionRuntime toolRuntime;
     private final Clock clock;
+    private final JarvisLog log;
     private final Map<SessionKey, Set<UUID>> activeRequestIds = new HashMap<>();
     private volatile boolean stopped;
 
@@ -152,6 +157,44 @@ public final class EmbeddedBrain {
         CommonRuntime.ExecutionRuntime toolRuntime,
         Clock clock
     ) {
+        this(
+            serverId,
+            capabilities,
+            sessions,
+            history,
+            scheduler,
+            jev,
+            routePolicy,
+            luna,
+            reasoningPolicy,
+            executionPolicy,
+            schedulingPolicy,
+            scheduledActions,
+            audit,
+            toolRuntime,
+            clock,
+            NoOpJarvisLog.INSTANCE
+        );
+    }
+
+    public EmbeddedBrain(
+        String serverId,
+        List<Capability> capabilities,
+        ChatSessionManager sessions,
+        ConversationHistoryStore history,
+        AiRequestScheduler scheduler,
+        JevClassifier jev,
+        DeterministicRoutePolicy routePolicy,
+        LunaClient luna,
+        ReasoningPolicy reasoningPolicy,
+        ExecutionPolicy executionPolicy,
+        SchedulingPolicy schedulingPolicy,
+        ScheduledActionService scheduledActions,
+        AuditSink audit,
+        CommonRuntime.ExecutionRuntime toolRuntime,
+        Clock clock,
+        JarvisLog log
+    ) {
         if (serverId == null || serverId.isBlank()) {
             throw new IllegalArgumentException("serverId must not be blank.");
         }
@@ -184,6 +227,7 @@ public final class EmbeddedBrain {
         this.audit = Objects.requireNonNull(audit, "audit");
         this.toolRuntime = Objects.requireNonNull(toolRuntime, "toolRuntime");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     public CompletionStage<JevClassification> classifyProactive(
@@ -249,7 +293,18 @@ public final class EmbeddedBrain {
 
     public void cancelActor(UUID requesterUuid) {
         scheduler.cancelActor(requesterUuid);
-        scheduledActions.cancelActor(requesterUuid);
+        List<UUID> cancelledSchedules =
+            scheduledActions.cancelActor(requesterUuid);
+        for (UUID scheduleId : cancelledSchedules) {
+            log.warn(
+                JarvisEvents.SCHEDULE_ABORTED,
+                JarvisFields.of(
+                    "scheduleId", scheduleId,
+                    "requesterUuid", requesterUuid,
+                    "reason", "ACTOR_INVALIDATED"
+                )
+            );
+        }
         history.clearActor(requesterUuid);
 
         List<SessionKey> keys;
@@ -261,9 +316,24 @@ public final class EmbeddedBrain {
         keys.forEach(this::clearTracked);
     }
 
+    public AiRequestScheduler.Snapshot schedulerSnapshot() {
+        return scheduler.snapshot();
+    }
+
     public void stop() {
         stopped = true;
+        List<UUID> pendingSchedules =
+            scheduledActions.pendingScheduleIds();
         scheduledActions.close();
+        for (UUID scheduleId : pendingSchedules) {
+            log.warn(
+                JarvisEvents.SCHEDULE_ABORTED,
+                JarvisFields.of(
+                    "scheduleId", scheduleId,
+                    "reason", "SERVER_STOPPING"
+                )
+            );
+        }
         scheduler.shutdown();
         Set<UUID> requestIds = new HashSet<>();
         synchronized (activeRequestIds) {
@@ -314,9 +384,10 @@ public final class EmbeddedBrain {
                 request.mode()
             );
 
+            Instant jevStarted = clock.instant();
             Instant jevDeadline = earlier(
                 budget.deadlineAt(),
-                clock.instant().plus(JdkJevClassifier.MAX_TIMEOUT)
+                jevStarted.plus(JdkJevClassifier.MAX_TIMEOUT)
             );
             return withDeadline(
                 jev.classify(input, jevDeadline),
@@ -324,6 +395,7 @@ public final class EmbeddedBrain {
                 ErrorCode.TIMEOUT,
                 "Jev classification timed out."
             ).handle((classification, failure) -> {
+                    long latency = elapsedMillis(jevStarted);
                     if (
                         failure != null
                             || classification == null
@@ -331,21 +403,82 @@ public final class EmbeddedBrain {
                                 classification.model()
                             )
                     ) {
+                        String errorCode = failureCode(
+                            failure,
+                            "JEV_FAILED",
+                            "JEV_TIMEOUT"
+                        );
+                        if (
+                            classification != null
+                                && !JdkJevClassifier.MODEL.equals(
+                                    classification.model()
+                                )
+                        ) {
+                            errorCode = "JEV_INVALID_OUTPUT";
+                        }
+                        log.warn(
+                            JarvisEvents.JEV_FAILED,
+                            JarvisFields.of(
+                                "requestId", request.requestId(),
+                                "errorCode", errorCode,
+                                "latencyMs", latency
+                            )
+                        );
+                        DeterministicRoutePolicy.RoutingDecision fallback =
+                            routePolicy.errorFallback(activeTools);
+                        ReasoningLevel reasoning =
+                            reasoningPolicy.fallback();
+                        log.warn(
+                            JarvisEvents.JEV_FALLBACK,
+                            JarvisFields.of(
+                                "requestId", request.requestId(),
+                                "reason", fallback.fallbackReason(),
+                                "fallbackRoute", fallback.category(),
+                                "fallbackReasoning", reasoning,
+                                "latencyMs", latency
+                            )
+                        );
+                        logPlanning(request, fallback, reasoning);
                         return new PlanningDecision(
-                            routePolicy.errorFallback(
-                                activeTools
-                            ),
-                            reasoningPolicy.fallback()
+                            fallback,
+                            reasoning
                         );
                     }
-                    return new PlanningDecision(
+
+                    log.debug(
+                        JarvisEvents.JEV_COMPLETED,
+                        JarvisFields.of(
+                            "requestId", request.requestId(),
+                            "route", classification.category(),
+                            "reasoning", classification.reasoning(),
+                            "engagement", classification.engagement(),
+                            "confidence", classification.confidence(),
+                            "latencyMs", latency
+                        )
+                    );
+                    DeterministicRoutePolicy.RoutingDecision routing =
                         routePolicy.route(
                             classification,
                             activeTools
-                        ),
-                        reasoningPolicy.resolve(
-                            classification
-                        )
+                        );
+                    ReasoningLevel reasoning =
+                        reasoningPolicy.resolve(classification);
+                    if (routing.fallbackActive()) {
+                        log.warn(
+                            JarvisEvents.JEV_FALLBACK,
+                            JarvisFields.of(
+                                "requestId", request.requestId(),
+                                "reason", routing.fallbackReason(),
+                                "fallbackRoute", routing.category(),
+                                "fallbackReasoning", reasoning,
+                                "latencyMs", latency
+                            )
+                        );
+                    }
+                    logPlanning(request, routing, reasoning);
+                    return new PlanningDecision(
+                        routing,
+                        reasoning
                     );
                 })
                 .thenCompose(
@@ -371,6 +504,9 @@ public final class EmbeddedBrain {
             assertRunning();
             assertSession(request.requesterUuid(), request.sessionId());
             budget.consumeModelRound(clock.instant());
+            int round = RequestBudget.MAX_MODEL_ROUNDS
+                - budget.remainingModelRounds()
+                - 1;
 
             DeterministicRoutePolicy.RoutingDecision effectiveRouting =
                 currentRouting(request, routing);
@@ -387,6 +523,7 @@ public final class EmbeddedBrain {
                 budget.deadlineAt()
             );
 
+            Instant lunaStarted = clock.instant();
             CompletionStage<LunaStep> model = withDeadline(
                 luna.next(input, effectiveRouting),
                 budget.deadlineAt(),
@@ -403,6 +540,19 @@ public final class EmbeddedBrain {
                     );
 
                     if (outcome.failure() != null) {
+                        log.warn(
+                            JarvisEvents.LUNA_FAILED,
+                            JarvisFields.of(
+                                "requestId", request.requestId(),
+                                "round", round,
+                                "errorCode", failureCode(
+                                    outcome.failure(),
+                                    "LUNA_FAILED",
+                                    "LUNA_TIMEOUT"
+                                ),
+                                "latencyMs", elapsedMillis(lunaStarted)
+                            )
+                        );
                         luna.clear(request.requestId());
                         history.append(
                             request.requesterUuid(),
@@ -423,6 +573,16 @@ public final class EmbeddedBrain {
 
                     LunaStep step = outcome.step();
                     if (step instanceof LunaStep.Final finalStep) {
+                        log.debug(
+                            JarvisEvents.LUNA_ROUND_COMPLETED,
+                            JarvisFields.of(
+                                "requestId", request.requestId(),
+                                "round", round,
+                                "kind", "FINAL",
+                                "toolCallCount", 0,
+                                "latencyMs", elapsedMillis(lunaStarted)
+                            )
+                        );
                         validateFinal(finalStep);
                         history.append(
                             request.requesterUuid(),
@@ -442,6 +602,16 @@ public final class EmbeddedBrain {
                     }
 
                     LunaStep.Tools tools = (LunaStep.Tools) step;
+                    log.debug(
+                        JarvisEvents.LUNA_ROUND_COMPLETED,
+                        JarvisFields.of(
+                            "requestId", request.requestId(),
+                            "round", round,
+                            "kind", "TOOL_CALLS",
+                            "toolCallCount", tools.calls().size(),
+                            "latencyMs", elapsedMillis(lunaStarted)
+                        )
+                    );
                     budget.consumeToolCalls(
                         tools.calls().size(),
                         clock.instant()
@@ -509,6 +679,19 @@ public final class EmbeddedBrain {
             request.toolsAllowed(),
             request.mode()
         );
+        long mutationCount = available.stream()
+            .filter(ToolName::stateChanging)
+            .count();
+        log.debug(
+            JarvisEvents.TOOL_EXPOSURE_RESOLVED,
+            JarvisFields.of(
+                "requestId", request.requestId(),
+                "executionMode", executionPolicy.currentMode(),
+                "candidateCount", routing.availableTools().size(),
+                "allowedCount", available.size(),
+                "mutationCount", mutationCount
+            )
+        );
         return new DeterministicRoutePolicy.RoutingDecision(
             routing.category(),
             routing.fallbackReason(),
@@ -541,13 +724,19 @@ public final class EmbeddedBrain {
         assertSession(request.requesterUuid(), request.sessionId());
         budget.assertLive(clock.instant());
 
-        if (
-            !executionPolicy.allows(
+        ExecutionPolicy.Decision initialDecision =
+            executionPolicy.evaluate(
                 call.tool(),
                 request.toolsAllowed(),
                 request.mode()
-            )
-        ) {
+            );
+        if (!initialDecision.allowed()) {
+            logToolDenied(
+                request,
+                call.tool(),
+                initialDecision.reason(),
+                null
+            );
             return CompletableFuture.failedFuture(
                 new ProtocolException(
                     ErrorCode.UNSUPPORTED,
@@ -608,13 +797,19 @@ public final class EmbeddedBrain {
             assertRunning();
             assertSession(request.requesterUuid(), request.sessionId());
 
-            if (
-                !executionPolicy.allows(
+            ExecutionPolicy.Decision currentDecision =
+                executionPolicy.evaluate(
                     call.tool(),
                     request.toolsAllowed(),
                     request.mode()
-                )
-            ) {
+                );
+            if (!currentDecision.allowed()) {
+                logToolDenied(
+                    request,
+                    call.tool(),
+                    ExecutionPolicy.DenialReason.POLICY_CHANGED,
+                    currentDecision.reason()
+                );
                 return CompletableFuture.failedFuture(
                     new ProtocolException(
                         ErrorCode.UNSUPPORTED,
@@ -622,6 +817,13 @@ public final class EmbeddedBrain {
                     )
                 );
             }
+
+            logToolStarted(
+                request,
+                call.tool(),
+                toolCallId,
+                actionId
+            );
 
             CommonRuntime.ToolInvocation invocation =
                 new CommonRuntime.ToolInvocation(
@@ -642,6 +844,15 @@ public final class EmbeddedBrain {
                     long latency = Math.max(
                         0L,
                         Duration.between(startedAt, clock.instant()).toMillis()
+                    );
+
+                    logToolCompleted(
+                        request,
+                        call.tool(),
+                        toolCallId,
+                        actionId,
+                        result,
+                        latency
                     );
 
                     CompletionStage<Void> postAudit = tryPostAudit(
@@ -697,12 +908,33 @@ public final class EmbeddedBrain {
             !toolRuntime.activeTools().contains(
                 arguments.tool()
             )
-                || !executionPolicy.allows(
-                    arguments.tool(),
-                    request.toolsAllowed(),
-                    request.mode()
-                )
         ) {
+            logToolDenied(
+                request,
+                arguments.tool(),
+                ExecutionPolicy.DenialReason.TOOL_INACTIVE,
+                null
+            );
+            return CompletableFuture.failedFuture(
+                new ProtocolException(
+                    ErrorCode.UNSUPPORTED,
+                    "Nested scheduled Tool is not currently allowed."
+                )
+            );
+        }
+        ExecutionPolicy.Decision nestedDecision =
+            executionPolicy.evaluate(
+                arguments.tool(),
+                request.toolsAllowed(),
+                request.mode()
+            );
+        if (!nestedDecision.allowed()) {
+            logToolDenied(
+                request,
+                arguments.tool(),
+                nestedDecision.reason(),
+                null
+            );
             return CompletableFuture.failedFuture(
                 new ProtocolException(
                     ErrorCode.UNSUPPORTED,
@@ -743,21 +975,57 @@ public final class EmbeddedBrain {
             schedulingPolicy.validateRegistration(
                 arguments
             );
-            if (
-                !executionPolicy.allows(
+            ExecutionPolicy.Decision scheduleDecision =
+                executionPolicy.evaluate(
                     call.tool(),
                     request.toolsAllowed(),
                     request.mode()
+                );
+            if (!scheduleDecision.allowed()) {
+                logToolDenied(
+                    request,
+                    call.tool(),
+                    ExecutionPolicy.DenialReason.POLICY_CHANGED,
+                    scheduleDecision.reason()
+                );
+                return CompletableFuture.failedFuture(
+                    new ProtocolException(
+                        ErrorCode.UNSUPPORTED,
+                        "Schedule was denied by the current policy."
+                    )
+                );
+            }
+            if (
+                !toolRuntime.activeTools().contains(
+                    arguments.tool()
                 )
-                    || !toolRuntime.activeTools().contains(
-                        arguments.tool()
-                    )
-                    || !executionPolicy.allows(
-                        arguments.tool(),
-                        request.toolsAllowed(),
-                        request.mode()
-                    )
             ) {
+                logToolDenied(
+                    request,
+                    arguments.tool(),
+                    ExecutionPolicy.DenialReason.TOOL_INACTIVE,
+                    null
+                );
+                return CompletableFuture.failedFuture(
+                    new ProtocolException(
+                        ErrorCode.UNSUPPORTED,
+                        "Schedule was denied by the current policy."
+                    )
+                );
+            }
+            ExecutionPolicy.Decision currentNestedDecision =
+                executionPolicy.evaluate(
+                    arguments.tool(),
+                    request.toolsAllowed(),
+                    request.mode()
+                );
+            if (!currentNestedDecision.allowed()) {
+                logToolDenied(
+                    request,
+                    arguments.tool(),
+                    ExecutionPolicy.DenialReason.POLICY_CHANGED,
+                    currentNestedDecision.reason()
+                );
                 return CompletableFuture.failedFuture(
                     new ProtocolException(
                         ErrorCode.UNSUPPORTED,
@@ -766,19 +1034,38 @@ public final class EmbeddedBrain {
                 );
             }
 
+            logToolStarted(
+                request,
+                call.tool(),
+                toolCallId,
+                actionId
+            );
+
             ToolResult result;
             try {
                 ScheduledActionService.Snapshot snapshot =
                     scheduledActions.schedule(
                         request.requesterUuid(),
                         arguments,
-                        runIndex -> runScheduledAction(
+                        (scheduleId, runIndex) -> runScheduledAction(
                             request,
                             routing,
                             arguments,
+                            scheduleId,
                             runIndex
                         )
                     );
+                log.info(
+                    JarvisEvents.SCHEDULE_CREATED,
+                    JarvisFields.of(
+                        "scheduleId", snapshot.scheduleId(),
+                        "requesterUuid", request.requesterUuid(),
+                        "tool", arguments.tool().wireName(),
+                        "delaySeconds", arguments.delaySeconds(),
+                        "intervalSeconds", arguments.intervalSeconds(),
+                        "durationSeconds", arguments.durationSeconds()
+                    )
+                );
                 result = ToolResult.ok(
                     new ScheduledActionData(
                         snapshot.scheduleId(),
@@ -857,13 +1144,19 @@ public final class EmbeddedBrain {
                 request.requesterUuid(),
                 request.sessionId()
             );
-            if (
-                !executionPolicy.allows(
+            ExecutionPolicy.Decision cancelDecision =
+                executionPolicy.evaluate(
                     call.tool(),
                     request.toolsAllowed(),
                     request.mode()
-                )
-            ) {
+                );
+            if (!cancelDecision.allowed()) {
+                logToolDenied(
+                    request,
+                    call.tool(),
+                    ExecutionPolicy.DenialReason.POLICY_CHANGED,
+                    cancelDecision.reason()
+                );
                 return CompletableFuture.failedFuture(
                     new ProtocolException(
                         ErrorCode.UNSUPPORTED,
@@ -872,10 +1165,26 @@ public final class EmbeddedBrain {
                 );
             }
 
+            logToolStarted(
+                request,
+                call.tool(),
+                toolCallId,
+                actionId
+            );
+
             boolean cancelled = scheduledActions.cancel(
                 request.requesterUuid(),
                 arguments.scheduleId()
             );
+            if (cancelled) {
+                log.info(
+                    JarvisEvents.SCHEDULE_CANCELLED,
+                    JarvisFields.of(
+                        "scheduleId", arguments.scheduleId(),
+                        "requesterUuid", request.requesterUuid()
+                    )
+                );
+            }
             ToolResult result = cancelled
                 ? ToolResult.ok(
                     new CancelScheduledActionData(
@@ -923,6 +1232,14 @@ public final class EmbeddedBrain {
                 clock.instant()
             ).toMillis()
         );
+        logToolCompleted(
+            request,
+            call.tool(),
+            toolCallId,
+            actionId,
+            result,
+            latency
+        );
         return tryPostAudit(
             auditEvent(
                 request,
@@ -964,25 +1281,20 @@ public final class EmbeddedBrain {
         ChatRequest origin,
         DeterministicRoutePolicy.RoutingDecision routing,
         ScheduleActionArguments schedule,
+        UUID scheduleId,
         int runIndex
     ) {
-        if (
-            stopped
-                || !schedulingPolicy.stillAllowed(
-                    schedule
-                )
-                || !toolRuntime.activeTools().contains(
-                    schedule.tool()
-                )
-                || !executionPolicy.allows(
-                    schedule.tool(),
-                    origin.toolsAllowed(),
-                    "SCHEDULED"
-                )
-        ) {
-            return CompletableFuture.completedFuture(
-                false
+        String blockedReason =
+            scheduledAbortReason(origin, schedule);
+        if (blockedReason != null) {
+            logScheduleAborted(
+                scheduleId,
+                origin.requesterUuid(),
+                schedule.tool(),
+                runIndex,
+                blockedReason
             );
+            return CompletableFuture.completedFuture(false);
         }
 
         LunaStep.ToolCall nested =
@@ -995,6 +1307,19 @@ public final class EmbeddedBrain {
             sentAt.plus(TOOL_TIMEOUT);
         UUID toolCallId = UUID.randomUUID();
         UUID actionId = UUID.randomUUID();
+
+        log.debug(
+            JarvisEvents.SCHEDULE_RUN_STARTED,
+            JarvisFields.of(
+                "scheduleId", scheduleId,
+                "runIndex", runIndex,
+                "requestId", origin.requestId(),
+                "requesterUuid", origin.requesterUuid(),
+                "tool", schedule.tool().wireName(),
+                "toolCallId", toolCallId,
+                "actionId", actionId
+            )
+        );
 
         CompletionStage<Void> preAudit =
             requirePreAudit(
@@ -1018,24 +1343,25 @@ public final class EmbeddedBrain {
             );
 
         return preAudit.thenCompose(ignored -> {
-            if (
-                stopped
-                    || !schedulingPolicy.stillAllowed(
-                        schedule
-                    )
-                    || !toolRuntime.activeTools().contains(
-                        schedule.tool()
-                    )
-                    || !executionPolicy.allows(
-                        schedule.tool(),
-                        origin.toolsAllowed(),
-                        "SCHEDULED"
-                    )
-            ) {
-                return CompletableFuture.completedFuture(
-                    false
+            String currentBlockedReason =
+                scheduledAbortReason(origin, schedule);
+            if (currentBlockedReason != null) {
+                logScheduleAborted(
+                    scheduleId,
+                    origin.requesterUuid(),
+                    schedule.tool(),
+                    runIndex,
+                    currentBlockedReason
                 );
+                return CompletableFuture.completedFuture(false);
             }
+
+            logToolStarted(
+                origin,
+                schedule.tool(),
+                toolCallId,
+                actionId
+            );
 
             CommonRuntime.ToolInvocation invocation =
                 new CommonRuntime.ToolInvocation(
@@ -1060,6 +1386,42 @@ public final class EmbeddedBrain {
                             clock.instant()
                         ).toMillis()
                     );
+
+                    logToolCompleted(
+                        origin,
+                        schedule.tool(),
+                        toolCallId,
+                        actionId,
+                        result,
+                        latency
+                    );
+                    log.debug(
+                        JarvisEvents.SCHEDULE_RUN_COMPLETED,
+                        JarvisFields.of(
+                            "scheduleId", scheduleId,
+                            "runIndex", runIndex,
+                            "requestId", origin.requestId(),
+                            "tool", schedule.tool().wireName(),
+                            "toolCallId", toolCallId,
+                            "actionId", actionId,
+                            "outcome", result.status(),
+                            "errorCode", toolErrorCode(result),
+                            "latencyMs", latency
+                        )
+                    );
+
+                    String abortReason =
+                        scheduleResultAbortReason(result);
+                    if (abortReason != null) {
+                        logScheduleAborted(
+                            scheduleId,
+                            origin.requesterUuid(),
+                            schedule.tool(),
+                            runIndex,
+                            abortReason
+                        );
+                    }
+
                     return tryPostAudit(
                         auditEvent(
                             origin,
@@ -1076,19 +1438,22 @@ public final class EmbeddedBrain {
                             POST_AUDIT_TIMEOUT
                         )
                     ).thenApply(postIgnored ->
-                        result.status()
-                            == io.github.kardane.jarvisminecraft.common.protocol.Protocol.ResultStatus.OK
-                            || result.status()
-                            == io.github.kardane.jarvisminecraft.common.protocol.Protocol.ResultStatus.EMPTY
+                        abortReason == null
                     );
                 });
-        }).handle(
-            (keepGoing, failure) ->
-                failure == null
-                    && Boolean.TRUE.equals(
-                        keepGoing
-                    )
-        );
+        }).handle((keepGoing, failure) -> {
+            if (failure != null) {
+                logScheduleAborted(
+                    scheduleId,
+                    origin.requesterUuid(),
+                    schedule.tool(),
+                    runIndex,
+                    scheduleFailureReason(failure)
+                );
+                return false;
+            }
+            return Boolean.TRUE.equals(keepGoing);
+        });
     }
 
     private CompletionStage<Void> requirePreAudit(
@@ -1153,6 +1518,231 @@ public final class EmbeddedBrain {
                 ? null
                 : routing.fallbackReason().name()
         );
+    }
+
+    private void logToolDenied(
+        ChatRequest request,
+        ToolName tool,
+        ExecutionPolicy.DenialReason reason,
+        ExecutionPolicy.DenialReason policyReason
+    ) {
+        Map<String, Object> fields = JarvisFields.of(
+            "requestId", request.requestId(),
+            "requesterUuid", request.requesterUuid(),
+            "origin", request.mode(),
+            "tool", tool.wireName(),
+            "reason", reason,
+            "policyReason", policyReason,
+            "executionMode", executionPolicy.currentMode()
+        );
+        if (tool.stateChanging()) {
+            log.warn(JarvisEvents.TOOL_DENIED, fields);
+        } else {
+            log.debug(JarvisEvents.TOOL_DENIED, fields);
+        }
+    }
+
+    private void logToolStarted(
+        ChatRequest request,
+        ToolName tool,
+        UUID toolCallId,
+        UUID actionId
+    ) {
+        log.debug(
+            JarvisEvents.TOOL_STARTED,
+            JarvisFields.of(
+                "requestId", request.requestId(),
+                "requesterUuid", request.requesterUuid(),
+                "tool", tool.wireName(),
+                "toolCallId", toolCallId,
+                "actionId", actionId,
+                "risk", tool.risk()
+            )
+        );
+    }
+
+    private void logToolCompleted(
+        ChatRequest request,
+        ToolName tool,
+        UUID toolCallId,
+        UUID actionId,
+        ToolResult result,
+        long latency
+    ) {
+        ErrorCode errorCode = toolErrorCode(result);
+        log.info(
+            JarvisEvents.TOOL_COMPLETED,
+            JarvisFields.of(
+                "requestId", request.requestId(),
+                "requesterUuid", request.requesterUuid(),
+                "tool", tool.wireName(),
+                "toolCallId", toolCallId,
+                "actionId", actionId,
+                "risk", tool.risk(),
+                "outcome", result.status(),
+                "source", result.source(),
+                "errorCode", errorCode,
+                "latencyMs", latency
+            )
+        );
+        if (errorCode == ErrorCode.OUTCOME_UNKNOWN) {
+            log.warn(
+                JarvisEvents.TOOL_OUTCOME_UNKNOWN,
+                JarvisFields.of(
+                    "requestId", request.requestId(),
+                    "requesterUuid", request.requesterUuid(),
+                    "tool", tool.wireName(),
+                    "toolCallId", toolCallId,
+                    "actionId", actionId
+                )
+            );
+        }
+    }
+
+    private ErrorCode toolErrorCode(ToolResult result) {
+        return result.error() == null
+            ? null
+            : result.error().code();
+    }
+
+    private String scheduledAbortReason(
+        ChatRequest origin,
+        ScheduleActionArguments schedule
+    ) {
+        if (stopped) {
+            return "SERVER_STOPPING";
+        }
+        if (!schedulingPolicy.stillAllowed(schedule)) {
+            return "SCHEDULING_DISABLED";
+        }
+        if (
+            !toolRuntime.activeTools().contains(
+                schedule.tool()
+            )
+        ) {
+            return "TOOL_INACTIVE";
+        }
+        ExecutionPolicy.Decision decision =
+            executionPolicy.evaluate(
+                schedule.tool(),
+                origin.toolsAllowed(),
+                "SCHEDULED"
+            );
+        if (!decision.allowed()) {
+            return decision.reason()
+                    == ExecutionPolicy.DenialReason.NO_REQUESTER_AUTHORITY
+                ? "AUTHORITY_REVOKED"
+                : "EXECUTION_POLICY_REVOKED";
+        }
+        return null;
+    }
+
+    private String scheduleResultAbortReason(
+        ToolResult result
+    ) {
+        if (
+            result.status()
+                == io.github.kardane.jarvisminecraft.common.protocol.Protocol.ResultStatus.OK
+                || result.status()
+                    == io.github.kardane.jarvisminecraft.common.protocol.Protocol.ResultStatus.EMPTY
+        ) {
+            return null;
+        }
+        ErrorCode code = toolErrorCode(result);
+        if (code == null) {
+            return "TOOL_FAILED";
+        }
+        return switch (code) {
+            case UNAUTHORIZED -> "AUTHORITY_REVOKED";
+            case TIMEOUT -> "TIMEOUT";
+            case OUTCOME_UNKNOWN -> "OUTCOME_UNKNOWN";
+            case CANCELLED -> "CANCELLED";
+            default -> "TOOL_FAILED";
+        };
+    }
+
+    private String scheduleFailureReason(
+        Throwable failure
+    ) {
+        Throwable cause = unwrap(failure);
+        if (cause instanceof ProtocolException protocol) {
+            return switch (protocol.code()) {
+                case UNAUTHORIZED -> "AUTHORITY_REVOKED";
+                case TIMEOUT -> "TIMEOUT";
+                case OUTCOME_UNKNOWN -> "OUTCOME_UNKNOWN";
+                case CANCELLED -> "CANCELLED";
+                case INTERNAL -> "AUDIT_FAILURE";
+                default -> "TOOL_FAILED";
+            };
+        }
+        return "TOOL_FAILED";
+    }
+
+    private void logScheduleAborted(
+        UUID scheduleId,
+        UUID requesterUuid,
+        ToolName tool,
+        int runIndex,
+        String reason
+    ) {
+        log.warn(
+            JarvisEvents.SCHEDULE_ABORTED,
+            JarvisFields.of(
+                "scheduleId", scheduleId,
+                "requesterUuid", requesterUuid,
+                "tool", tool.wireName(),
+                "runIndex", runIndex,
+                "reason", reason
+            )
+        );
+    }
+
+    private void logPlanning(
+        ChatRequest request,
+        DeterministicRoutePolicy.RoutingDecision routing,
+        ReasoningLevel reasoning
+    ) {
+        log.debug(
+            JarvisEvents.ROUTING_RESOLVED,
+            JarvisFields.of(
+                "requestId", request.requestId(),
+                "route", routing.category(),
+                "fallback", routing.fallbackActive(),
+                "availableTools", routing.availableTools().size()
+            )
+        );
+        log.debug(
+            JarvisEvents.REASONING_RESOLVED,
+            JarvisFields.of(
+                "requestId", request.requestId(),
+                "reasoning", reasoning
+            )
+        );
+    }
+
+    private long elapsedMillis(Instant startedAt) {
+        return Math.max(
+            0L,
+            Duration.between(startedAt, clock.instant()).toMillis()
+        );
+    }
+
+    private String failureCode(
+        Throwable failure,
+        String fallback,
+        String timeout
+    ) {
+        if (failure == null) {
+            return fallback;
+        }
+        Throwable cause = unwrap(failure);
+        if (
+            cause instanceof ProtocolException protocol
+                && protocol.code() == ErrorCode.TIMEOUT
+        ) {
+            return timeout;
+        }
+        return fallback;
     }
 
     private void validateFinal(LunaStep.Final step) {

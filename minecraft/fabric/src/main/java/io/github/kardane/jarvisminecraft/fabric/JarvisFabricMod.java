@@ -7,6 +7,9 @@ import io.github.kardane.jarvisminecraft.common.brain.PackagingSmoke;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
+import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
 import io.github.kardane.jarvisminecraft.common.config.PropertiesJarvisConfigSource;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
@@ -15,16 +18,20 @@ import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftTools;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
 import io.github.kardane.jarvisminecraft.fabric.chat.FabricChatController;
+import io.github.kardane.jarvisminecraft.fabric.logging.FabricJarvisLog;
 import io.github.kardane.jarvisminecraft.fabric.platform.FabricPlatformAccess;
 import io.github.kardane.jarvisminecraft.fabric.platform.FabricServerScheduler;
 import io.github.kardane.jarvisminecraft.fabric.platform.MinecraftFabricPlatformAccess;
 import io.github.kardane.jarvisminecraft.fabric.tools.FabricToolService;
 import net.fabricmc.api.ModInitializer;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
 import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.command.CommandManager;
+import net.minecraft.text.Text;
 
 import java.nio.file.Path;
 import java.time.Clock;
@@ -40,6 +47,34 @@ public final class JarvisFabricMod implements ModInitializer {
     @Override
     public void onInitialize() {
         ServerLifecycleEvents.SERVER_STARTED.register(this::onServerStarted);
+        CommandRegistrationCallback.EVENT.register(
+            (dispatcher, registryAccess, environment) ->
+                dispatcher.register(
+                    CommandManager.literal("jm")
+                        .requires(source -> source.hasPermissionLevel(2))
+                        .then(
+                            CommandManager.literal("status")
+                                .executes(context -> {
+                                    RuntimeState current = runtime;
+                                    if (current == null) {
+                                        context.getSource().sendError(
+                                            Text.literal("JARVIS runtime is not running.")
+                                        );
+                                        return 0;
+                                    }
+                                    JarvisStatusFormatter.lines(
+                                        current.brain().status()
+                                    ).forEach(line ->
+                                        context.getSource().sendFeedback(
+                                            () -> Text.literal(line),
+                                            false
+                                        )
+                                    );
+                                    return 1;
+                                })
+                        )
+                )
+        );
         ServerLifecycleEvents.SERVER_STOPPING.register(this::onServerStopping);
 
         ServerMessageEvents.ALLOW_CHAT_MESSAGE.register((message, sender, params) -> {
@@ -125,6 +160,10 @@ public final class JarvisFabricMod implements ModInitializer {
             return;
         }
 
+        JarvisLog operationalLog = new ConfiguredJarvisLog(
+            configManager,
+            new FabricJarvisLog(LOGGER)
+        );
         Clock clock = Clock.systemUTC();
         FabricPlatformAccess platform =
             new MinecraftFabricPlatformAccess(server);
@@ -160,7 +199,8 @@ public final class JarvisFabricMod implements ModInitializer {
             commonRuntime,
             serverScheduler,
             platform,
-            clock
+            clock,
+            operationalLog
         );
 
         FabricChatController chat = new FabricChatController(

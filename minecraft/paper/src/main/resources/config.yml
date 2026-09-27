@@ -77,3 +77,20 @@ jarvis:
     enabled: false
     max-delay-seconds: 60
     max-duration-seconds: 60
+
+  logging:
+    # Operational console logging. Audit JSONL remains independent.
+    level: INFO
+    console:
+      enabled: true
+    request:
+      lifecycle: true
+    ai:
+      jev: true
+      luna: true
+    tool:
+      lifecycle: true
+    proactive:
+      decisions: false
+    health:
+      interval-seconds: 30

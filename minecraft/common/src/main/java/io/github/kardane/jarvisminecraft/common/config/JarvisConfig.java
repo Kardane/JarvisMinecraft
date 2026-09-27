@@ -5,6 +5,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+import io.github.kardane.jarvisminecraft.common.logging.JarvisLogLevel;
+
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.Risk;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
 
@@ -13,7 +15,8 @@ public record JarvisConfig(
     Model model,
     Response response,
     Execution execution,
-    Scheduling scheduling
+    Scheduling scheduling,
+    Logging logging
 ) {
     public JarvisConfig {
         Objects.requireNonNull(interaction, "interaction");
@@ -21,6 +24,24 @@ public record JarvisConfig(
         Objects.requireNonNull(response, "response");
         Objects.requireNonNull(execution, "execution");
         Objects.requireNonNull(scheduling, "scheduling");
+        Objects.requireNonNull(logging, "logging");
+    }
+
+    public JarvisConfig(
+        Interaction interaction,
+        Model model,
+        Response response,
+        Execution execution,
+        Scheduling scheduling
+    ) {
+        this(
+            interaction,
+            model,
+            response,
+            execution,
+            scheduling,
+            Logging.defaults()
+        );
     }
 
     public static JarvisConfig defaults() {
@@ -60,7 +81,8 @@ public record JarvisConfig(
                 new ToolFilter(List.of(), List.of()),
                 new ToolFilter(List.of(), List.of())
             ),
-            new Scheduling(false, 60, 60)
+            new Scheduling(false, 60, 60),
+            Logging.defaults()
         );
     }
 
@@ -310,6 +332,40 @@ public record JarvisConfig(
                 1,
                 60,
                 "scheduling.maxDurationSeconds"
+            );
+        }
+    }
+
+    public record Logging(
+        JarvisLogLevel level,
+        boolean consoleEnabled,
+        boolean requestLifecycle,
+        boolean aiJev,
+        boolean aiLuna,
+        boolean toolLifecycle,
+        boolean proactiveDecisions,
+        int healthIntervalSeconds
+    ) {
+        public Logging {
+            Objects.requireNonNull(level, "logging.level");
+            requireRange(
+                healthIntervalSeconds,
+                1,
+                3600,
+                "logging.health.intervalSeconds"
+            );
+        }
+
+        public static Logging defaults() {
+            return new Logging(
+                JarvisLogLevel.INFO,
+                true,
+                true,
+                true,
+                true,
+                true,
+                false,
+                30
             );
         }
     }
