@@ -1,34 +1,31 @@
 # 나중에 할 것들
-- 컨픽에서 호출어를 지정하고, 사용자가 무언가 채팅을 치면 이것이 자비스의 대답이 필요로 하는지 jev를 이용하여 판단한다.
-- 컨픽에서 자비스의 수동적/능동적 태도를 토글할 수 있다.
-  - 수동적일 경우, 호출어와 같이 사용자가 먼저 발화해야 자비스가 응답한다. (이후 단기간 티키타카 응답은 호출어 판단 없이도 진행 가능)
-  - 능동적일 경우, 채팅흐름을 파악하여 자비스가 스스로 발화를 시작할 수 있다.
-- 자비스와 대화할 수 있는 대상은 `OP`, `WHITELIST`, `ALL`, `BLACKLIST`로 설정할 수 있다.
-  - `WHITELIST`는 화이트리스트에 등록된 닉네임을 가진 유저만이 자비스와 상호작용할 수 있다.
-  - `OP`는 서버 내 OP 권한을 가진 유저만이 자비스와 상호작용할 수 있다.
-  - `ALL`은 모든 플레이어가 자비스와 상호작용할 수 있다.
-  - `BLACKLIST`는 특정 플레이어가 자비스와 상호작용할 수 있는 것을 막는다.
 
-- LLM모델은 gpt6 luna를 사용하며, 추론 수준은 `none`,`low`,`medium`,`high`중 하나를 사용할 수 있다.
-  - 추론 수준은 jev가 자동으로 정하게끔 한다.
+현재 Phase 1~8 및 Operational Logging L1~L6 구현 이후 남아 있는 항목만 기록한다.
 
-- 높은 추론을 사용하여 예상 응답시간이 길어질 경우, 사용자가 끊긴 느낌을 받지 않도록 연결어 채팅을 먼저 보내도록 한다.
-  - ex: `잠시만요`, `찾아볼게요`, `웹 검색을 해볼게요`, `음..`, `조금만 기다려주세요` 등등
+## Admin command
 
-- 컨픽에서 자비스의 채팅 스타일을 지정할 수 있으며, 마인크래프트 색 코드도 적용할 수 있다. (&5, &d 등등)
-- 컨픽에서 자비스가 대답을 할 때, 질문을 한 플레이어에게 어떤 효과음을 재생하게 할 지 정할 수 있다.
+- `/jm reload`
+  - runtime config 재로드
+  - parse/validation 실패 시 기존 valid snapshot 유지
+  - 성공/실패 operational log
+- `/jm test`
+  - provider/Jev/Luna/Tool boundary를 안전하게 확인할 수 있는 진단 명령
+  - secret/raw prompt는 출력하지 않음
 
-- 컨픽에서 자비스의 행동 범위도 조절할 수 있다. `READ_TALK`,`EXCUTE_LITE`, `EXECUTE`
-  - `READ_TALK`모드는 파일을 읽을 수 있으나 실행하지는 못한다.
-  - `EXECUTE_LITE`모드는 간단하고 짧은 마인크래프트 명렁어를 사용할 수 있다. 주로 퍼미션 레벨2 급의 명령어들, 길이 제한 있음
-    - 이 모드에서는 특정 명령어를 블랙리스트에 넣어 사용을 방지할 수 있다.
-  - `EXECUTE`모드는 더 많은 마인크래프트 명령어를 사용할 수 있다. 주로 퍼미션 레벨4급의 명렁어들
+## Verification 보강
 
-- 단발성 실행이 아닌, 예약 및 지속성 실행도 할 수 있다. 최대 1분.
-  - ex: `10초 뒤에 ~로 이동시켜줘`, `5초동안 내가 바라보는 곳으로 돌진하게 해줘`
+- protocol fixture Java verification을 정식 task로 묶기
+- scheduling/ACTIVE race deterministic coverage 보강
+- operational logging event/secret masking regression coverage 추가
+- Audit health degraded/recovered injection test 추가
 
+## 운영성
 
-- 명령어 추가
-  - `/jm status` : 현재 api 상황
-  - `/jm test` : 입출력 테스트
-  - `/jm reload` : 설정 리로드,재반영
+- 필요 시 metrics exporter 검토
+  - request latency/count
+  - Jev/Luna latency
+  - Tool latency/error count
+  - AI queue depth
+  - Audit queue depth
+  - proactive candidate/accept count
+- 반복 warning에 대한 rate limiting 필요성 검토
