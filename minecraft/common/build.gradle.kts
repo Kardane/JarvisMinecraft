@@ -77,9 +77,20 @@ val embeddedBrainParityVerification by tasks.registering(JavaExec::class) {
     systemProperty("jarvis.repoRoot", rootProject.projectDir.absolutePath)
 }
 
+val jarvisConfigVerification by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "Runs Phase 1 runtime configuration validation and fail-safe reload checks."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set(
+        "io.github.kardane.jarvisminecraft.common.config.JarvisConfigVerificationMain"
+    )
+}
+
 tasks.named("check") {
     dependsOn(embeddedBrainVerification)
     dependsOn(embeddedBrainParityVerification)
+    dependsOn(jarvisConfigVerification)
 }
 
 val embeddedBrainLiveVerification by tasks.registering(JavaExec::class) {

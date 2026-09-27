@@ -1,0 +1,42 @@
+# JarvisMinecraft runtime policy settings for Fabric / NeoForge.
+# Provider credentials remain in environment variables/system properties and
+# are intentionally not stored here.
+#
+# List values use | as the separator.
+
+jarvis.interaction.mode=PASSIVE
+jarvis.interaction.wake-words=자비스|jarvis|재비스
+jarvis.interaction.follow-up-seconds=120
+
+jarvis.interaction.audience.mode=OP
+jarvis.interaction.audience.whitelist=
+jarvis.interaction.audience.blacklist=
+
+jarvis.interaction.proactive.context-messages=12
+jarvis.interaction.proactive.cooldown-seconds=15
+jarvis.interaction.proactive.confidence-threshold=0.75
+
+jarvis.model.name=gpt-6-luna
+jarvis.model.reasoning.mode=AUTO
+jarvis.model.reasoning.fallback=MEDIUM
+
+jarvis.response.prefix=[JARVIS] 
+jarvis.response.waiting-message.enabled=true
+jarvis.response.waiting-message.threshold-ms=1800
+jarvis.response.waiting-message.messages=잠시만요.|확인해볼게요.|서버 상태를 살펴보고 있어요.
+
+jarvis.response.sound.enabled=false
+jarvis.response.sound.id=minecraft:block.note_block.pling
+jarvis.response.sound.volume=1.0
+jarvis.response.sound.pitch=1.0
+
+jarvis.execution.mode=READ_TALK
+jarvis.execution.actors=OP
+jarvis.execution.lite.allow-tools=
+jarvis.execution.lite.deny-tools=
+jarvis.execution.full.allow-tools=
+jarvis.execution.full.deny-tools=
+
+jarvis.scheduling.enabled=false
+jarvis.scheduling.max-delay-seconds=60
+jarvis.scheduling.max-duration-seconds=60

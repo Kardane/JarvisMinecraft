@@ -1,0 +1,390 @@
+package io.github.kardane.jarvisminecraft.common.config;
+
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+
+public record JarvisConfig(
+    Interaction interaction,
+    Model model,
+    Response response,
+    Execution execution,
+    Scheduling scheduling
+) {
+    public JarvisConfig {
+        Objects.requireNonNull(interaction, "interaction");
+        Objects.requireNonNull(model, "model");
+        Objects.requireNonNull(response, "response");
+        Objects.requireNonNull(execution, "execution");
+        Objects.requireNonNull(scheduling, "scheduling");
+    }
+
+    public static JarvisConfig defaults() {
+        return new JarvisConfig(
+            new Interaction(
+                InteractionMode.PASSIVE,
+                List.of("자비스", "jarvis", "재비스"),
+                120,
+                new Audience(AudienceMode.OP, List.of(), List.of()),
+                new Proactive(12, 15, 0.75)
+            ),
+            new Model(
+                "gpt-6-luna",
+                new Reasoning(ReasoningMode.AUTO, ReasoningMode.MEDIUM)
+            ),
+            new Response(
+                "[JARVIS] ",
+                new WaitingMessage(
+                    true,
+                    1_800,
+                    List.of(
+                        "잠시만요.",
+                        "확인해볼게요.",
+                        "서버 상태를 살펴보고 있어요."
+                    )
+                ),
+                new Sound(
+                    false,
+                    "minecraft:block.note_block.pling",
+                    1.0,
+                    1.0
+                )
+            ),
+            new Execution(
+                ExecutionMode.READ_TALK,
+                ExecutionActors.OP,
+                new ToolFilter(List.of(), List.of()),
+                new ToolFilter(List.of(), List.of())
+            ),
+            new Scheduling(false, 60, 60)
+        );
+    }
+
+    public enum InteractionMode {
+        PASSIVE,
+        ACTIVE
+    }
+
+    public enum AudienceMode {
+        OP,
+        WHITELIST,
+        ALL,
+        BLACKLIST
+    }
+
+    public enum ReasoningMode {
+        AUTO,
+        NONE,
+        LOW,
+        MEDIUM,
+        HIGH
+    }
+
+    public enum ExecutionMode {
+        READ_TALK,
+        EXECUTE_LITE,
+        EXECUTE
+    }
+
+    /**
+     * Phase 1 keeps the current v0.1 authority boundary: only online OPs may
+     * execute state-changing work. Additional actor modes require a later
+     * contract change and are intentionally not accepted yet.
+     */
+    public enum ExecutionActors {
+        OP
+    }
+
+    public record Interaction(
+        InteractionMode mode,
+        List<String> wakeWords,
+        int followUpSeconds,
+        Audience audience,
+        Proactive proactive
+    ) {
+        public Interaction {
+            Objects.requireNonNull(mode, "interaction.mode");
+            wakeWords = normalizedList(
+                wakeWords,
+                "interaction.wakeWords",
+                1,
+                32,
+                64
+            );
+            requireRange(
+                followUpSeconds,
+                1,
+                600,
+                "interaction.followUpSeconds"
+            );
+            Objects.requireNonNull(audience, "interaction.audience");
+            Objects.requireNonNull(proactive, "interaction.proactive");
+        }
+    }
+
+    public record Audience(
+        AudienceMode mode,
+        List<String> whitelist,
+        List<String> blacklist
+    ) {
+        public Audience {
+            Objects.requireNonNull(mode, "interaction.audience.mode");
+            whitelist = normalizedList(
+                whitelist,
+                "interaction.audience.whitelist",
+                0,
+                256,
+                64
+            );
+            blacklist = normalizedList(
+                blacklist,
+                "interaction.audience.blacklist",
+                0,
+                256,
+                64
+            );
+        }
+    }
+
+    public record Proactive(
+        int contextMessages,
+        int cooldownSeconds,
+        double confidenceThreshold
+    ) {
+        public Proactive {
+            requireRange(
+                contextMessages,
+                1,
+                50,
+                "interaction.proactive.contextMessages"
+            );
+            requireRange(
+                cooldownSeconds,
+                0,
+                300,
+                "interaction.proactive.cooldownSeconds"
+            );
+            requireProbability(
+                confidenceThreshold,
+                "interaction.proactive.confidenceThreshold"
+            );
+        }
+    }
+
+    public record Model(
+        String name,
+        Reasoning reasoning
+    ) {
+        public Model {
+            name = requireText(name, "model.name", 64);
+            if (!"gpt-6-luna".equals(name)) {
+                throw new IllegalArgumentException(
+                    "model.name must remain gpt-6-luna in the current product contract."
+                );
+            }
+            Objects.requireNonNull(reasoning, "model.reasoning");
+        }
+    }
+
+    public record Reasoning(
+        ReasoningMode mode,
+        ReasoningMode fallback
+    ) {
+        public Reasoning {
+            Objects.requireNonNull(mode, "model.reasoning.mode");
+            Objects.requireNonNull(fallback, "model.reasoning.fallback");
+            if (fallback == ReasoningMode.AUTO) {
+                throw new IllegalArgumentException(
+                    "model.reasoning.fallback must be a concrete reasoning level."
+                );
+            }
+        }
+    }
+
+    public record Response(
+        String prefix,
+        WaitingMessage waitingMessage,
+        Sound sound
+    ) {
+        public Response {
+            prefix = requireTextAllowEmpty(prefix, "response.prefix", 128);
+            Objects.requireNonNull(
+                waitingMessage,
+                "response.waitingMessage"
+            );
+            Objects.requireNonNull(sound, "response.sound");
+        }
+    }
+
+    public record WaitingMessage(
+        boolean enabled,
+        int thresholdMillis,
+        List<String> messages
+    ) {
+        public WaitingMessage {
+            requireRange(
+                thresholdMillis,
+                0,
+                30_000,
+                "response.waitingMessage.thresholdMillis"
+            );
+            messages = normalizedList(
+                messages,
+                "response.waitingMessage.messages",
+                enabled ? 1 : 0,
+                16,
+                256
+            );
+        }
+    }
+
+    public record Sound(
+        boolean enabled,
+        String id,
+        double volume,
+        double pitch
+    ) {
+        public Sound {
+            id = requireText(id, "response.sound.id", 128);
+            requireFiniteRange(volume, 0.0, 4.0, "response.sound.volume");
+            requireFiniteRange(pitch, 0.01, 2.0, "response.sound.pitch");
+        }
+    }
+
+    public record Execution(
+        ExecutionMode mode,
+        ExecutionActors actors,
+        ToolFilter lite,
+        ToolFilter full
+    ) {
+        public Execution {
+            Objects.requireNonNull(mode, "execution.mode");
+            Objects.requireNonNull(actors, "execution.actors");
+            Objects.requireNonNull(lite, "execution.lite");
+            Objects.requireNonNull(full, "execution.full");
+        }
+    }
+
+    public record ToolFilter(
+        List<String> allowTools,
+        List<String> denyTools
+    ) {
+        public ToolFilter {
+            allowTools = normalizedList(
+                allowTools,
+                "execution.allowTools",
+                0,
+                128,
+                96
+            );
+            denyTools = normalizedList(
+                denyTools,
+                "execution.denyTools",
+                0,
+                128,
+                96
+            );
+        }
+    }
+
+    public record Scheduling(
+        boolean enabled,
+        int maxDelaySeconds,
+        int maxDurationSeconds
+    ) {
+        public Scheduling {
+            requireRange(
+                maxDelaySeconds,
+                1,
+                60,
+                "scheduling.maxDelaySeconds"
+            );
+            requireRange(
+                maxDurationSeconds,
+                1,
+                60,
+                "scheduling.maxDurationSeconds"
+            );
+        }
+    }
+
+    private static List<String> normalizedList(
+        List<String> values,
+        String field,
+        int minSize,
+        int maxSize,
+        int maxEntryLength
+    ) {
+        Objects.requireNonNull(values, field);
+        Set<String> normalized = new LinkedHashSet<>();
+        for (String value : values) {
+            normalized.add(requireText(value, field, maxEntryLength));
+        }
+        if (normalized.size() < minSize || normalized.size() > maxSize) {
+            throw new IllegalArgumentException(
+                field + " must contain between " + minSize + " and " + maxSize + " unique entries."
+            );
+        }
+        return List.copyOf(normalized);
+    }
+
+    private static String requireText(
+        String value,
+        String field,
+        int maxLength
+    ) {
+        Objects.requireNonNull(value, field);
+        String normalized = value.trim();
+        if (normalized.isEmpty() || normalized.length() > maxLength) {
+            throw new IllegalArgumentException(
+                field + " must be non-blank and at most " + maxLength + " characters."
+            );
+        }
+        return normalized;
+    }
+
+    private static String requireTextAllowEmpty(
+        String value,
+        String field,
+        int maxLength
+    ) {
+        Objects.requireNonNull(value, field);
+        if (value.length() > maxLength) {
+            throw new IllegalArgumentException(
+                field + " must be at most " + maxLength + " characters."
+            );
+        }
+        return value;
+    }
+
+    private static void requireRange(
+        int value,
+        int min,
+        int max,
+        String field
+    ) {
+        if (value < min || value > max) {
+            throw new IllegalArgumentException(
+                field + " must be between " + min + " and " + max + "."
+            );
+        }
+    }
+
+    private static void requireProbability(double value, String field) {
+        requireFiniteRange(value, 0.0, 1.0, field);
+    }
+
+    private static void requireFiniteRange(
+        double value,
+        double min,
+        double max,
+        String field
+    ) {
+        if (!Double.isFinite(value) || value < min || value > max) {
+            throw new IllegalArgumentException(
+                field + " must be between " + min + " and " + max + "."
+            );
+        }
+    }
+}
