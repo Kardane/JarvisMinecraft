@@ -6,6 +6,7 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.JdkJevClassifier;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaClient;
 import io.github.kardane.jarvisminecraft.common.brain.ai.OpenAiLunaClient;
 import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
+import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolArgumentCodec;
