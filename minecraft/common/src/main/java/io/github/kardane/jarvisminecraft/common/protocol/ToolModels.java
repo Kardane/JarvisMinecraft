@@ -18,13 +18,13 @@ public final class ToolModels {
     public sealed interface ToolArguments permits
         NoArguments, PagingArguments, GetPlayerByUuidArguments, GetPlayerByNameArguments,
         PlayerUuidArguments, NearbyArguments, WorldInfoArguments, TeleportArguments,
-        AreaHistoryArguments, PlayerHistoryArguments, RegionsAtLocationArguments,
+        WeatherSetArguments, TimeSetArguments, AreaHistoryArguments, PlayerHistoryArguments, RegionsAtLocationArguments,
         RegionInfoArguments, BuildPermissionArguments {
     }
 
     public sealed interface ToolData permits
         ServerStatusData, OnlinePlayersData, PlayerData, PlayerLocationData,
-        NearbyPlayersData, WorldInfoData, TeleportData, HistoryData,
+        NearbyPlayersData, WorldInfoData, TeleportData, WeatherSetData, TimeSetData, HistoryData,
         RegionsAtLocationData, RegionInfoData, BuildPermissionData, CmiPlayerInfoData {
     }
 
@@ -50,6 +50,25 @@ public final class ToolModels {
     }
 
     public record TeleportArguments(UUID targetPlayerUuid) implements ToolArguments {
+    }
+
+    public enum WeatherType {
+        CLEAR,
+        RAIN,
+        THUNDER
+    }
+
+    public record WeatherSetArguments(
+        String worldId,
+        WeatherType weather,
+        int durationSeconds
+    ) implements ToolArguments {
+    }
+
+    public record TimeSetArguments(
+        String worldId,
+        int timeOfDay
+    ) implements ToolArguments {
     }
 
     public record AreaHistoryArguments(
@@ -146,6 +165,21 @@ public final class ToolModels {
         UUID targetPlayerUuid,
         String fromWorldId,
         String toWorldId,
+        boolean completed
+    ) implements ToolData {
+    }
+
+    public record WeatherSetData(
+        String worldId,
+        WeatherType weather,
+        int durationSeconds,
+        boolean completed
+    ) implements ToolData {
+    }
+
+    public record TimeSetData(
+        String worldId,
+        int timeOfDay,
         boolean completed
     ) implements ToolData {
     }

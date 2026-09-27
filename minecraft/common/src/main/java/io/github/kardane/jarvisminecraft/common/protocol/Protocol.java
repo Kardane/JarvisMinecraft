@@ -52,6 +52,10 @@ public final class Protocol {
         GET_WORLD_INFO("get_world_info", "world.info", false, Risk.READ_ONLY),
         @SerializedName("teleport_staff")
         TELEPORT_STAFF("teleport_staff", "staff.self_teleport", true, Risk.LOW),
+        @SerializedName("weather_set")
+        WEATHER_SET("weather_set", "world.weather.set", true, Risk.LOW),
+        @SerializedName("time_set")
+        TIME_SET("time_set", "world.time.set", true, Risk.LOW),
         @SerializedName("lookup_area_history")
         LOOKUP_AREA_HISTORY("lookup_area_history", "history.lookup", false, Risk.READ_ONLY),
         @SerializedName("lookup_player_history")

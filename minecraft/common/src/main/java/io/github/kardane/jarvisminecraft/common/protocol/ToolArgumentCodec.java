@@ -57,6 +57,21 @@ public final class ToolArgumentCodec {
                 exactFields(arguments, Set.of("targetPlayerUuid"));
                 yield new TeleportArguments(uuid(arguments, "targetPlayerUuid"));
             }
+            case WEATHER_SET -> {
+                exactFields(arguments, Set.of("worldId", "weather", "durationSeconds"));
+                yield new WeatherSetArguments(
+                    string(arguments, "worldId", 1, 128),
+                    weatherType(arguments, "weather"),
+                    integer(arguments, "durationSeconds", 1, 3_600)
+                );
+            }
+            case TIME_SET -> {
+                exactFields(arguments, Set.of("worldId", "timeOfDay"));
+                yield new TimeSetArguments(
+                    string(arguments, "worldId", 1, 128),
+                    integer(arguments, "timeOfDay", 0, 23_999)
+                );
+            }
             case LOOKUP_AREA_HISTORY -> {
                 exactFields(
                     arguments,
@@ -178,6 +193,15 @@ public final class ToolArgumentCodec {
             throw invalid(field + " is too long.");
         }
         return value;
+    }
+
+    private WeatherType weatherType(JsonObject object, String field) {
+        String value = string(object, field, 1, 16);
+        try {
+            return WeatherType.valueOf(value);
+        } catch (IllegalArgumentException failure) {
+            throw invalid(field + " must be CLEAR, RAIN, or THUNDER.");
+        }
     }
 
     private UUID uuid(JsonObject object, String field) {

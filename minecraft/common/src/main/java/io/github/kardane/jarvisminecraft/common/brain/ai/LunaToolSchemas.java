@@ -155,6 +155,35 @@ public final class LunaToolSchemas {
                     )
                 )
             );
+            case WEATHER_SET -> List.of(
+                define(
+                    tool.wireName(),
+                    tool,
+                    "Set weather for one already loaded world after an explicit user request. Duration is 1 to 3600 seconds.",
+                    objectSchema(
+                        properties(
+                            "worldId", stringSchema(1, 128),
+                            "weather", enumStringSchema("CLEAR", "RAIN", "THUNDER"),
+                            "durationSeconds", integerSchema(1, 3_600)
+                        ),
+                        List.of("worldId", "weather", "durationSeconds")
+                    )
+                )
+            );
+            case TIME_SET -> List.of(
+                define(
+                    tool.wireName(),
+                    tool,
+                    "Set time-of-day for one already loaded world after an explicit user request. Value is 0 to 23999.",
+                    objectSchema(
+                        properties(
+                            "worldId", stringSchema(1, 128),
+                            "timeOfDay", integerSchema(0, 23_999)
+                        ),
+                        List.of("worldId", "timeOfDay")
+                    )
+                )
+            );
             case LOOKUP_AREA_HISTORY -> List.of(
                 define(
                     tool.wireName(),
@@ -310,6 +339,17 @@ public final class LunaToolSchemas {
         schema.addProperty("type", "string");
         schema.addProperty("minLength", min);
         schema.addProperty("maxLength", max);
+        return schema;
+    }
+
+    private JsonObject enumStringSchema(String... values) {
+        JsonObject schema = new JsonObject();
+        schema.addProperty("type", "string");
+        JsonArray choices = new JsonArray();
+        for (String value : values) {
+            choices.add(value);
+        }
+        schema.add("enum", choices);
         return schema;
     }
 

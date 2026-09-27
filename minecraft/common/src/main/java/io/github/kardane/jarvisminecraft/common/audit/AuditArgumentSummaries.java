@@ -38,6 +38,19 @@ public final class AuditArgumentSummaries {
         if (arguments instanceof TeleportArguments value) {
             return map("targetPlayerUuid", value.targetPlayerUuid());
         }
+        if (arguments instanceof WeatherSetArguments value) {
+            return map(
+                "worldId", value.worldId(),
+                "weather", value.weather().name(),
+                "durationSeconds", value.durationSeconds()
+            );
+        }
+        if (arguments instanceof TimeSetArguments value) {
+            return map(
+                "worldId", value.worldId(),
+                "timeOfDay", value.timeOfDay()
+            );
+        }
         if (arguments instanceof AreaHistoryArguments value) {
             return map(
                 "center", location(value.center()),
