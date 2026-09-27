@@ -9,6 +9,7 @@ import io.github.kardane.jarvisminecraft.common.logging.JarvisEvents;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisFields;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
+import io.github.kardane.jarvisminecraft.common.prompt.PromptContentSnapshot;
 import io.github.kardane.jarvisminecraft.common.runtime.ExecutionPolicy;
 
 import java.time.Clock;
@@ -72,6 +73,26 @@ final class ModelConversationLoop {
         DeterministicRoutePolicy.RoutingDecision routing,
         ReasoningLevel reasoningLevel
     ) {
+        return run(
+            request,
+            budget,
+            routing,
+            reasoningLevel,
+            PromptContentSnapshot.empty()
+        );
+    }
+
+    CompletionStage<EmbeddedBrain.Reply> run(
+        EmbeddedBrain.ChatRequest request,
+        RequestBudget budget,
+        DeterministicRoutePolicy.RoutingDecision routing,
+        ReasoningLevel reasoningLevel,
+        PromptContentSnapshot promptContent
+    ) {
+        Objects.requireNonNull(
+            promptContent,
+            "promptContent"
+        );
         try {
             guard.assertRunning();
             guard.assertSession(
@@ -98,6 +119,7 @@ final class ModelConversationLoop {
                 budget.remainingToolCalls(),
                 budget.remainingModelRounds(),
                 reasoningLevel,
+                promptContent,
                 budget.deadlineAt()
             );
 
@@ -117,6 +139,7 @@ final class ModelConversationLoop {
                         budget,
                         routing,
                         reasoningLevel,
+                        promptContent,
                         effectiveRouting,
                         round,
                         lunaStarted,
@@ -133,6 +156,7 @@ final class ModelConversationLoop {
         RequestBudget budget,
         DeterministicRoutePolicy.RoutingDecision routing,
         ReasoningLevel reasoningLevel,
+        PromptContentSnapshot promptContent,
         DeterministicRoutePolicy.RoutingDecision effectiveRouting,
         int round,
         Instant lunaStarted,
@@ -250,7 +274,8 @@ final class ModelConversationLoop {
                 request,
                 budget,
                 routing,
-                reasoningLevel
+                reasoningLevel,
+                promptContent
             )
         );
     }
