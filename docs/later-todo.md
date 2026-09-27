@@ -1,31 +1,31 @@
-# 나중에 할 것들
+# Later Work
 
-현재 Phase 1~8 및 Operational Logging L1~L6 구현 이후 남아 있는 항목만 기록한다.
+This file lists only items that remain after the current Phase 1–8 and Operational Logging L1–L6 implementation.
 
-## Admin command
+## Admin Commands
 
 - `/jm reload`
-  - runtime config 재로드
-  - parse/validation 실패 시 기존 valid snapshot 유지
-  - 성공/실패 operational log
+  - reload runtime configuration
+  - keep the previous valid snapshot if parsing/validation fails
+  - emit operational logs for success and failure
 - `/jm test`
-  - provider/Jev/Luna/Tool boundary를 안전하게 확인할 수 있는 진단 명령
-  - secret/raw prompt는 출력하지 않음
+  - provide a diagnostic command for safely checking Provider/Jev/Luna/Tool boundaries
+  - never print secrets or raw prompts
 
-## Verification 보강
+## Verification Improvements
 
-- protocol fixture Java verification을 정식 task로 묶기
-- scheduling/ACTIVE race deterministic coverage 보강
-- operational logging event/secret masking regression coverage 추가
-- Audit health degraded/recovered injection test 추가
+- formalize Java verification for protocol fixtures as a Gradle task
+- expand deterministic coverage for scheduling/ACTIVE-mode races
+- add regression coverage for operational logging events and secret masking
+- add Audit health degraded/recovered fault-injection tests
 
-## 운영성
+## Operability
 
-- 필요 시 metrics exporter 검토
+- consider a metrics exporter if needed
   - request latency/count
   - Jev/Luna latency
   - Tool latency/error count
   - AI queue depth
   - Audit queue depth
   - proactive candidate/accept count
-- 반복 warning에 대한 rate limiting 필요성 검토
+- evaluate rate limiting for repeated warnings
