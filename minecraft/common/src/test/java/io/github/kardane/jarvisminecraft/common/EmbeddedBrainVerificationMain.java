@@ -809,5 +809,10 @@ public final class EmbeddedBrainVerificationMain {
         public void sendPrivatePlain(UUID requesterUuid, String text) {
             messages.add(text);
         }
+
+        @Override
+        public void sendPublicPlain(String text) {
+            messages.add(text);
+        }
     }
 }

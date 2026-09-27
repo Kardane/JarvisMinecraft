@@ -2,6 +2,6 @@ name: JarvisMinecraft
 version: 0.1.0-dev
 main: io.github.kardane.jarvisminecraft.paper.JarvisPaperPlugin
 api-version: '1.21'
-description: Private AI operations assistant for Minecraft server operators.
+description: OP-gated AI operations assistant with public chat replies for Minecraft servers.
 authors: [Kardane]
 softdepend: [CMILib, CMI, CoreProtect, WorldEdit, WorldGuard]

@@ -328,6 +328,11 @@ public final class T08VerificationMain {
             throw new AssertionError("not used by fake Tool tests");
         }
 
+        @Override
+        public void sendPublicPlain(String text) {
+            throw new AssertionError("not used by fake Tool tests");
+        }
+
         private static PlayerSnapshot player(UUID uuid, String name, double x, double y, double z) {
             return new PlayerSnapshot(
                 uuid,

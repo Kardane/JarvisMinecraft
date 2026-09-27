@@ -72,12 +72,12 @@ public final class FabricChatController {
                     decision.sessionId(),
                     CancelReason.SESSION_ENDED
                 );
-                platform.sendPrivatePlain(requesterUuid, "대화를 종료했습니다.");
-                yield false;
+                platform.sendPublicPlain("대화를 종료했습니다.");
+                yield true;
             }
             case FORWARD -> {
                 if (decision.started()) {
-                    platform.sendPrivatePlain(requesterUuid, SESSION_RULES);
+                    platform.sendPublicPlain(SESSION_RULES);
                 }
 
                 brain.submitChat(
@@ -92,15 +92,14 @@ public final class FabricChatController {
                     }
                     scheduler.submit(() -> {
                         if (platform.isOnlineOperator(requesterUuid)) {
-                            platform.sendPrivatePlain(
-                                requesterUuid,
+                            platform.sendPublicPlain(
                                 "자비스 요청을 현재 처리하지 못했습니다."
                             );
                         }
                         return CompletableFuture.completedFuture(null);
                     });
                 });
-                yield false;
+                yield true;
             }
         };
     }

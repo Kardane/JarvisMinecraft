@@ -4,6 +4,8 @@
 
 JARVIS now runs the Brain inside the Minecraft server JVM. There is no Node.js Brain daemon, WebSocket listener, shared-secret handshake, or reconnect process to operate.
 
+JARVIS access remains OP-only, while accepted invocations, follow-up messages, session notices, and replies are visible to all online players in server chat. Only the requesting OP's JARVIS messages are sent to the Brain.
+
 ## Required secrets
 
 Supply these to the Minecraft server process through your normal secret store:

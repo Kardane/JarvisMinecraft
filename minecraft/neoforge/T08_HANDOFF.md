@@ -47,7 +47,7 @@ Current OP state is rechecked:
 
 - before chat submission;
 - before T03 CommonRuntime Tool execution;
-- before private response delivery;
+- before public response broadcast;
 - immediately before self teleport.
 
 Model claims and permission-node strings are not accepted as operator evidence.
@@ -66,10 +66,11 @@ Rules:
 - partial tokens such as `자비스팅` are ordinary chat;
 - direct invocation starts a 120 second session;
 - accepted follow-up refreshes TTL;
-- `대화 끝` ends locally and suppresses public broadcast;
+- `대화 끝` ends locally and remains visible in public chat;
 - `!내용` bypasses Brain for one message and uses `ServerChatEvent#setMessage` to publish the text without the escape marker;
 - logout, deop and TTL expiry invalidate local session/request state;
-- Brain responses go only to the original current online OP;
+- accepted JARVIS invocations and follow-ups remain visible to all online players, while only the requesting OP's JARVIS text is sent to Brain;
+- the Adapter rechecks that the requester is online, remains an OP, and still owns the active session before broadcasting a Brain response to all online players;
 - responses are plain `Component.literal` text and cannot create commands/click actions.
 
 ### Thread boundary

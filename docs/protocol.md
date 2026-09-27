@@ -95,8 +95,8 @@ requesterUuid는 **권한 증거가 아니다**. Adapter가 실제 접수한 요
 |---|---|---|---|
 | hello | 양방향 | null | protocol/platform instance 확인 |
 | capabilities | Adapter -> Brain | null | 현재 실제로 사용할 수 있는 capability/Tool 목록 |
-| chat.message | Adapter -> Brain | 필수 | JARVIS가 접수한 비공개 OP 입력 |
-| chat.response | Brain -> Adapter | 필수 | 해당 OP에게만 전달할 평문 응답 |
+| chat.message | Adapter -> Brain | 필수 | OP가 보낸 JARVIS 입력. 입력은 서버 채팅에 공개 유지 |
+| chat.response | Brain -> Adapter | 필수 | 요청 세션에 연결된 평문 응답. Adapter는 요청자의 OP 권한과 세션을 재검사한 뒤 전체 접속자에게 공개 |
 | tool.request | Brain -> Adapter | 필수 | allowlist Tool 실행 요청 |
 | tool.result | Adapter -> Brain | 필수 | 구조화된 Tool 결과 |
 | cancel | 양방향 | requestId 필수 | 진행 요청의 best-effort 취소 |
@@ -203,7 +203,7 @@ Adapter가 처리할 규칙:
 - 활성 세션의 "대화 끝"은 Brain에 보내지 않고 종료한다.
 - 활성 세션의 "!내용"은 해당 메시지만 일반 채팅으로 보내고 Brain에 보내지 않는다.
 - 비OP 일반 채팅은 Brain이나 모델로 전송하지 않는다.
-- JARVIS 입력과 응답은 다른 플레이어/다른 OP에게 자동 공유하지 않는다.
+- OP의 JARVIS 입력은 서버 채팅에 남고 JARVIS 응답은 전체 접속자에게 방송한다. Brain에는 해당 OP가 보낸 JARVIS 입력만 전달한다.
 
 세션 key는 (serverId, requesterUuid, sessionId)다. 이름은 key로 사용하지 않는다.
 
@@ -359,7 +359,7 @@ T01 작성 시 T00의 세 플랫폼 경계를 기준으로 static contract revie
 | protocol에 플랫폼 객체 포함 없음 | PASS | PASS | PASS |
 | OP 판정을 Adapter authority로 유지 | PASS | PASS | PASS |
 | scheduler/execution bridge 구현 가능 | PASS | PASS | PASS |
-| 비공개 requester-only 응답 표현 가능 | PASS | PASS | PASS |
+| OP/session 재검사 후 전체 채팅 응답 방송 가능 | PASS | PASS | PASS |
 | Tool DTO가 platform-neutral | PASS | PASS | PASS |
 | exact runtime event signature live 검증 | T06/T10 | T07/T10 | T08/T10 |
 

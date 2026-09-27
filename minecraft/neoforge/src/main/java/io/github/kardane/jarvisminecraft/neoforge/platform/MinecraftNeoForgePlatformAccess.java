@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 public final class MinecraftNeoForgePlatformAccess implements NeoForgePlatformAccess {
-    private static final String PRIVATE_PREFIX = "[JARVIS] ";
+    private static final String MESSAGE_PREFIX = "[JARVIS] ";
 
     private final MinecraftServer server;
     private final NeoForgeTickSampler tickSampler;
@@ -200,7 +200,16 @@ public final class MinecraftNeoForgePlatformAccess implements NeoForgePlatformAc
         if (player == null || !manager.isOp(player.getGameProfile())) {
             return;
         }
-        player.sendSystemMessage(Component.literal(PRIVATE_PREFIX + text), false);
+        player.sendSystemMessage(Component.literal(MESSAGE_PREFIX + text), false);
+    }
+
+    @Override
+    public void sendPublicPlain(String text) {
+        requireServerThread();
+        Component message = Component.literal(MESSAGE_PREFIX + text);
+        server.getPlayerList().getPlayers().forEach(
+            player -> player.sendSystemMessage(message, false)
+        );
     }
 
     private Optional<ServerLevel> findWorld(String worldId) {

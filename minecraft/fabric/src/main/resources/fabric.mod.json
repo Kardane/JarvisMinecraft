@@ -3,7 +3,7 @@
   "id": "jarvisminecraft",
   "version": "0.1.0-SNAPSHOT",
   "name": "Minecraft JARVIS",
-  "description": "Private AI operations assistant for Minecraft server operators.",
+  "description": "OP-gated AI operations assistant with public chat replies for Minecraft servers.",
   "environment": "server",
   "depends": {
     "fabricloader": ">=0.17.2",

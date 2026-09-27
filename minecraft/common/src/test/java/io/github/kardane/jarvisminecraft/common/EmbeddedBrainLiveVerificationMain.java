@@ -482,6 +482,14 @@ public final class EmbeddedBrainLiveVerificationMain {
         }
 
         @Override
+        public void sendPublicPlain(String text) {
+            synchronized (sentMessages) {
+                sentMessages.add(text);
+            }
+            System.out.println("  [Public Chat Broadcast] " + text);
+        }
+
+        @Override
         public Optional<PlayerSnapshot> findOnlinePlayer(UUID playerUuid) {
             if (operatorUuid.equals(playerUuid)) return Optional.of(operatorSnapshot);
             if (steveUuid.equals(playerUuid)) return Optional.of(steveSnapshot);

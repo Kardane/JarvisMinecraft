@@ -6,7 +6,7 @@ license="All Rights Reserved"
 modId="jarvisminecraft"
 version="0.1.0-SNAPSHOT"
 displayName="Minecraft JARVIS"
-description='''Private AI operations assistant for Minecraft server operators.'''
+description='''OP-gated AI operations assistant with public chat replies for Minecraft servers.'''
 displayTest="IGNORE_ALL_VERSION"
 
 [[dependencies.jarvisminecraft]]

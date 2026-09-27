@@ -16,7 +16,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 public final class MinecraftFabricPlatformAccess implements FabricPlatformAccess {
-    private static final String PRIVATE_PREFIX = "[JARVIS] ";
+    private static final String MESSAGE_PREFIX = "[JARVIS] ";
 
     private final MinecraftServer server;
 
@@ -209,7 +209,16 @@ public final class MinecraftFabricPlatformAccess implements FabricPlatformAccess
         if (player == null || !manager.isOperator(player.getGameProfile())) {
             return;
         }
-        player.sendMessage(Text.literal(PRIVATE_PREFIX + text), false);
+        player.sendMessage(Text.literal(MESSAGE_PREFIX + text), false);
+    }
+
+    @Override
+    public void sendPublicPlain(String text) {
+        requireServerThread();
+        Text message = Text.literal(MESSAGE_PREFIX + text);
+        server.getPlayerManager().getPlayerList().forEach(
+            player -> player.sendMessage(message, false)
+        );
     }
 
     private Optional<ServerWorld> findWorld(String worldId) {

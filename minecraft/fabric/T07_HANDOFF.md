@@ -50,12 +50,12 @@ Authoritative Fabric OP status is:
 The Adapter rechecks current operator state:
 - before a JARVIS chat message is submitted;
 - before T03 CommonRuntime executes a Tool;
-- before a private Brain response is delivered;
+- before a public Brain response is broadcast;
 - immediately before `teleport_staff`.
 
 No permission-node/model field is accepted as OP evidence.
 
-### Private chat sessions
+### Public chat sessions
 
 Direct aliases:
 - 자비스
@@ -67,8 +67,9 @@ Rules:
 - partial tokens such as `자비스팅` are normal chat;
 - direct invocation starts a 120 second session;
 - follow-up messages refresh TTL;
-- `대화 끝` terminates the session locally and suppresses broadcast;
+- `대화 끝` terminates the session locally and remains visible in public chat;
 - `!내용` bypasses Brain for one message and is publicly broadcast.
+- accepted JARVIS messages remain publicly visible, and replies/session notices are broadcast to all online players.
 
 Fabric signed-message handling does not rewrite `!내용` to strip the leading exclamation mark. The marker may therefore remain visible in public chat. This preserves the signed chat message instead of mutating it.
 
@@ -195,7 +196,7 @@ T07 does not claim:
 - actual Fabric dedicated-server boot evidence;
 - actual 1.21.8 chat callback thread observation;
 - signed-chat client UI behavior;
-- live private-chat visibility verification;
+- live public-chat visibility verification;
 - live teleport verification;
 - Luna/Jev live model calls.
 

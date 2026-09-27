@@ -66,7 +66,7 @@ OP 권한 근거는 LLM이나 별도 permission node가 아니라 서버가 제�
 | 채팅 진입점 후보 | ServerMessageEvents.ALLOW_CHAT_MESSAGE | CONFIRMED |
 | OP 판정 | PlayerManager.isOperator(GameProfile) | CONFIRMED |
 
-Fabric API 0.133.4+1.21.8의 ServerMessageEvents.ALLOW_CHAT_MESSAGE는 플레이어 채팅의 서버 broadcast를 막을 수 있다. JARVIS 직접 호출을 공개 채팅으로 보내지 않기 위한 1차 후보로 채택한다.
+Fabric API 0.133.4+1.21.8의 ServerMessageEvents.ALLOW_CHAT_MESSAGE는 반환값으로 플레이어 채팅의 서버 broadcast를 막을 수 있다. JARVIS 직접 호출도 입력 메시지를 공개 채팅에 남기므로 승인된 호출에서는 broadcast를 허용한다.
 
 주의: 공식 Javadoc은 해당 callback의 스레드 계약을 명시적으로 설명하지 않는다. T07에서는 callback이 실제 dedicated server thread에서 실행되는지 검증하고, **문서로 보장되지 않은 스레드 안전성을 전제로 삼지 않는다.** Minecraft world/player 객체는 서버 실행 큐에서 스냅샷으로 변환한다.
 
@@ -232,7 +232,7 @@ T14 상태, 사용자 허가 확인 경계, runtime smoke 절차는 [`T14_HANDOF
 | 대상 | T00 정책 |
 |---|---|
 | AI HTTP/WebSocket/disk/DB | Minecraft tick thread에서 대기 금지 |
-| Paper AsyncChatEvent | 공개 전달 차단/메시지 캡처만; Bukkit API 접근은 scheduler로 넘김 |
+| Paper ChatEvent | 서버 스레드에서 OP/세션을 확인하고 입력 채팅을 공개 유지; AI 요청과 네트워크 작업은 비동기 처리 |
 | Fabric chat callback | 공식 thread 명시 부족. 서버 객체 접근은 server execute/scheduler 경계 안에서 수행 |
 | NeoForge ServerChatEvent | logical server event. world/player state 접근·변경은 server execution context에서만 수행 |
 | CoreProtect DB lookup | server-thread snapshot 후 비동기 Provider 작업 |

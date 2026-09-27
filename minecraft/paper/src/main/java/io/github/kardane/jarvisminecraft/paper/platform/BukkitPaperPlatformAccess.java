@@ -17,7 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 public final class BukkitPaperPlatformAccess implements PaperPlatformAccess {
-    private static final String PRIVATE_PREFIX = "[JARVIS] ";
+    private static final String MESSAGE_PREFIX = "[JARVIS] ";
 
     private final Server server;
 
@@ -205,7 +205,14 @@ public final class BukkitPaperPlatformAccess implements PaperPlatformAccess {
         if (player == null || !player.isOnline() || !player.isOp()) {
             return;
         }
-        player.sendMessage(Component.text(PRIVATE_PREFIX + text));
+        player.sendMessage(Component.text(MESSAGE_PREFIX + text));
+    }
+
+    @Override
+    public void sendPublicPlain(String text) {
+        requireServerThread();
+        Component message = Component.text(MESSAGE_PREFIX + text);
+        server.getOnlinePlayers().forEach(player -> player.sendMessage(message));
     }
 
     private PlayerSnapshot snapshot(Player player) {

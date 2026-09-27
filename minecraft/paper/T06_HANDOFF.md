@@ -38,9 +38,9 @@ Runtime validation:
 - blank/sample/short secrets are rejected by T03 shared-secret policy.
 - the default CHANGE_ME intentionally disables startup until replaced.
 
-### OP/private chat behavior
+### OP/public chat behavior
 
-The Paper Adapter listens to Paper `ChatEvent` so the decision to suppress/publicly pass chat is made on the server thread.
+The Paper Adapter listens to Paper `ChatEvent` and makes the OP/session decision on the server thread. Accepted JARVIS messages remain on the normal public chat path; replies and session notices are broadcast as plain text.
 
 Supported direct aliases:
 - 자비스
@@ -55,7 +55,7 @@ Rules:
 - `대화 끝` ends locally and sends cancel for outstanding session requests.
 - `!내용` escapes one active-session message back to normal public chat.
 - logout, OP revoke detection and TTL expiry invalidate local sessions and outstanding bindings.
-- model responses are delivered only to the original online OP and only as `Component.text`.
+- model responses are broadcast to all online players as `Component.text` after the requester remains online, OP-authorized, and in the active session.
 - MiniMessage/click commands/console strings are never interpreted.
 
 ### Thread boundary
@@ -66,7 +66,7 @@ It asserts primary-thread access for:
 - OP checks
 - player/world snapshots
 - metrics
-- private response delivery
+- public response broadcast
 - teleport initiation
 
 `PaperServerScheduler` moves work onto the Paper primary thread.

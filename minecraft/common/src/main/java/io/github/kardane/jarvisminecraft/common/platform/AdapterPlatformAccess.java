@@ -8,4 +8,6 @@ public interface AdapterPlatformAccess {
     boolean isOnlineOperator(UUID playerUuid);
 
     void sendPrivatePlain(UUID requesterUuid, String text);
+
+    void sendPublicPlain(String text);
 }

@@ -280,7 +280,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 return;
             }
 
-            platform.sendPrivatePlain(requesterUuid, reply.text());
+            platform.sendPublicPlain(reply.text());
 
             if (reply.sessionState() == LunaStep.SessionState.END) {
                 sessions.end(requesterUuid, sessionId);
@@ -309,7 +309,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 platform.isOnlineOperator(requesterUuid)
                     && sessions.isActive(requesterUuid, sessionId)
             ) {
-                platform.sendPrivatePlain(requesterUuid, text);
+                platform.sendPublicPlain(text);
             }
         });
     }
