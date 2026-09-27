@@ -3,34 +3,76 @@ package io.github.kardane.jarvisminecraft.common.prompt;
 import java.nio.charset.StandardCharsets;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Supplier;
 
 public final class PromptContentManager {
-    private final PromptContentLoader loader;
-    private final AtomicReference<PromptContentSnapshot> current;
+    private final Supplier<PromptContentSnapshot> currentSource;
+    private final Supplier<ReloadResult> reloadOperation;
 
     public PromptContentManager(PromptContentLoader loader) {
-        this.loader = Objects.requireNonNull(loader, "loader");
-        this.current = new AtomicReference<>(
-            Objects.requireNonNull(
-                loader.load(),
-                "initial prompt content"
-            )
+        Objects.requireNonNull(loader, "loader");
+        AtomicReference<PromptContentSnapshot> state =
+            new AtomicReference<>(
+                Objects.requireNonNull(
+                    loader.load(),
+                    "initial prompt content"
+                )
+            );
+        this.currentSource = state::get;
+        this.reloadOperation =
+            () -> reloadStandalone(loader, state);
+    }
+
+    private PromptContentManager(
+        Supplier<PromptContentSnapshot> currentSource,
+        Supplier<ReloadResult> reloadOperation
+    ) {
+        this.currentSource = Objects.requireNonNull(
+            currentSource,
+            "currentSource"
+        );
+        this.reloadOperation = Objects.requireNonNull(
+            reloadOperation,
+            "reloadOperation"
+        );
+    }
+
+    public static PromptContentManager managed(
+        Supplier<PromptContentSnapshot> currentSource,
+        Supplier<ReloadResult> reloadOperation
+    ) {
+        return new PromptContentManager(
+            currentSource,
+            reloadOperation
         );
     }
 
     public PromptContentSnapshot current() {
-        return current.get();
+        return Objects.requireNonNull(
+            currentSource.get(),
+            "current prompt content"
+        );
     }
 
     public synchronized ReloadResult reload() {
-        PromptContentSnapshot previous = current.get();
+        return Objects.requireNonNull(
+            reloadOperation.get(),
+            "reload result"
+        );
+    }
+
+    private static ReloadResult reloadStandalone(
+        PromptContentLoader loader,
+        AtomicReference<PromptContentSnapshot> state
+    ) {
+        PromptContentSnapshot previous = state.get();
         try {
             PromptContentSnapshot next =
                 Objects.requireNonNull(
                     loader.load(),
                     "reloaded prompt content"
                 );
-            current.set(next);
+            state.set(next);
             return ReloadResult.success(
                 ContentSummary.from(next)
             );
@@ -42,7 +84,9 @@ public final class PromptContentManager {
         }
     }
 
-    private String safeMessage(RuntimeException failure) {
+    private static String safeMessage(
+        RuntimeException failure
+    ) {
         String message = failure.getMessage();
         if (message == null || message.isBlank()) {
             return "Prompt content reload failed.";
@@ -75,7 +119,7 @@ public final class PromptContentManager {
             }
         }
 
-        static ReloadResult success(
+        public static ReloadResult success(
             ContentSummary activeContent
         ) {
             return new ReloadResult(
@@ -85,7 +129,7 @@ public final class PromptContentManager {
             );
         }
 
-        static ReloadResult failure(
+        public static ReloadResult failure(
             ContentSummary activeContent,
             String error
         ) {
@@ -103,9 +147,10 @@ public final class PromptContentManager {
         int knowledgeDocuments,
         int knowledgeBytes
     ) {
-        static ContentSummary from(
+        public static ContentSummary from(
             PromptContentSnapshot snapshot
         ) {
+            Objects.requireNonNull(snapshot, "snapshot");
             int personaBytes =
                 snapshot.persona()
                     .getBytes(StandardCharsets.UTF_8)
