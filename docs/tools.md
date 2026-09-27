@@ -1,69 +1,69 @@
-# Minecraft JARVIS Tool 계약
+# Minecraft JARVIS Tool Contract
 
-작성일: 2026-09-24  
-관련 작업: T01  
-정규 입력/결과 schema: ../protocol/schema/protocol.schema.json
+Date: 2026-09-24  
+Related work: T01  
+Canonical input/result schema: ../protocol/schema/protocol.schema.json
 
-## 1. 원칙
+## 1. Principles
 
-Tool은 LLM에게 Minecraft 서버 전체 권한을 주는 인터페이스가 아니다. **사전에 등록된 좁은 함수 allowlist**다.
+Tools are not an interface that gives the LLM unrestricted Minecraft server authority. They are a **narrow, pre-registered function allowlist**.
 
-초기 릴리스에는 다음 기능이 존재하지 않는다.
+The initial release does not provide:
 
-- 임의 console command
-- SQL 실행
-- 코드 실행
-- 임의 파일 접근
-- 임의 좌표 텔레포트
-- 다른 플레이어 강제 텔레포트
+- arbitrary console commands
+- SQL execution
+- code execution
+- arbitrary file access
+- arbitrary-coordinate teleportation
+- forced teleportation of another player
 - ban / warn
 - rollback
 
-Brain이 임의 Tool 이름을 생성해도 Adapter는 실행하지 않는다.
+Even if the Brain invents an arbitrary Tool name, the Adapter does not execute it.
 
-## 2. 릴리스별 Catalog
+## 2. Catalog by Release
 
 ### v0.1
 
-| Tool | Capability | 변경 여부 | 위험도 |
+| Tool | Capability | Mutation | Risk |
 |---|---|---:|---|
-| get_server_status | server.status | 읽기 | READ_ONLY |
-| get_online_players | player.list | 읽기 | READ_ONLY |
-| get_player | player.lookup | 읽기 | READ_ONLY |
-| get_player_location | player.location | 읽기 | READ_ONLY |
-| get_nearby_players | player.nearby | 읽기 | READ_ONLY |
-| get_world_info | world.info | 읽기 | READ_ONLY |
-| teleport_staff | staff.self_teleport | 변경 | LOW |
+| get_server_status | server.status | read-only | READ_ONLY |
+| get_online_players | player.list | read-only | READ_ONLY |
+| get_player | player.lookup | read-only | READ_ONLY |
+| get_player_location | player.location | read-only | READ_ONLY |
+| get_nearby_players | player.nearby | read-only | READ_ONLY |
+| get_world_info | world.info | read-only | READ_ONLY |
+| teleport_staff | staff.self_teleport | mutation | LOW |
 
 ### Phase 6 structured actions
 
-| Tool | Capability | 변경 여부 | 위험도 |
+| Tool | Capability | Mutation | Risk |
 |---|---|---:|---|
-| weather_set | world.weather.set | 변경 | LOW |
-| time_set | world.time.set | 변경 | LOW |
+| weather_set | world.weather.set | mutation | LOW |
+| time_set | world.time.set | mutation | LOW |
 
-두 Tool은 raw console command를 실행하지 않는다. 현재 로드된 world 한 개에 대해
-플랫폼의 직접 API만 호출하며, execution policy allowlist와 current online OP
-재검증을 모두 통과해야 한다.
+Neither Tool executes a raw console command. Each operates only on one currently loaded world
+through direct platform APIs and must pass both the execution-policy allowlist and a fresh current-online-OP
+check.
 
 ### v0.1.1
 
-| Tool | Capability | Provider | 변경 여부 |
+| Tool | Capability | Provider | Mutation |
 |---|---|---|---:|
-| lookup_area_history | history.lookup | CoreProtect | 읽기 |
-| lookup_player_history | history.lookup | CoreProtect | 읽기 |
-| get_regions_at_location | region.lookup | WorldGuard | 읽기 |
-| get_region_info | region.lookup | WorldGuard | 읽기 |
-| check_build_permission | region.protection | WorldGuard | 읽기 |
-| get_cmi_player_info | player.cmi_profile | CMI | 읽기 |
+| lookup_area_history | history.lookup | CoreProtect | read-only |
+| lookup_player_history | history.lookup | CoreProtect | read-only |
+| get_regions_at_location | region.lookup | WorldGuard | read-only |
+| get_region_info | region.lookup | WorldGuard | read-only |
+| check_build_permission | region.protection | WorldGuard | read-only |
+| get_cmi_player_info | player.cmi_profile | CMI | read-only |
 
-`get_cmi_player_info`는 T14 선택형 Paper Tool이다. UUID로 현재 접속 중인 플레이어 한 명만 조회하고, CMI nickname과 AFK 상태를 반환한다. nickname 색상 코드와 제어 문자를 제거하고 최대 64 UTF-16 단위로 제한하며, 값이 없으면 Minecraft 이름을 쓴다. 오프라인 사용자 데이터, play time, CMI warning은 조회하지 않는다. CMI API가 없거나 호출에 실패하면 `PROVIDER_UNAVAILABLE`로 닫는다.
+`get_cmi_player_info` is the optional Paper Tool introduced in T14. It looks up exactly one currently online player by UUID and returns the CMI nickname and AFK state. Nickname color codes and control characters are removed, output is limited to 64 UTF-16 units, and the Minecraft name is used when no nickname exists. It does not query offline user data, play time, or CMI warnings. If the CMI API is unavailable or the call fails, it fails closed with `PROVIDER_UNAVAILABLE`.
 
-CMI capability와 Tool은 CMI와 CMILib가 모두 활성화되고 공개 API 계약을 사용할 수 있을 때만 Paper가 광고한다. 사용자는 Zrips의 명시적 허가를 받았다고 확인했다. CMI 9.8.9.6 + CMILib 1.5.9.9 runtime smoke는 실제 서버 환경에서 별도로 확인한다.
+Paper advertises the CMI capability and Tool only when both CMI and CMILib are active and the public API contract can be used. The user confirmed explicit permission from Zrips. Runtime smoke for CMI 9.8.9.6 + CMILib 1.5.9.9 is verified separately in the real server environment.
 
-## 3. 공통 결과
+## 3. Common Results
 
-모든 Tool은 아래 wrapper를 반환한다.
+Every Tool returns the wrapper below.
 
 ~~~json
 {
@@ -78,22 +78,22 @@ CMI capability와 Tool은 CMI와 CMILib가 모두 활성화되고 공개 API 계
 
 ### status
 
-- OK: 성공했고 data가 의미 있는 결과를 포함한다.
-- EMPTY: 정상 조회했으나 컬렉션/이력이 비어 있다.
-- ERROR: 요청 실패. data=null, error 필수.
-- UNSUPPORTED: 현재 플랫폼/Provider가 기능을 제공하지 않는다. data=null, error 필수.
+- `OK`: execution succeeded and `data` contains a meaningful result.
+- `EMPTY`: the query completed normally but the collection/history is empty.
+- `ERROR`: request failed; `data=null` and `error` is required.
+- `UNSUPPORTED`: the current platform/Provider does not provide the feature; `data=null` and `error` is required.
 
-Provider가 시작 후 장애가 나면 capability를 가능한 빨리 제거한다. 이미 들어온 요청은 PROVIDER_UNAVAILABLE 또는 UNSUPPORTED로 명시적으로 실패한다.
+If a Provider fails after startup, remove its capability as quickly as possible. Existing requests fail explicitly with `PROVIDER_UNAVAILABLE` or `UNSUPPORTED`.
 
 ## 4. get_server_status
 
-입력: 빈 object.
+Input: empty object.
 
 ~~~json
 {}
 ~~~
 
-반환 metric:
+Returned metrics:
 
 - tps
 - mspt
@@ -102,15 +102,15 @@ Provider가 시작 후 장애가 나면 capability를 가능한 빨리 제거한
 - memoryUsedBytes
 - memoryMaxBytes
 
-각 metric은 value, unit, windowMs, observedAt, source를 가진다.
+Each metric contains `value`, `unit`, `windowMs`, `observedAt`, and `source`.
 
-플랫폼이 특정 지표를 안전하게 제공하지 못하면 **0을 만들지 않는다. value=null**로 반환한다.
+If a platform cannot safely provide a metric, **do not invent `0`; return `value=null`**.
 
-서버 전체를 순회하거나 chunk를 새로 로드해서 지표를 계산하지 않는다.
+Do not scan the entire server or load new chunks merely to calculate metrics.
 
 ## 5. get_online_players
 
-입력:
+Input:
 
 ~~~json
 {
@@ -119,60 +119,60 @@ Provider가 시작 후 장애가 나면 capability를 가능한 빨리 제거한
 }
 ~~~
 
-제약:
+Constraints:
 
 - limit 1~100
-- 반환 최대 100명
-- UUID + 현재 이름만 반환
-- IP, 접속 주소, 개인 채팅은 반환하지 않음
-- 다음 페이지가 있으면 nextCursor 제공
-- 전체 수를 정확히 모르면 추측하지 않음
+- return at most 100 players
+- return only UUID + current name
+- do not return IP address, connection address, or private chat
+- provide `nextCursor` if another page exists
+- do not guess the total count when it is not known exactly
 
-현재 접속자 0명은 오류가 아니라 정상적인 빈 목록이다.
+Zero online players is a normal empty list, not an error.
 
 ## 6. get_player
 
-둘 중 하나만 사용한다.
+Use exactly one of the following selectors.
 
 ~~~json
 {"playerUuid": "uuid"}
 ~~~
 
-또는:
+Or:
 
 ~~~json
 {"exactName": "Steve"}
 ~~~
 
-v0.1은 prefix/fuzzy 검색을 하지 않는다. 단일 UUID로 확인할 수 없으면 AMBIGUOUS_TARGET, 존재하지 않으면 NOT_FOUND다.
+v0.1 does not perform prefix/fuzzy search. Return `AMBIGUOUS_TARGET` if the request cannot resolve to one UUID and `NOT_FOUND` if the target does not exist.
 
-반환:
+Returns:
 
 - player.uuid
 - player.name
 - online=true
 
-오프라인 profile 대량 검색은 초기 범위에 넣지 않는다.
+Bulk offline-profile search is outside the initial scope.
 
 ## 7. get_player_location
 
-입력:
+Input:
 
 ~~~json
 {"playerUuid": "uuid"}
 ~~~
 
-제약:
+Constraints:
 
-- 대상은 현재 온라인이어야 한다.
-- 현재 로드된 서버/월드 상태에서 읽는다.
-- worldId, x/y/z, yaw/pitch와 observedAt를 반환한다.
-- offline이면 NOT_FOUND.
-- 좌표를 모델이 추정해서 보완하지 않는다.
+- target must currently be online
+- read from currently loaded server/world state
+- return `worldId`, x/y/z, yaw/pitch, and `observedAt`
+- return `NOT_FOUND` if offline
+- do not let the model infer or fill in coordinates
 
 ## 8. get_nearby_players
 
-입력:
+Input:
 
 ~~~json
 {
@@ -189,24 +189,24 @@ v0.1은 prefix/fuzzy 검색을 하지 않는다. 단일 UUID로 확인할 수 �
 }
 ~~~
 
-제약:
+Constraints:
 
-- radius > 0, 최대 64 block
-- limit 최대 100
-- 같은 world만
-- 거리 기준은 플랫폼 구현에서 일관되게 Euclidean distance
-- 조회를 위해 chunk를 새로 load하지 않는다.
-- 반환 배열에는 player와 distance를 포함한다.
+- `radius > 0`, maximum 64 blocks
+- `limit` maximum 100
+- same world only
+- use Euclidean distance consistently in the platform implementation
+- do not load new chunks for the query
+- each returned array element includes player and distance
 
 ## 9. get_world_info
 
-입력:
+Input:
 
 ~~~json
 {"worldId": "world"}
 ~~~
 
-반환 가능한 공통 정보:
+Common returnable information:
 
 - worldId
 - dimensionKey
@@ -214,37 +214,37 @@ v0.1은 prefix/fuzzy 검색을 하지 않는다. 단일 UUID로 확인할 수 �
 - difficulty
 - timeOfDay
 
-플랫폼에서 안전하게 제공하지 못하는 값은 null. world 자체를 찾지 못하면 NOT_FOUND다.
+Values a platform cannot safely provide are `null`. Return `NOT_FOUND` if the world itself does not exist.
 
 ## 10. teleport_staff
 
-입력:
+Input:
 
 ~~~json
 {"targetPlayerUuid": "uuid"}
 ~~~
 
-top-level actionId 필수.
+Top-level `actionId` is required.
 
-### 절대 규칙
+### Absolute Rules
 
-- 이동 주체는 항상 requesterUuid다.
-- arguments에 requester UUID를 받지 않는다.
-- 대상 targetPlayerUuid는 실행 직전 online 여부와 위치를 다시 확인한다.
-- requester도 실행 직전 online + OP를 다시 확인한다.
-- arbitrary coordinate 이동은 지원하지 않는다.
-- 다른 플레이어를 이동시키지 않는다.
-- 단순 "Steve 어디 있어?" 질문에서는 호출하면 안 된다.
-- 사용자가 실제로 자신을 대상에게 이동시켜 달라고 요청한 턴에서만 Brain이 제안한다.
-- Jev 장애 fallback에서는 제공하지 않는다.
+- the actor being moved is always `requesterUuid`
+- arguments never contain the requester UUID
+- re-check that `targetPlayerUuid` is online and has a current location immediately before execution
+- re-check that the requester is online + OP immediately before execution
+- arbitrary-coordinate movement is unsupported
+- do not move another player
+- do not call this Tool for a simple location question such as "Where is Steve?"
+- the Brain may propose it only on a turn where the user explicitly asks to move themselves to the target
+- do not expose it in Jev failure fallback
 
-플랫폼 teleport API가 취소/실패하면 성공 응답을 만들지 않는다. 실제 완료를 확인한 뒤 completed=true를 반환한다.
+If the platform teleport API cancels or fails, do not manufacture success. Return `completed=true` only after actual completion is confirmed.
 
-timeout/ACK 손실로 결과가 불명확하면 OUTCOME_UNKNOWN이며 자동 재실행하지 않는다.
+If timeout/ACK loss makes the result uncertain, return `OUTCOME_UNKNOWN` and do not automatically re-execute.
 
 ## 10.1 weather_set — Phase 6
 
-입력:
+Input:
 
 ~~~json
 {
@@ -254,19 +254,19 @@ timeout/ACK 손실로 결과가 불명확하면 OUTCOME_UNKNOWN이며 자동 재
 }
 ~~~
 
-제약:
+Constraints:
 
-- worldId는 현재 로드된 world만 허용한다.
-- weather는 `CLEAR / RAIN / THUNDER` 중 하나다.
-- durationSeconds는 1~3600이다.
-- requester는 실행 직전에도 online OP여야 한다.
-- 명시적인 날씨 변경 요청에서만 제안한다.
-- 구현은 platform weather API를 직접 사용하고 command 문자열을 만들지 않는다.
-- 성공 결과는 worldId, 적용 weather, durationSeconds, completed=true를 포함한다.
+- `worldId` must refer to a currently loaded world
+- `weather` must be one of `CLEAR / RAIN / THUNDER`
+- `durationSeconds` must be 1–3600
+- requester must still be an online OP immediately before execution
+- propose only for an explicit weather-change request
+- implementation uses the platform weather API directly and never constructs a command string
+- successful result includes `worldId`, applied `weather`, `durationSeconds`, and `completed=true`
 
 ## 10.2 time_set — Phase 6
 
-입력:
+Input:
 
 ~~~json
 {
@@ -275,21 +275,21 @@ timeout/ACK 손실로 결과가 불명확하면 OUTCOME_UNKNOWN이며 자동 재
 }
 ~~~
 
-제약:
+Constraints:
 
-- worldId는 현재 로드된 world만 허용한다.
-- timeOfDay는 0~23999다.
-- 현재 day count를 유지한 채 해당 world의 time-of-day만 맞춘다.
-- requester는 실행 직전에도 online OP여야 한다.
-- 명시적인 시간 변경 요청에서만 제안한다.
-- 구현은 platform world time API를 직접 사용하고 command 문자열을 만들지 않는다.
-- 성공 결과는 worldId, 실제 적용 timeOfDay, completed=true를 포함한다.
+- `worldId` must refer to a currently loaded world
+- `timeOfDay` must be 0–23999
+- preserve the current day count and change only that world's time-of-day
+- requester must still be an online OP immediately before execution
+- propose only for an explicit time-change request
+- implementation uses the platform world-time API directly and never constructs a command string
+- successful result includes `worldId`, the actually applied `timeOfDay`, and `completed=true`
 
 ## 11. lookup_area_history — v0.1.1
 
 Provider: CoreProtect.
 
-입력:
+Input:
 
 ~~~json
 {
@@ -308,32 +308,32 @@ Provider: CoreProtect.
 }
 ~~~
 
-제약:
+Constraints:
 
-- 기본 UX 범위: radius 10 / 최근 30분
+- default UX range: radius 10 / last 30 minutes
 - radius: 0~64
 - lookbackSeconds: 1~86400
 - limit: 1~100
-- radius 0은 exact block 위치 조회 용도로 사용할 수 있음
+- `radius=0` may be used for an exact-block-position query
 
-Brain이 사용자의 "최근"을 해석할 때 기본값을 제안할 수 있지만, **실제 windowStart/windowEnd는 Adapter가 실행 시각을 기준으로 고정**한다.
+When the Brain interprets phrases such as "recently," it may propose defaults, but **the Adapter fixes the actual `windowStart/windowEnd` relative to execution time**.
 
-반환:
+Returns:
 
-- records 최대 100
+- at most 100 `records`
 - returnedCount
-- totalCount: backend가 정확한 값을 제공하지 않으면 null
+- `totalCount`: `null` if the backend does not provide an exact value
 - nextCursor
 - windowStart
 - windowEnd
 
-truncated=true는 결과가 없다는 뜻이 아니다.
+`truncated=true` does not mean there were no results.
 
-CoreProtect 기록은 "이 actor 이름으로 이 변경이 기록됐다"는 사실만 제공한다. JARVIS가 의도/악의/그리핑 여부를 사실처럼 단정하지 않는다.
+CoreProtect records establish only that a change was recorded under a given actor name. JARVIS must not state intent, malice, or griefing as fact.
 
 ## 12. lookup_player_history — v0.1.1
 
-입력:
+Input:
 
 ~~~json
 {
@@ -344,32 +344,32 @@ CoreProtect 기록은 "이 actor 이름으로 이 변경이 기록됐다"는 사
 }
 ~~~
 
-시간/개수 상한은 area history와 동일하다.
+Time/count limits are the same as area history.
 
-Provider가 UUID 기반 조회를 직접 보장하지 못하고 이름 mapping에 의존해야 하면 그 한계를 source/error/운영 문서에 명시한다. 서로 다른 사용자를 같은 actor로 추정해서 합치지 않는다.
+If the Provider cannot guarantee UUID-based lookup directly and must depend on name mapping, document that limitation in source/error/operations documentation. Do not infer that different users are the same actor and merge their records.
 
 ## 13. get_regions_at_location — v0.1.1
 
 Provider: WorldGuard.
 
-입력:
+Input:
 
 ~~~json
 {"location": {"worldId":"world","x":0,"y":64,"z":0,"yaw":0,"pitch":0}}
 ~~~
 
-반환 Region summary:
+Returned Region summary:
 
 - id
 - priority
 - owners
 - members
 
-region 포함 관계와 priority는 WorldGuard API 결과를 따른다. JARVIS가 자체 region engine을 구현하지 않는다.
+Region containment and priority follow WorldGuard API results. JARVIS does not implement its own region engine.
 
 ## 14. get_region_info — v0.1.1
 
-입력:
+Input:
 
 ~~~json
 {
@@ -378,7 +378,7 @@ region 포함 관계와 priority는 WorldGuard API 결과를 따른다. JARVIS�
 }
 ~~~
 
-반환:
+Returns:
 
 - id
 - worldId
@@ -388,11 +388,11 @@ region 포함 관계와 priority는 WorldGuard API 결과를 따른다. JARVIS�
 - members
 - serializable flags
 
-flag 값은 모델에 넘기기 전에 단순 string/number/boolean/null DTO로 변환한다. Bukkit/WorldGuard object 자체를 protocol에 넣지 않는다.
+Convert flag values to simple string/number/boolean/null DTOs before sending them to the model. Never place Bukkit/WorldGuard objects themselves in the protocol.
 
 ## 15. check_build_permission — v0.1.1
 
-입력:
+Input:
 
 ~~~json
 {
@@ -408,107 +408,107 @@ flag 값은 모델에 넘기기 전에 단순 string/number/boolean/null DTO로 
 }
 ~~~
 
-반환 decision:
+Returned decision:
 
 - ALLOW
 - DENY
 - UNDEFINED
 
-추가 반환:
+Additional returned data:
 
 - bypass
 - matchedRegions
 - reason
 
-보호 판정을 owner/priority/flag 조합으로 JARVIS가 재구현하지 않는다. WorldGuard RegionQuery를 사용하고 bypass는 별도 공식 API 판정을 반영한다.
+JARVIS does not reimplement protection decisions by combining owner/priority/flags. Use WorldGuard `RegionQuery` and incorporate bypass through the separate official API decision.
 
-## 16. Capability와 Tool 노출
+## 16. Capability and Tool Exposure
 
-Brain은 capabilities.tools에 들어온 Tool만 해당 server connection의 모델에 제공한다.
+The Brain exposes to the model only Tools present in `capabilities.tools` for that server connection.
 
-예:
+Examples:
 
-- Fabric에 CoreProtect Provider 없음 -> history Tool 0개 노출
-- Paper에 WorldGuard 없음 -> region Tool 0개 노출
-- Provider version 불일치 -> plugin 파일이 있어도 Tool 0개 노출
-- Provider가 runtime 장애 -> capability 제거 후 신규 요청에 미노출
+- Fabric without a CoreProtect Provider -> expose zero history Tools
+- Paper without WorldGuard -> expose zero region Tools
+- Provider version mismatch -> expose zero Tools even if a plugin file exists
+- Provider runtime failure -> remove the capability and stop exposing it to new requests
 
-Adapter는 Brain이 이미 Tool을 알고 있더라도 **실행 때 다시 capability를 검사한다.**
+The Adapter **re-checks capability at execution time** even if the Brain already knows the Tool.
 
-## 17. Argument 검증
+## 17. Argument Validation
 
-모든 arguments는 strict schema다.
+All arguments use strict schemas.
 
-- unknown field 거부
-- string -> number 자동 coercion 금지
-- UUID/date-time format 검사
-- 상한 초과를 clamp해서 몰래 실행하지 않고 INVALID_ARGUMENT
-- 서버 object name을 입력값 그대로 command/SQL/code에 삽입하는 경로 없음
+- reject unknown fields
+- no automatic string -> number coercion
+- validate UUID/date-time formats
+- do not silently clamp values above limits; return `INVALID_ARGUMENT`
+- provide no path that interpolates server object names directly into commands/SQL/code
 
-LLM이 생성한 값은 신뢰 입력이 아니다.
+LLM-generated values are not trusted input.
 
-## 18. 데이터 최소화
+## 18. Data Minimization
 
-Tool result에는 질문 해결에 필요한 데이터만 넣는다.
+Tool results contain only data necessary to answer the question.
 
-기본 제외:
+Excluded by default:
 
 - IP
 - API key
 - shared secret
-- 전체 서버 로그
+- full server logs
 - private chat
-- 인증 token
+- authentication tokens
 - filesystem path
 - stack trace
 
-Player name, UUID, 현재 위치, region/history 정보는 해당 OP 요청 해결에 필요한 범위에서만 외부 모델로 보낸다.
+Send player name, UUID, current location, and region/history information to external models only within the scope necessary to answer the relevant OP request.
 
-## 19. T03/T04/T05 인계
+## 19. T03/T04/T05 Handoff
 
 T03:
 
-- schema의 Tool arguments/result DTO와 1:1 대응.
-- Adapter-side allowlist, capability, thread bridge, result source/observedAt 구현.
+- Keep Tool arguments/result DTOs 1:1 with the schema.
+- Implement Adapter-side allowlist, capability checks, thread bridge, and result `source/observedAt`.
 
 T04:
 
-- capability별 Tool registry 구성.
-- request당 최대 Tool 8회.
-- state-changing Tool은 fallback 경로에서 제외.
-- requester/session/server binding 확인.
+- Build the Tool registry by capability.
+- Allow at most 8 Tool calls per request.
+- Exclude state-changing Tools from fallback routes.
+- Validate requester/session/server binding.
 
 T05:
 
-- Luna function schema는 이 catalog에서 생성.
-- 모델이 schema 밖 인자를 만들면 재질문 또는 INVALID_ARGUMENT 처리.
-- Jev category는 Tool 후보를 좁힐 뿐 실행 권한을 주지 않는다.
+- Generate Luna function schemas from this catalog.
+- If the model produces arguments outside the schema, ask again or return `INVALID_ARGUMENT`.
+- Jev category narrows Tool candidates only; it does not grant execution authority.
 
 
 ## Phase 7 scheduling controls
 
 ### schedule_action
 
-예약 가능한 nested Tool:
+Schedulable nested Tools:
 
 - `teleport_staff`
 - `weather_set`
 - `time_set`
 
-입력은 nested `tool`, strict `arguments`, `delaySeconds`,
-`intervalSeconds`, `durationSeconds`를 포함한다.
+Input contains nested `tool`, strict `arguments`, `delaySeconds`,
+`intervalSeconds`, and `durationSeconds`.
 
-- delay: 1~60초
-- one-shot: interval/duration 모두 null
-- repeat: interval/duration 모두 정수이며 duration >= interval
-- duration: 최대 60초
-- scheduling.enabled=false이면 Tool 자체를 노출하지 않는다.
-- proactive origin에서는 등록하지 않는다.
+- delay: 1–60 seconds
+- one-shot: both interval and duration are null
+- repeat: interval and duration are integers and `duration >= interval`
+- duration: maximum 60 seconds
+- if `scheduling.enabled=false`, do not expose the Tool itself
+- do not register from a proactive origin
 
-등록 결과는 `scheduleId`, 첫 실행 시각, 선택적 만료 시각을 반환한다.
-실제 실행은 등록 요청의 deadline을 재사용하지 않는다.
+The registration result returns `scheduleId`, first execution time, and optional expiration time.
+Actual execution does not reuse the registration request deadline.
 
 ### cancel_scheduled_action
 
-`scheduleId` 하나를 받아 현재 requester가 소유한 pending schedule만 취소한다.
-다른 플레이어의 ID, 이미 종료된 ID, 존재하지 않는 ID는 NOT_FOUND로 처리한다.
+Accept one `scheduleId` and cancel only a pending schedule owned by the current requester.
+Return `NOT_FOUND` for another player's ID, an already-finished ID, or a nonexistent ID.

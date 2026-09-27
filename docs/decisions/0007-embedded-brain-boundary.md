@@ -1,48 +1,48 @@
-# ADR-0007: Embedded Brain 전환과 JVM 내부 권한 경계
+# ADR-0007: Embedded Brain Migration and In-JVM Authority Boundary
 
-- 상태: Accepted
-- 일자: 2026-09-26
-- 관련 작업: Embedded Brain E0–E17
-- 관련 ADR: [ADR-0003](0003-platform-thread-and-op-boundary.md), [ADR-0005](0005-jev-luna-routing-authority-boundary.md), [ADR-0006](0006-provider-abstraction-threshold.md)
+- Status: Accepted
+- Date: 2026-09-26
+- Related work: Embedded Brain E0–E17
+- Related ADRs: [ADR-0003](0003-platform-thread-and-op-boundary.md), [ADR-0005](0005-jev-luna-routing-authority-boundary.md), [ADR-0006](0006-provider-abstraction-threshold.md)
 
-## 맥락
+## Context
 
-JarvisMinecraft는 과거 Minecraft Adapter와 TypeScript Brain을 loopback WebSocket으로 분리했다. E12 parity 검증 후 E13/E14에서 해당 process boundary와 Node production Brain을 제거했고, 현재 production Brain은 Minecraft JVM 내부에 embedded된다.
+JarvisMinecraft historically separated Minecraft Adapters from a TypeScript Brain over a loopback WebSocket. After E12 parity verification, E13/E14 removed that process boundary and the Node production Brain. The production Brain is now embedded inside the Minecraft JVM.
 
-최종 배포 목표는 서버 관리자가 플랫폼별 JAR/MOD 하나와 모델 API 키만 준비하면 JARVIS를 사용할 수 있게 하는 것이다. 따라서 Brain의 세션·예산·분류·모델 orchestration을 JVM 안으로 옮기되, sidecar 구조에서 필요했던 process-boundary 상태를 Java 객체로 그대로 복제하지 않는다.
+The deployment goal is for a server administrator to run JARVIS with one platform-specific JAR/MOD plus model API keys. Session, budget, classification, and model orchestration therefore move into the JVM without recreating process-boundary state as equivalent Java objects.
 
-## 결정
+## Decision
 
-1. production Brain은 최종적으로 JVM 안의 Embedded Brain으로 전환한다.
-2. Jev와 Luna 이중 모델 구조는 유지한다.
-3. Jev는 요청 분류 및 deterministic Tool narrowing에만 사용하며 권한 근거가 아니다.
-4. Luna Tool call은 신뢰되지 않은 제안으로 취급한다.
-5. Minecraft 권한과 실제 상태의 최종 authority는 계속 `CommonRuntime`과 플랫폼 Adapter에 둔다.
-6. TypeScript Brain은 구조를 1:1 Java로 포팅하지 않고, 필요한 정책 불변조건만 이식한다.
-7. Remote Brain은 E12 parity 기준점 확보까지만 reference implementation으로 유지했으며, E13/E14에서 제거한다.
-8. AI HTTPS 호출은 비동기로 수행하며 Minecraft server/tick thread에서 기다리지 않는다.
-9. 기존 Java runtime의 `ToolName`, `ToolRegistry`, `AuditSink`, `CommonRuntime`, `RequesterAuthority`, `DeadlinePolicy`, `DeduplicationLedger`, `ServerScheduler`를 재사용한다.
-10. Tool argument shape/range/schema는 하나의 Java `ToolSpec`을 source of truth로 사용하고, protocol parser와 AI function schema가 이를 공유한다.
-11. E16부터 공식 OpenAI Java SDK runtime은 플랫폼별 단일 artifact 안에 포함한다.
-12. SDK와 Jackson/OkHttp/Kotlin 등 SDK runtime dependency package는 JARVIS 내부 namespace로 relocation해 Minecraft 플랫폼 classpath와 격리한다.
-13. Minecraft가 제공하는 Gson은 번들하지 않고 compile-only로 유지한다.
+1. The production Brain uses the in-JVM Embedded Brain.
+2. Retain the Jev + Luna dual-model architecture.
+3. Use Jev only for request classification and deterministic Tool narrowing; Jev is not authority evidence.
+4. Treat Luna Tool calls as untrusted proposals.
+5. Keep final authority over Minecraft permissions and actual state in `CommonRuntime` and the platform Adapter.
+6. Do not port the TypeScript Brain structure 1:1 to Java; migrate only required policy invariants.
+7. Keep the Remote Brain only through the E12 parity baseline; remove it in E13/E14.
+8. Perform AI HTTPS calls asynchronously and never wait for them on the Minecraft server/tick thread.
+9. Reuse existing Java runtime components: `ToolName`, `ToolRegistry`, `AuditSink`, `CommonRuntime`, `RequesterAuthority`, `DeadlinePolicy`, `DeduplicationLedger`, and `ServerScheduler`.
+10. Use one Java `ToolSpec` as the source of truth for Tool argument shape/range/schema, shared by the protocol parser and AI function schema.
+11. Starting with E16, include the official OpenAI Java SDK runtime inside each platform's single deployment artifact.
+12. Relocate SDK runtime dependency packages, including Jackson/OkHttp/Kotlin, under the JARVIS internal namespace to isolate them from Minecraft platform classpaths.
+13. Do not bundle Gson provided by Minecraft; keep it compile-only.
 
-## 유지할 정책 불변조건
+## Policy Invariants to Preserve
 
-- 현재 접속 중인 OP만 요청을 수락한다.
-- 실행 직전 current online OP를 다시 확인한다.
-- request/session binding을 유지한다.
-- 활성 Tool/capability allowlist를 유지한다.
-- strict Tool argument validation을 유지한다.
-- request deadline, Tool call budget, model round budget을 유지한다.
-- session별 AI 요청을 직렬화하고 bounded queue를 유지한다.
-- state-changing Tool은 pre-execution audit 성공 후에만 실행한다.
-- state-changing 결과가 deadline 안에 확정되지 않으면 `OUTCOME_UNKNOWN`으로 남긴다.
-- state-changing Tool은 자동 retry하지 않는다.
-- deop/logout/session-end race에서 stale Tool 실행과 stale 응답 전달을 차단한다.
-- optional Provider가 실제로 활성화되지 않으면 관련 Tool을 Luna에 노출하지 않는다.
+- Accept requests only from currently online OPs.
+- Re-check current online OP immediately before execution.
+- Preserve request/session binding.
+- Preserve the active Tool/capability allowlist.
+- Preserve strict Tool argument validation.
+- Preserve request deadline, Tool-call budget, and model-round budget.
+- Serialize AI requests per session and keep the queue bounded.
+- Execute state-changing Tools only after successful pre-execution audit.
+- If a state-changing result cannot be determined before the deadline, return `OUTCOME_UNKNOWN`.
+- Never automatically retry state-changing Tools.
+- Block stale Tool execution and stale response delivery across de-op/logout/session-end races.
+- Do not expose optional Provider Tools to Luna unless the Provider is actually active.
 
-## Embedded 목표 호출 흐름
+## Target Embedded Call Flow
 
 ```text
 Minecraft Chat
@@ -59,7 +59,7 @@ Tool proposal
   ↓
 ToolArgumentCodec
   ↓
-route / active Tool 확인
+route / active Tool check
   ↓
 ToolExecutionCoordinator / ScheduledToolCoordinator
   ↓
@@ -76,31 +76,31 @@ Tool result
 Luna final response
 ```
 
-## 상태의 단일 소유권
+## Single Ownership of State
 
-### Session lifecycle
+### Session Lifecycle
 
-`ChatSessionManager`가 session ID, TTL, active 여부, 종료/invalidate를 소유한다.
+`ChatSessionManager` owns session IDs, TTL, active state, termination, and invalidation.
 
-Embedded Brain은 별도의 session TTL store를 두지 않는다. 모델 대화 이력만 `ConversationHistoryStore`에 저장한다.
+The Embedded Brain does not maintain a separate session TTL store. It stores only model conversation history in `ConversationHistoryStore`.
 
-### Tool metadata
+### Tool Metadata
 
-`Protocol.ToolName`이 Tool의 정적 metadata인 wire name, capability, state-changing 여부, risk의 source of truth다.
+`Protocol.ToolName` is the source of truth for static Tool metadata: wire name, capability, state-changing flag, and risk.
 
-`ToolRegistry`는 현재 서버에서 실제 등록된 Tool set을 소유한다. 별도 `BrainToolCatalog`은 만들지 않는다.
+`ToolRegistry` owns the set of Tools actually registered on the current server. Do not introduce a separate `BrainToolCatalog`.
 
-### Tool argument validation
+### Tool Argument Validation
 
-`ToolSpec`이 field shape, UUID/range/selector 제약과 AI function schema metadata를 단일 소유한다. Remote protocol과 Embedded Luna function call은 같은 `ToolArgumentCodec` facade를 통해 `ToolSpec` validation을 사용하므로 unknown/missing field, UUID, range, selector shape 검증을 별도로 복제하지 않는다.
+`ToolSpec` exclusively owns field shapes, UUID/range/selector constraints, and AI function-schema metadata. The preserved Remote protocol and Embedded Luna function calls both use the same `ToolArgumentCodec` facade over `ToolSpec` validation, so unknown/missing fields, UUIDs, ranges, and selector shapes are not implemented twice.
 
 ### Audit
 
-Embedded Brain은 기존 Java `AuditSink` contract를 사용한다. 별도 `AuditPort`를 만들지 않는다.
+The Embedded Brain uses the existing Java `AuditSink` contract. Do not introduce a separate `AuditPort`.
 
-## Embedded에서 재현하지 않을 sidecar 상태
+## Sidecar State Not Recreated in Embedded Mode
 
-다음은 WebSocket/process boundary가 존재하기 때문에 필요한 상태다. Embedded 경로에는 새 abstraction으로 옮기지 않는다.
+The following state existed only because of the WebSocket/process boundary and should not be moved into new Embedded abstractions:
 
 ```text
 Brain-side connection registry
@@ -114,16 +114,16 @@ Brain-side AdapterPort
 remote Tool result connection binding
 ```
 
-E13/E14 완료 후 위 상태와 abstraction은 production source에서 제거되었다.
+After E13/E14, this state and the related abstractions were removed from production source.
 
-## 단계적 전환
+## Migration Sequence
 
 ```text
 BrainGateway seam
   ↓
-공용 Java contract 정리
+shared Java contract cleanup
   ↓
-Conversation history / budget / scheduler
+conversation history / budget / scheduler
   ↓
 Jev / route / Luna
   ↓
@@ -131,31 +131,31 @@ EmbeddedBrain orchestration
   ↓
 Remote/Embedded policy parity
   ↓
-WebSocket 제거
+WebSocket removal
   ↓
-Node Brain 제거
+Node Brain removal
 ```
 
-E12 shared fixture에서 deterministic policy parity와 핵심 safety invariant를 검증한 뒤 E13에서 WebSocket 경계를, E14에서 Node production Brain을 제거했다. 과거 protocol/eval/evidence 자산은 보존한다.
+After E12 shared fixtures verified deterministic policy parity and key safety invariants, E13 removed the WebSocket boundary and E14 removed the Node production Brain. Historical protocol/evaluation/evidence assets are retained.
 
-## 결과
+## Consequences
 
-### 장점
+### Benefits
 
-- 최종 운영자는 Node.js/npm/Brain daemon을 관리하지 않는다.
-- process-boundary 전용 상태와 설정을 제거할 수 있다.
-- Java에 이미 있는 authority, Tool registry, dedupe, deadline 정책을 재사용한다.
-- session lifecycle, Tool metadata, Tool argument 검증의 이중 소유를 줄인다.
+- Operators no longer manage Node.js/npm or a Brain daemon.
+- Process-boundary-only state and configuration can be removed.
+- Existing Java authority, Tool registry, dedupe, and deadline policies are reused.
+- Reduces duplicate ownership of session lifecycle, Tool metadata, and Tool argument validation.
 
-### 비용
+### Costs
 
-- TypeScript Brain 정책을 Java로 의미 보존 이식해야 한다.
-- E12까지 Remote/Embedded 두 경로를 유지하는 일시적 migration 비용이 발생했다.
-- Jev/Luna JVM client와 audit sink 구현이 필요하다.
+- TypeScript Brain policy required a semantics-preserving migration to Java.
+- Remote and Embedded paths temporarily coexisted through E12.
+- JVM Jev/Luna clients and an audit-sink implementation were required.
 
-## E16 packaging 결정
+## E16 Packaging Decision
 
-OpenAI Java SDK packaging 전략은 E16에서 확정했다.
+The OpenAI Java SDK packaging strategy was finalized in E16.
 
 ```text
 platform artifact
@@ -165,4 +165,4 @@ platform artifact
        └─ io.github.kardane.jarvisminecraft.internal.shaded.*
 ```
 
-각 플랫폼 artifact는 하나의 배포 JAR/MOD로 생성하며, 정적 artifact 검사와 clean-server boot smoke로 packaging/classloader 경계를 검증한다. Jev는 JDK `HttpClient` 경로를 유지하므로 별도 third-party HTTP runtime을 추가하지 않는다.
+Each platform produces one deployment JAR/MOD. Static artifact checks and clean-server boot smoke tests verify packaging/classloader boundaries. Jev continues to use JDK `HttpClient`, so no separate third-party HTTP runtime is added.

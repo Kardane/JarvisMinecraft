@@ -58,9 +58,9 @@ No permission-node/model field is accepted as OP evidence.
 ### Public chat sessions
 
 Direct aliases:
-- 자비스
+- `자비스` — Korean wake-word literal (`Jarvis`);
 - jarvis, case-insensitive
-- 재비스
+- `재비스` — alternate Korean wake-word literal;
 
 Rules:
 - non-OP chat is never sent to Brain;

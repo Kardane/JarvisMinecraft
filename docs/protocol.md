@@ -1,39 +1,39 @@
-# Minecraft JARVIS 통신 계약 1.0
+# Minecraft JARVIS Communication Contract 1.0
 
-> **E14 status (2026-09-27):** 이 문서는 Remote Brain 시절의 protocol 1.0 계약을 보존하는 역사적/호환성 자료다. 현재 production runtime에는 Adapter ↔ Brain WebSocket 경계가 없으며, 권한·Tool·deadline·deduplication 정책은 JVM 내부 `EmbeddedBrain`과 `CommonRuntime`에서 직접 집행한다. 아래 wire 세부사항을 현재 운영 절차로 해석하지 않는다.
+> **E14 status (2026-09-27):** This document preserves the protocol 1.0 contract from the Remote Brain era as historical/compatibility material. The current production runtime has no Adapter ↔ Brain WebSocket boundary; authority, Tool, deadline, and deduplication policies are enforced directly inside the JVM by `EmbeddedBrain` and `CommonRuntime`. Do not interpret the wire details below as current operational procedures.
 
-작성일: 2026-09-24  
-관련 작업: T01  
-선행 기준: docs/compatibility.md, docs/tools.md
-정규 스키마: ../protocol/schema/protocol.schema.json
+Date: 2026-09-24  
+Related work: T01  
+Prerequisites: docs/compatibility.md, docs/tools.md
+Canonical schema: ../protocol/schema/protocol.schema.json
 
-## 1. 목적과 적용 범위
+## 1. Purpose and Scope
 
-이 문서는 Minecraft Adapter(Paper/Fabric/NeoForge)와 TypeScript Brain 사이의 **언어 중립 통신 계약**을 고정한다. T03~T10 구현은 이 계약을 소비하며 플랫폼별 편의를 이유로 envelope, 권한 의미, 오류 의미를 독자적으로 바꾸지 않는다.
+This document fixes the **language-neutral communication contract** between Minecraft Adapters (Paper/Fabric/NeoForge) and the historical TypeScript Brain. T03–T10 implementations consume this contract and must not independently change envelope, authority, or error semantics for platform convenience.
 
-현재 protocol version은 **1.0**이다.
+The current protocol version is **1.0**.
 
-T01은 wire contract만 고정한다. WebSocket 라이브러리, Java/TypeScript serializer/validator 구현, build/CI 연결은 T02/T03/T04 범위다.
+T01 fixes the wire contract only. WebSocket library choice, Java/TypeScript serializer/validator implementation, and build/CI integration belong to T02/T03/T04.
 
-## 2. 전송 계층
+## 2. Transport Layer
 
-- Brain이 loopback 주소에 WebSocket 서버를 연다.
-- Adapter가 Brain에 연결한다.
-- HTTP Upgrade 요청에서 공유 비밀을 **X-Jarvis-Secret** 헤더로 전달한다.
-- 비밀은 URL, query string, protocol JSON, audit log에 넣지 않는다.
-- Brain은 공유 비밀을 상수 시간 비교 방식으로 검증해야 한다.
-- 빈 비밀, 샘플 비밀, 인증 실패는 연결을 거부한다.
-- 인증 후에도 hello 검증이 끝나기 전에는 hello 외 업무 메시지를 처리하지 않는다.
-- 한 WebSocket message에는 UTF-8 JSON object 하나만 담는다.
-- 최대 message 크기는 **65,536 bytes**다. byte 상한은 JSON parse 전에 적용한다.
-- 압축 사용 여부는 구현 단계에서 결정할 수 있으나 해제 후 payload가 상한을 우회해서는 안 된다.
+- The Brain opens a WebSocket server on a loopback address.
+- The Adapter connects to the Brain.
+- The shared secret is sent in the **X-Jarvis-Secret** header during the HTTP Upgrade request.
+- Never place the secret in the URL, query string, protocol JSON, or audit log.
+- The Brain must compare the shared secret in constant time.
+- Reject empty secrets, sample secrets, and failed authentication.
+- Even after authentication, process no business message except `hello` until hello validation succeeds.
+- Each WebSocket message contains exactly one UTF-8 JSON object.
+- Maximum message size is **65,536 bytes**. Apply the byte limit before JSON parsing.
+- Compression may be chosen by the implementation, but the decompressed payload must not bypass the size limit.
 
-## 3. 연결 상태 전이
+## 3. Connection State Transitions
 
 ~~~text
 DISCONNECTED
     |
-    | WebSocket upgrade + secret 검증
+    | WebSocket upgrade + secret validation
     v
 TRANSPORT_AUTHENTICATED
     |
@@ -51,66 +51,66 @@ ACTIVE
 DISCONNECTED
 ~~~
 
-규칙:
+Rules:
 
-1. Adapter hello의 serverId가 인증된 연결에 결합된다.
-2. 같은 연결의 이후 모든 메시지는 같은 serverId를 사용해야 한다.
-3. capabilities는 재접속마다 다시 교환한다.
-4. 재접속은 새 연결이다. 이전 연결의 session/action을 자동 부활시키지 않는다.
-5. protocol major가 맞지 않으면 UNSUPPORTED로 종료한다.
-6. 현재 1.0 구현은 정확히 protocolVersion="1.0"만 허용한다.
+1. The Adapter hello `serverId` is bound to the authenticated connection.
+2. Every later message on the same connection must use the same `serverId`.
+3. Capabilities are exchanged again on every reconnect.
+4. A reconnect is a new connection. Do not automatically revive sessions/actions from the previous connection.
+5. If the protocol major version is incompatible, terminate with `UNSUPPORTED`.
+6. The current 1.0 implementation accepts exactly `protocolVersion="1.0"`.
 
-## 4. 공통 Envelope
+## 4. Common Envelope
 
-모든 protocol message는 아래 필드를 **전부 포함**한다. 사용하지 않는 식별자는 생략하지 않고 null을 보낸다.
+Every protocol message includes **all** fields below. Identifiers that are not used are sent as `null` rather than omitted.
 
-| 필드 | 형식 | 의미 |
+| Field | Format | Meaning |
 |---|---|---|
-| protocolVersion | "1.0" | wire contract 버전 |
+| protocolVersion | "1.0" | wire-contract version |
 | type | string | message type discriminator |
-| messageId | UUID | 개별 wire message 식별자 |
-| requestId | UUID 또는 null | 하나의 사용자 요청과 그 Tool loop 전체의 식별자 |
-| serverId | 1~64자 | 인증된 Minecraft 서버 식별자 |
-| sessionId | UUID 또는 null | OP 대화 세션 식별자 |
-| requesterUuid | UUID 또는 null | 요청한 실제 Minecraft 플레이어 UUID |
-| sentAt | RFC3339 date-time | 송신 시각 |
-| deadlineAt | RFC3339 date-time 또는 null | 해당 요청이 더 이상 유효하지 않은 절대 시각 |
-| payload | object | type별 payload |
+| messageId | UUID | identifier for an individual wire message |
+| requestId | UUID or null | identifier spanning one user request and its entire Tool loop |
+| serverId | 1–64 chars | authenticated Minecraft server identifier |
+| sessionId | UUID or null | OP conversation session identifier |
+| requesterUuid | UUID or null | UUID of the actual Minecraft player making the request |
+| sentAt | RFC3339 date-time | send time |
+| deadlineAt | RFC3339 date-time or null | absolute time after which the request is no longer valid |
+| payload | object | payload for the message type |
 
-Tool message에는 추가로 toolCallId가 존재한다. 상태 변경 Tool에는 actionId도 존재한다.
+Tool messages additionally carry `toolCallId`. State-changing Tools also carry `actionId`.
 
-### 식별자 의미
+### Identifier Semantics
 
-- messageId: 각 송신마다 새 값. transport 중복 판별용.
-- requestId: 한 OP 메시지부터 최종 chat.response까지 유지한다.
-- sessionId: 직접 호출로 시작한 120초 대화 범위에서 유지한다.
-- toolCallId: 하나의 Tool 시도 식별자. 같은 requestId 안에서도 Tool마다 다르다.
-- actionId: 서버 상태를 바꾸는 1회성 작업 식별자. v0.1에서는 teleport_staff에만 사용한다.
+- `messageId`: new value for each send; used for transport-duplicate detection.
+- `requestId`: remains constant from one OP message through the final `chat.response`.
+- `sessionId`: remains constant within the 120-second conversation started by a direct invocation.
+- `toolCallId`: identifies one Tool attempt; each Tool call gets a different value even within the same `requestId`.
+- `actionId`: identifies one state-changing operation. In v0.1, it is used only by `teleport_staff`.
 
-requesterUuid는 **권한 증거가 아니다**. Adapter가 실제 접수한 요청과 binding을 검증하기 위한 식별자일 뿐이다.
+`requesterUuid` is **not authority evidence**. It is only an identifier used to validate binding against the request actually admitted by the Adapter.
 
-## 5. 메시지 종류와 방향
+## 5. Message Types and Direction
 
-| type | 방향 | request/session/requester | 설명 |
+| type | Direction | request/session/requester | Description |
 |---|---|---|---|
-| hello | 양방향 | null | protocol/platform instance 확인 |
-| capabilities | Adapter -> Brain | null | 현재 실제로 사용할 수 있는 capability/Tool 목록 |
-| chat.message | Adapter -> Brain | 필수 | OP가 보낸 JARVIS 입력. 입력은 서버 채팅에 공개 유지 |
-| chat.response | Brain -> Adapter | 필수 | 요청 세션에 연결된 평문 응답. Adapter는 요청자의 OP 권한과 세션을 재검사한 뒤 전체 접속자에게 공개 |
-| tool.request | Brain -> Adapter | 필수 | allowlist Tool 실행 요청 |
-| tool.result | Adapter -> Brain | 필수 | 구조화된 Tool 결과 |
-| cancel | 양방향 | requestId 필수 | 진행 요청의 best-effort 취소 |
-| error | 양방향 | 상황에 따라 null | connection/request 수준 오류 |
-| ping | 양방향 | null | keepalive |
-| pong | 양방향 | null | ping 응답 |
+| hello | bidirectional | null | verify protocol/platform instance |
+| capabilities | Adapter -> Brain | null | list of capabilities/Tools actually available now |
+| chat.message | Adapter -> Brain | required | JARVIS input sent by an OP; input remains visible in server chat |
+| chat.response | Brain -> Adapter | required | plain-text response bound to the request session; Adapter re-checks requester OP authority and session, then broadcasts to all connected players |
+| tool.request | Brain -> Adapter | required | allowlisted Tool execution request |
+| tool.result | Adapter -> Brain | required | structured Tool result |
+| cancel | bidirectional | requestId required | best-effort cancellation of an in-progress request |
+| error | bidirectional | nullable by context | connection/request-level error |
+| ping | bidirectional | null | keepalive |
+| pong | bidirectional | null | ping response |
 
-Tool 실행 자체의 실패는 error message가 아니라 **tool.result의 ERROR/UNSUPPORTED 상태**로 표현한다. error message는 protocol/connection/request orchestration 실패에 사용한다.
+Tool-execution failure is represented as **`ERROR`/`UNSUPPORTED` in `tool.result`**, not as an `error` message. The `error` message is reserved for protocol/connection/request-orchestration failures.
 
-## 6. Hello와 Capability
+## 6. Hello and Capability
 
 ### Adapter hello
 
-포함 정보:
+Included information:
 
 - adapterInstanceId
 - platform: paper / fabric / neoforge
@@ -118,7 +118,7 @@ Tool 실행 자체의 실패는 error message가 아니라 **tool.result의 ERRO
 - adapterVersion
 - platformVersion
 
-Brain은 이 값으로 권한을 추정하지 않는다. 호환되지 않는 platform/version이면 연결을 명시적으로 거부한다.
+The Brain does not infer authority from these values. An incompatible platform/version is rejected explicitly.
 
 ### Brain hello
 
@@ -126,13 +126,13 @@ Brain은 이 값으로 권한을 추정하지 않는다. 호환되지 않는 pla
 - brainVersion
 - accepted=true
 
-accepted=false 형태는 protocol에 두지 않는다. 거부는 error 후 연결 종료로 처리한다.
+There is no `accepted=false` form in the protocol. Rejection is represented by `error` followed by connection close.
 
 ### Capability
 
-capability가 존재하려면 **실제 runtime 검증이 끝난 Provider/플랫폼 기능**이어야 한다. 단순 플러그인 파일 존재는 capability가 아니다.
+A capability exists only after **real runtime verification of the Provider/platform feature**. Mere plugin-file presence is not a capability.
 
-초기 capability 이름:
+Initial capability names:
 
 - server.status
 - player.list
@@ -145,113 +145,113 @@ capability가 존재하려면 **실제 runtime 검증이 끝난 Provider/플랫�
 - region.lookup
 - region.protection
 
-Brain은 capabilities 메시지의 tools 배열에 없는 Tool을 모델에 제공하지 않는다. Adapter는 그래도 실행 시점에 다시 allowlist/capability를 검사한다.
+The Brain does not expose a Tool to the model if it is absent from the `tools` array in the capabilities message. The Adapter still re-checks allowlist/capability at execution time.
 
-## 7. OP 및 Actor 계약
+## 7. OP and Actor Contract
 
-v0.1의 유일한 상호작용 주체는 **현재 접속 중이며 서버가 실제 OP로 인정한 플레이어**다.
+The only v0.1 interaction actor is a player who is **currently online and actually recognized as OP by the server**.
 
-권위 있는 판정:
+Authoritative checks:
 
-- Paper: server API의 isOp()
+- Paper: server API `isOp()`
 - Fabric: PlayerManager.isOperator(GameProfile)
-- NeoForge: vanilla operator registry/PlayerList의 실제 판정
+- NeoForge: actual vanilla operator registry / `PlayerList` check
 
-다음 값은 권한 근거가 아니다.
+The following are not authority evidence:
 
-- Brain 내부 플래그
-- LLM 출력
-- 요청 JSON의 임의 boolean
-- jarvis.* permission node만 단독으로 충족한 상태
+- Brain-internal flags
+- LLM output
+- arbitrary booleans in request JSON
+- satisfying only a `jarvis.*` permission node
 
-의도적으로 protocol schema에는 isOp 필드를 두지 않는다.
+The protocol schema intentionally has no `isOp` field.
 
-Adapter는 최소 세 번 권한을 재검사한다.
+The Adapter re-checks authority at least three times:
 
-1. chat.message 접수 직전
-2. tool.request 실행 직전
-3. chat.response 전달 직전
+1. immediately before accepting `chat.message`
+2. immediately before executing `tool.request`
+3. immediately before delivering `chat.response`
 
-deop 또는 logout이 확인되면 session을 폐기하고 진행 중 변경 실행을 새로 시작하지 않는다.
+If de-op or logout is observed, discard the session and do not begin new in-progress mutation execution.
 
-## 8. 채팅 세션 계약
+## 8. Chat Session Contract
 
 ~~~text
 NONE
   |
-  | OP가 독립 호출어로 시작
+  | OP starts with an independent wake word
   v
-ACTIVE (TTL 120초)
+ACTIVE (TTL 120 seconds)
   |  accepted follow-up
   |--------------------+
   |                    |
   +---- TTL refresh <--+
   |
-  +--> "대화 끝" -> ENDED
+  +--> "대화 끝" (end conversation) -> ENDED
   |
-  +--> 120초 무입력 -> EXPIRED
+  +--> 120 seconds idle -> EXPIRED
   |
   +--> deop/logout/disconnect -> INVALIDATED
 ~~~
 
-Adapter가 처리할 규칙:
+Adapter rules:
 
-- 직접 호출 alias: 자비스 / jarvis / 재비스
-- 메시지 시작의 독립 호출어만 인정한다.
-- 영문은 대소문자를 무시한다.
-- 자비스팅 같은 부분 문자열은 호출로 취급하지 않는다.
-- 활성 세션의 "대화 끝"은 Brain에 보내지 않고 종료한다.
-- 활성 세션의 "!내용"은 해당 메시지만 일반 채팅으로 보내고 Brain에 보내지 않는다.
-- 비OP 일반 채팅은 Brain이나 모델로 전송하지 않는다.
-- OP의 JARVIS 입력은 서버 채팅에 남고 JARVIS 응답은 전체 접속자에게 방송한다. Brain에는 해당 OP가 보낸 JARVIS 입력만 전달한다.
+- Direct-invocation aliases: `자비스` / `jarvis` / `재비스`.
+- Accept a wake word only when it is an independent token at the start of the message.
+- English matching is case-insensitive.
+- Do not treat a substring such as `자비스팅` as an invocation.
+- In an active session, `"대화 끝"` terminates locally and is not sent to the Brain.
+- In an active session, `"!내용"` sends only that message as ordinary chat and does not send it to the Brain.
+- Do not send ordinary non-OP chat to the Brain or model.
+- Keep OP JARVIS input visible in server chat and broadcast JARVIS responses to all connected players. Send only that OP's JARVIS input to the Brain.
 
-세션 key는 (serverId, requesterUuid, sessionId)다. 이름은 key로 사용하지 않는다.
+The session key is `(serverId, requesterUuid, sessionId)`. Do not use player name as a key.
 
-## 9. 요청 직렬화와 예산
+## 9. Request Serialization and Budgets
 
-세션 하나에서는 사용자 요청을 직렬화한다.
+Serialize user requests within a session.
 
-초기 한도:
+Initial limits:
 
-- session당 실행 중 1건
-- session당 대기 2건
-- server당 실행 중 대화 4건
-- 전체 대기 16건
-- request당 Tool 최대 8회
-- request당 모델 왕복 최대 4회
-- 전체 request deadline 30초
-- Jev deadline 3초
-- 일반 조회 Tool deadline 5초
+- 1 in-flight request per session
+- 2 queued requests per session
+- 4 in-flight conversations per server
+- 16 queued requests globally
+- at most 8 Tool calls per request
+- at most 4 model round trips per request
+- 30-second overall request deadline
+- 3-second Jev deadline
+- 5-second ordinary read-only Tool deadline
 
-상한을 넘으면 BUSY 또는 TIMEOUT으로 종료하고 무제한 queue를 만들지 않는다.
+If a limit is exceeded, terminate with `BUSY` or `TIMEOUT`; never create an unbounded queue.
 
-deadlineAt은 절대 시각이다. 수신자는 자체 제한과 들어온 deadline 중 더 이른 값을 사용한다. deadlineAt <= sentAt인 업무 메시지는 INVALID_ARGUMENT으로 거절한다.
+`deadlineAt` is an absolute timestamp. The receiver uses the earlier of its own limit and the incoming deadline. Reject a business message where `deadlineAt <= sentAt` with `INVALID_ARGUMENT`.
 
-## 10. Tool 실행과 중복 방지
+## 10. Tool Execution and Deduplication
 
 ### Read-only Tool
 
-actionId는 반드시 null이다.
+`actionId` must be `null`.
 
-같은 연결에서 이미 본 toolCallId가 다시 오면:
+If the same `toolCallId` is seen again on the same connection:
 
-- 실행 중이면 BUSY를 반환한다.
-- terminal result를 보관 중이면 같은 terminal result를 재사용할 수 있다.
-- 새 Tool 실행으로 간주해서 호출량을 증폭시키지 않는다.
+- return `BUSY` if it is still executing;
+- reuse the same terminal result if one is retained;
+- do not treat it as a new Tool execution and amplify calls.
 
 ### State-changing Tool
 
-v0.1에서는 teleport_staff만 해당한다.
+In v0.1 this applies only to `teleport_staff`.
 
-- actionId는 UUID 필수.
-- Adapter가 actionId별 실행 상태를 보관한다.
-- 동일 actionId를 두 번 실행하지 않는다.
-- ACK/result 손실로 결과를 확인할 수 없으면 OUTCOME_UNKNOWN이다.
-- OUTCOME_UNKNOWN을 자동 재실행하지 않는다.
-- 재접속 후 이전 connection/session의 state-changing request는 거부한다.
-- network timeout은 Minecraft 변경이 취소됐다는 증거가 아니다.
+- `actionId` is a required UUID.
+- The Adapter stores execution state by `actionId`.
+- Never execute the same `actionId` twice.
+- If ACK/result loss makes the outcome impossible to confirm, return `OUTCOME_UNKNOWN`.
+- Never automatically re-execute `OUTCOME_UNKNOWN`.
+- After reconnect, reject state-changing requests from a previous connection/session.
+- A network timeout is not evidence that the Minecraft mutation was cancelled.
 
-초기 action state:
+Initial action states:
 
 ~~~text
 UNSEEN
@@ -263,9 +263,9 @@ EXECUTING
   +------> OUTCOME_UNKNOWN
 ~~~
 
-## 11. 취소
+## 11. Cancellation
 
-cancel은 best-effort orchestration 신호다.
+`cancel` is a best-effort orchestration signal.
 
 reason:
 
@@ -275,158 +275,158 @@ reason:
 - OP_REVOKED
 - SHUTDOWN
 
-이미 완료된 Tool을 되돌리는 의미가 아니다. 특히 상태 변경이 시작된 후 cancel/timeout이 왔다고 해서 실패나 rollback으로 추측하지 않는다.
+It does not mean undoing an already completed Tool. In particular, do not infer failure or rollback merely because cancel/timeout arrives after a mutation has started.
 
-## 12. Tool Result 공통 계약
+## 12. Common Tool Result Contract
 
-모든 Tool result에는 다음 필드가 있다.
+Every Tool result contains these fields:
 
-| 필드 | 의미 |
+| Field | Meaning |
 |---|---|
 | status | OK / EMPTY / ERROR / UNSUPPORTED |
-| data | Tool별 구조화 데이터. ERROR/UNSUPPORTED에서는 null |
-| error | ERROR/UNSUPPORTED에서 구조화 오류. OK/EMPTY에서는 null |
-| observedAt | 서버/Provider가 해당 사실을 관측한 시각 |
-| source | Paper, Fabric, NeoForge, CoreProtect, WorldGuard 등 실제 출처 |
-| truncated | 제한 때문에 결과 일부만 반환했는지 |
+| data | Tool-specific structured data; null for ERROR/UNSUPPORTED |
+| error | structured error for ERROR/UNSUPPORTED; null for OK/EMPTY |
+| observedAt | time the server/Provider observed the fact |
+| source | actual source such as Paper, Fabric, NeoForge, CoreProtect, or WorldGuard |
+| truncated | whether only part of the result was returned because of limits |
 
-EMPTY는 정상적으로 조회했지만 기록/목록이 비어 있음을 뜻한다. NOT_FOUND는 특정 요구 대상 자체를 찾지 못한 오류다. 둘을 혼동하지 않는다.
+`EMPTY` means the query completed normally but its record/list is empty. `NOT_FOUND` means the requested target itself does not exist. Do not conflate them.
 
-## 13. 오류 코드
+## 13. Error Codes
 
-고정 오류 코드:
+Fixed error codes:
 
-| 코드 | 의미 |
+| Code | Meaning |
 |---|---|
-| UNAUTHORIZED | 인증/현재 OP/actor binding 실패 |
-| INVALID_ARGUMENT | schema 이후 의미 검증 실패 포함 |
-| UNSUPPORTED | protocol/capability/기능 미지원 |
-| NOT_FOUND | 정확한 대상 없음 |
-| AMBIGUOUS_TARGET | 단일 UUID로 확정할 수 없음 |
-| BUSY | queue/동일 Tool 실행/동시성 상한 |
-| TIMEOUT | deadline 내 완료 불가 |
-| PROVIDER_UNAVAILABLE | 등록 Provider가 현재 장애 |
-| CANCELLED | 명시 취소 |
-| OUTCOME_UNKNOWN | 변경 결과를 안전하게 확정 불가 |
-| INTERNAL | 외부에 세부 stack을 노출하지 않는 내부 실패 |
+| UNAUTHORIZED | authentication/current OP/actor-binding failure |
+| INVALID_ARGUMENT | includes semantic validation failure after schema validation |
+| UNSUPPORTED | unsupported protocol/capability/feature |
+| NOT_FOUND | exact target does not exist |
+| AMBIGUOUS_TARGET | cannot resolve to one UUID |
+| BUSY | queue/same-Tool execution/concurrency limit |
+| TIMEOUT | cannot complete before deadline |
+| PROVIDER_UNAVAILABLE | registered Provider is currently unavailable |
+| CANCELLED | explicit cancellation |
+| OUTCOME_UNKNOWN | cannot safely determine mutation outcome |
+| INTERNAL | internal failure whose detailed stack must not be exposed |
 
-error.message는 플레이어에게 노출 가능한 안전한 문장이어야 한다. API key, stack trace, SQL, filesystem secret을 넣지 않는다.
+`error.message` must be a safe sentence suitable for player display. Never include API keys, stack traces, SQL, or filesystem secrets.
 
-## 14. 재시도 규칙
+## 14. Retry Rules
 
-- 상태 변경 Tool은 자동 재시도하지 않는다.
-- read-only Tool은 deadline 안에서만 제한적으로 재시도할 수 있다.
-- 같은 장애에 SDK retry와 JARVIS retry를 중첩해 호출량을 증폭하지 않는다.
-- retry는 새로운 toolCallId를 만들지 않는다. 같은 논리 Tool 시도에 대한 transport retry는 원래 toolCallId를 유지한다.
-- Provider가 결과를 반환했는지 불명확한 상태 변경은 OUTCOME_UNKNOWN으로 끝낸다.
+- Never automatically retry state-changing Tools.
+- Read-only Tools may be retried only within the deadline and under bounded policy.
+- Do not stack SDK retries and JARVIS retries for the same failure and amplify call volume.
+- Retry does not create a new `toolCallId`. A transport retry of the same logical Tool attempt retains the original `toolCallId`.
+- If it is unclear whether a Provider returned a result for a state-changing operation, terminate with `OUTCOME_UNKNOWN`.
 
-## 15. Plain Text 출력
+## 15. Plain-Text Output
 
-chat.response.payload.text는 **항상 평문**이다.
+`chat.response.payload.text` is **always plain text**.
 
-Adapter는 모델 문자열을 다음으로 해석하지 않는다.
+The Adapter does not interpret model strings as:
 
 - MiniMessage markup
-- 클릭 가능한 command
+- clickable commands
 - console command
 - JSON chat component command
-- URL 기반 자동 실행
+- URL-based automatic execution
 
-Minecraft 플랫폼별 색상/브랜딩이 필요하면 Adapter가 신뢰 가능한 고정 prefix만 추가한다.
+If platform-specific color/branding is needed, the Adapter may add only a trusted fixed prefix.
 
-## 16. Schema 밖에서 반드시 검증할 의미 조건
+## 16. Semantic Conditions That Must Be Validated Outside Schema
 
-JSON Schema 통과는 실행 허가가 아니다. 다음은 runtime validation이다.
+Passing JSON Schema is not execution authorization. The following are runtime validations:
 
 - raw UTF-8 message <= 65,536 bytes
 - deadlineAt > sentAt
-- 연결에 bind된 serverId와 일치
-- requestId/sessionId/requesterUuid가 Adapter가 실제 등록한 요청과 일치
-- 현재 requester가 online + OP
-- 현재 capability/tool allowlist에 존재
-- request 예산/queue 상한
-- Tool별 서버 상태 조건
-- teleport_staff의 명시 이동 요청 여부
-- actionId/toolCallId 중복
-- result 전달 전 requester의 online + OP 재검사
+- matches the `serverId` bound to the connection
+- `requestId/sessionId/requesterUuid` match a request actually registered by the Adapter
+- requester is currently online + OP
+- currently present in capability/Tool allowlist
+- request budget/queue limits
+- Tool-specific server-state conditions
+- explicit movement intent for `teleport_staff`
+- duplicate `actionId/toolCallId` handling
+- re-check requester online + OP before result delivery
 
-## 17. 플랫폼 계약 검토
+## 17. Platform Contract Review
 
-T01 작성 시 T00의 세 플랫폼 경계를 기준으로 static contract review를 수행했다.
+When T01 was written, a static contract review was performed against the three platform boundaries established in T00.
 
-| 항목 | Paper | Fabric | NeoForge |
+| Item | Paper | Fabric | NeoForge |
 |---|---|---|---|
-| protocol에 플랫폼 객체 포함 없음 | PASS | PASS | PASS |
-| OP 판정을 Adapter authority로 유지 | PASS | PASS | PASS |
-| scheduler/execution bridge 구현 가능 | PASS | PASS | PASS |
-| OP/session 재검사 후 전체 채팅 응답 방송 가능 | PASS | PASS | PASS |
-| Tool DTO가 platform-neutral | PASS | PASS | PASS |
-| exact runtime event signature live 검증 | T06/T10 | T07/T10 | T08/T10 |
+| no platform objects in protocol | PASS | PASS | PASS |
+| OP decision remains Adapter authority | PASS | PASS | PASS |
+| scheduler/execution bridge implementable | PASS | PASS | PASS |
+| broadcast response after OP/session re-check | PASS | PASS | PASS |
+| Tool DTOs are platform-neutral | PASS | PASS | PASS |
+| exact runtime event signature live verification | T06/T10 | T07/T10 | T08/T10 |
 
-이 표는 실제 서버 E2E 증거가 아니다. 각 Adapter 구현 담당자는 T06~T08 착수 시 이 계약을 다시 검토하고 호환 파괴 요구가 있으면 T01 계약 변경 요청을 제출한다.
+This table is not real-server E2E evidence. Adapter implementers must re-review this contract when starting T06–T08 and submit a T01 contract-change request if implementation requires a compatibility-breaking change.
 
-## 18. Fixture 규칙
+## 18. Fixture Rules
 
-Java와 TypeScript 모두 protocol/fixtures/manifest.json을 읽어 동일 fixture를 검증한다.
+Java and TypeScript both read `protocol/fixtures/manifest.json` and validate the same fixtures.
 
-- valid/*: 모두 schema 통과
-- invalid/*: 모두 schema 실패
+- `valid/*`: all must pass schema validation
+- `invalid/*`: all must fail schema validation
 - Draft 2020-12
-- UUID/date-time format validation 활성화
-- type coercion 금지
-- unknown field 허용 금지
+- UUID/date-time format validation enabled
+- no type coercion
+- unknown fields prohibited
 
-T01에서 schema/fixture 구조 검증을 수행했으며, build/CI 자동화는 T02에서 연결한다.
+T01 performed schema/fixture structural verification; build/CI automation is connected in T02.
 
-### E14 이후 contract asset 상태
+### Contract Asset Status After E14
 
-E13에서 Java `ProtocolCodec`, `ProtocolMessage`, WebSocket transport와 connection binding이 제거되었고, E14에서 TypeScript Brain runtime과 AJV validator가 제거되었다.
+E13 removed Java `ProtocolCodec`, `ProtocolMessage`, WebSocket transport, and connection binding; E14 removed the TypeScript Brain runtime and AJV validator.
 
-`protocol/schema/protocol.schema.json`과 fixtures는 삭제하지 않고 다음 용도로 유지한다.
+`protocol/schema/protocol.schema.json` and fixtures are retained for:
 
-- Remote/Embedded migration의 historical compatibility reference
-- 과거 T10 evidence 해석
-- Tool/envelope shape 회귀 분석
-- `GeneratedContractConstants.java`의 역사적 source
+- historical compatibility reference for the Remote/Embedded migration
+- interpretation of historical T10 evidence
+- Tool/envelope shape regression analysis
+- historical source of `GeneratedContractConstants.java`
 
-현재 production Java path의 Tool argument 검증은 `ToolArgumentCodec`, Tool metadata는 `Protocol.ToolName`, 실제 활성 Tool은 `ToolRegistry`, authority/deadline/deduplication은 `CommonRuntime`이 담당한다.
+In the current production Java path, `ToolArgumentCodec` owns Tool argument validation, `Protocol.ToolName` owns Tool metadata, `ToolRegistry` owns actual active Tools, and `CommonRuntime` owns authority/deadline/deduplication.
 
 
-## 19. T01 인계
+## 19. T01 Handoff
 
 T03 Java common:
 
-- envelope/DTO 타입은 schema에서 생성하거나 schema와 1:1 대응시킨다.
-- 플랫폼 객체를 DTO에 추가하지 않는다.
-- 인증, binding, deadline, toolCallId/actionId 중복 방지 구현.
+- Generate envelope/DTO types from schema or keep them 1:1 with schema.
+- Do not add platform objects to DTOs.
+- Implement authentication, binding, deadline, and `toolCallId/actionId` deduplication.
 
 T04 Brain:
 
-- session/request binding, queue와 예산, active Tool allowlist를 이 계약 기준으로 구현.
-- requesterUuid나 모델 출력을 권한 증거로 사용하지 않는다.
+- Implement session/request binding, queues/budgets, and active Tool allowlists according to this contract.
+- Do not use `requesterUuid` or model output as authority evidence.
 
 T05 AI:
 
-- 모델에는 capabilities에 존재하는 Tool schema만 제공.
-- 모델이 만든 인자는 schema + 정책 검사를 모두 통과해야 한다.
+- Expose only Tool schemas present in capabilities to the model.
+- Model-generated arguments must pass both schema and policy checks.
 
 T06~T08 Adapter:
 
-- platform event를 이 protocol DTO로 변환.
-- Tool 실행과 결과 전달 양쪽에서 현재 OP와 actor binding 재검사.
+- Convert platform events to these protocol DTOs.
+- Re-check current OP and actor binding both at Tool execution and result delivery.
 
 
 ## Phase 7 scheduling control Tools
 
-Embedded runtime은 분석/회귀용 protocol schema에도 다음 control Tool을 유지한다.
+For analysis/regression, the Embedded runtime retains the following control Tools in the protocol schema:
 
 - `schedule_action`
 - `cancel_scheduled_action`
 
-둘 다 state-changing control Tool이므로 wire fixture에서는 non-null
-`actionId`를 요구한다. `schedule_action`의 nested tool은
-`teleport_staff / weather_set / time_set` 중 하나로 제한한다.
+Both are state-changing control Tools, so wire fixtures require a non-null
+`actionId`. The nested Tool for `schedule_action` is restricted to
+`teleport_staff / weather_set / time_set`.
 
-`schedule_action`은 원 Tool request를 60초 동안 열어 두는 계약이 아니다.
-등록 성공 시 schedule ID를 즉시 결과로 반환하고, 실제 delayed/repeating
-실행은 Embedded runtime 내부에서 새 toolCallId/actionId/deadline으로 수행한다.
+`schedule_action` does not keep the original Tool request open for 60 seconds.
+On successful registration it immediately returns a schedule ID; actual delayed/repeated
+execution runs inside the Embedded runtime with a new `toolCallId/actionId/deadline`.

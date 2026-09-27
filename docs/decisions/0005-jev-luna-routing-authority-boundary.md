@@ -1,19 +1,19 @@
-# ADR-0005: Jev + Luna 이중 모델 라우팅과 권한 경계
+# ADR-0005: Jev + Luna Dual-Model Routing and Authority Boundary
 
-- 상태: Accepted
-- 일자: 2026-09-26
-- 관련 작업: Phase 6–7 refactoring
-- 관련 ADR: [ADR-0002](0002-ai-sdk-model-pins.md), [ADR-0003](0003-platform-thread-and-op-boundary.md)
+- Status: Accepted
+- Date: 2026-09-26
+- Related work: Phase 6–7 refactoring
+- Related ADRs: [ADR-0002](0002-ai-sdk-model-pins.md), [ADR-0003](0003-platform-thread-and-op-boundary.md)
 
-## 맥락
+## Context
 
-JARVIS Brain은 TypeSafe Jev와 GPT-6 Luna를 함께 사용한다. 두 모델을 단순 fallback 관계로 보거나 Jev confidence를 실행 권한으로 해석하면, 분류와 권한 집행의 경계가 흐려진다.
+The JARVIS Brain uses TypeSafe Jev and GPT-6 Luna together. Treating the two models as a simple fallback pair, or interpreting Jev confidence as execution authority, would blur the boundary between classification and authorization enforcement.
 
-또한 Brain의 `RemoteAdapter`는 Minecraft 서버 API를 직접 호출하지 않는다. 따라서 Brain이 확인할 수 있는 것은 현재 WebSocket 연결에 등록된 requester/request/session binding의 유효성이지, Minecraft가 현재 해당 플레이어를 OP로 인정하는지 자체는 아니다.
+The Brain's historical `RemoteAdapter` also did not call Minecraft server APIs directly. Therefore, the Brain could verify only whether a requester/request/session binding was valid for the current WebSocket connection, not whether Minecraft currently recognized that player as OP.
 
-## 결정
+## Decision
 
-Jev + Luna 이중 모델 구조를 유지한다.
+Retain the Jev + Luna dual-model architecture.
 
 ~~~text
 OP input
@@ -25,53 +25,53 @@ OP input
   -> Minecraft server authority
 ~~~
 
-책임을 다음처럼 고정한다.
+Responsibilities are fixed as follows.
 
 ### Jev
 
-- 요청 의도를 분류하고 Luna에 노출할 Tool 후보를 좁힌다.
-- confidence나 category는 권한, 승인, capability 또는 서버 상태의 증거가 아니다.
-- timeout, 오류, 저신뢰, `UNCERTAIN`에서는 상태 변경 Tool 범위를 확대하지 않는다.
+- Classifies request intent and narrows the Tool candidates exposed to Luna.
+- Confidence and category are not evidence of authority, approval, capability, or server state.
+- On timeout, error, low confidence, or `UNCERTAIN`, do not broaden the mutation Tool set.
 
 ### Luna
 
-- 사용자 응답과 허용된 Tool 호출을 제안한다.
-- Luna의 Tool 호출은 실행 명령이 아니라 비신뢰 제안이다.
-- Brain allowlist/capability/argument policy와 Adapter 검사를 우회할 수 없다.
+- Proposes user responses and calls to allowed Tools.
+- A Luna Tool call is an untrusted proposal, not an execution command.
+- It cannot bypass Brain allowlist/capability/argument policy or Adapter checks.
 
 ### Brain
 
-- 세션, 요청 예산, route policy, Tool allowlist와 request binding을 관리한다.
-- Brain의 AdapterPort 메서드는 `isRequestBindingActive`로 명명한다.
-- 이 메서드는 requester/request/session이 현재 연결에 결합돼 있는지만 뜻하며 Minecraft OP 권한 판정을 보장하지 않는다.
+- Manages sessions, request budgets, route policy, Tool allowlists, and request bindings.
+- The historical Brain AdapterPort method is named `isRequestBindingActive`.
+- That method means only that requester/request/session are bound to the current connection; it does not establish Minecraft OP authority.
 
 ### Adapter / CommonRuntime
 
-- 현재 online + OP 여부의 최종 권위는 Minecraft Adapter다.
-- Tool 실행 직전 capability, 현재 권한, actor/request binding, deadline, deduplication과 action 상태를 다시 검사한다.
-- 상태 변경 결과가 불명확하면 `OUTCOME_UNKNOWN`으로 끝내고 자동 재실행하지 않는다.
+- The Minecraft Adapter is the final authority for current online + OP status.
+- Immediately before Tool execution, re-check capability, current authority, actor/request binding, deadline, deduplication, and action state.
+- If the result of a mutation is uncertain, finish with `OUTCOME_UNKNOWN` and do not retry automatically.
 
-## 실패 정책
+## Failure Policy
 
-- Jev 실패/불확실: read-only 범위 또는 재질문 경로. 상태 변경 Tool을 새로 허용하지 않는다.
-- Luna 실패: 고정 실패 경로를 사용하고 사실·Tool 결과를 추측하지 않는다.
-- Brain request binding 실패: 모델/Tool/응답 전달을 계속하지 않는다.
-- Adapter 권한 실패: 서버 권위 기준으로 실행과 응답을 거부한다.
+- Jev failure/uncertainty: stay read-only or ask a clarifying question. Do not newly authorize mutation Tools.
+- Luna failure: use the fixed failure path and do not invent facts or Tool results.
+- Brain request-binding failure: do not continue model, Tool, or response delivery.
+- Adapter authority failure: reject execution and response delivery according to server authority.
 
-## 결과
+## Consequences
 
-장점:
+Benefits:
 
-- 분류 모델과 생성 모델의 역할이 명확하며 두 모델을 동시에 사용하는 현재 제품 의도를 보존한다.
-- Brain의 binding 확인을 실제 Minecraft 권한 확인으로 과장하지 않는다.
-- 모델 confidence나 출력이 권한 확대로 연결되는 것을 구조적으로 방지한다.
+- Clearly separates the classifier and generator roles while preserving the intended dual-model product architecture.
+- Avoids overstating a Brain binding check as a real Minecraft authority check.
+- Structurally prevents model confidence or output from expanding authority.
 
-비용:
+Costs:
 
-- 단일 모델 구조보다 provider 호출과 관측 지점이 많다.
-- Jev route 품질과 Luna Tool 품질을 각각 평가해야 한다.
-- 모델 또는 SDK 변경 시 두 단계의 회귀 검증이 필요하다.
+- More Provider calls and observability points than a single-model design.
+- Jev route quality and Luna Tool quality require separate evaluation.
+- Model or SDK changes require regression verification at both stages.
 
-## 변경 조건
+## Change Conditions
 
-Jev 또는 Luna 중 하나를 제거하거나 역할을 합치는 변경은 단순 리팩터링으로 처리하지 않는다. 평가 근거와 실패 정책을 포함한 새 ADR이 이 결정을 명시적으로 대체해야 한다.
+Removing Jev or Luna, or merging their responsibilities, is not a routine refactor. A new ADR with evaluation evidence and failure policy must explicitly supersede this decision.

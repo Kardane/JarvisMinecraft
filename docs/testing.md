@@ -1,20 +1,20 @@
 # JARVIS testing guide
 
-갱신일: 2026-09-27
+Last updated: 2026-09-27
 
-이 문서는 현재 Embedded Brain 기반 `main` 구조의 테스트 기준만 다룬다. 과거 Phase/E-series 검증 기록은 유지하지 않는다.
+This document covers only the current testing baseline for the Embedded Brain architecture on `main`. Historical Phase/E-series verification records are not maintained here.
 
-## 1. 기본 빌드
+## 1. Default Build
 
-Java 21에서 실행한다.
+Run with Java 21.
 
 ```bash
 ./gradlew build --stacktrace
 ```
 
-이 명령은 common/platform verification과 artifact 검사를 포함하는 기본 deterministic gate다.
+This command is the default deterministic gate and includes common/platform verification plus artifact checks.
 
-플랫폼별 배포 artifact:
+Platform deployment artifacts:
 
 ```text
 minecraft/paper/build/libs/jarvisminecraft-paper.jar
@@ -22,9 +22,9 @@ minecraft/fabric/build/libs/jarvisminecraft-fabric.jar
 minecraft/neoforge/build/libs/jarvisminecraft-neoforge.jar
 ```
 
-## 2. 주요 deterministic verification
+## 2. Primary Deterministic Verification
 
-필요할 때 개별 실행:
+Run individually when needed:
 
 ```bash
 ./gradlew :minecraft:common:jarvisConfigVerification --stacktrace
@@ -62,7 +62,7 @@ bash scripts/e16-boot-smoke.sh fabric
 bash scripts/e16-boot-smoke.sh neoforge
 ```
 
-NeoForge 전용 smoke:
+NeoForge-only smoke:
 
 ```bash
 ./gradlew :minecraft:neoforge:verifyT08BootSmoke --stacktrace
@@ -70,27 +70,27 @@ NeoForge 전용 smoke:
 
 ## 4. Live AI verification
 
-실제 provider 호출은 기본 CI에 포함하지 않는다. API 비용이 발생할 수 있다.
+Real Provider calls are not part of default CI and may incur API cost.
 
 ```bash
 OPENAI_API_KEY=... TYPESAFE_API_KEY=... \
   ./gradlew :minecraft:common:embeddedBrainLiveVerification --stacktrace
 ```
 
-확인 대상:
+Verify:
 
 - Jev engagement/route/reasoning parse
 - deterministic fallback
 - Luna Tool loop
-- reasoning effort 유지
-- Tool result 이후 후속 model round
+- reasoning effort remains stable
+- subsequent model round after Tool result
 - provider timeout/error safe failure
 
-## 5. 수동 게임플레이 smoke
+## 5. Manual Gameplay Smoke
 
-Paper/Fabric/NeoForge 각각 별도 서버 디렉터리를 사용한다. 서버 바이너리, world, log, secret 파일은 repository에 commit하지 않는다.
+Use a separate server directory for each of Paper, Fabric, and NeoForge. Do not commit server binaries, worlds, logs, or secret files to the repository.
 
-권장 사용자:
+Recommended actors:
 
 ```text
 Admin = online OP
@@ -98,26 +98,26 @@ Guest = non-OP
 Other = optional observer
 ```
 
-핵심 시나리오:
+Core scenarios:
 
-- wake word DIRECT 요청과 FOLLOW_UP
-- `/jm status` 출력
-- READ_TALK에서 mutation Tool 미노출
-- EXECUTE_LITE에서 allowlisted `teleport_staff/weather_set/time_set`
-- audience=ALL인 non-OP의 대화 가능 + Minecraft Tool 0개
-- de-op/logout/session-end race에서 Tool/reply 차단
-- Jev failure의 read-only fallback
+- DIRECT wake-word request and FOLLOW_UP
+- `/jm status` output
+- mutation Tools are not exposed in `READ_TALK`
+- allowlisted `teleport_staff/weather_set/time_set` in `EXECUTE_LITE`
+- a non-OP admitted under `audience=ALL` can converse but receives zero Minecraft Tools
+- Tool/reply blocked across de-op/logout/session-end races
+- read-only fallback after Jev failure
 - Luna failure safe response
-- Audit 장애 시 mutation fail-closed
-- state-changing timeout 시 `OUTCOME_UNKNOWN`, 자동 재시도 없음
-- ACTIVE proactive의 cooldown/in-flight 제한
-- ACTIVE proactive에서 mutation Tool hard-block
-- scheduled action의 policy/authority 재검사
-- shutdown 시 pending schedule 취소
+- mutation fails closed when Audit is unavailable
+- state-changing timeout yields `OUTCOME_UNKNOWN` with no automatic retry
+- ACTIVE proactive cooldown/in-flight limits
+- hard block on mutation Tools for ACTIVE proactive requests
+- scheduled actions re-check policy/authority
+- pending schedules are cancelled on shutdown
 
 ## 6. Scheduling E2E
 
-예시 설정:
+Example configuration:
 
 ```yaml
 execution:
@@ -135,58 +135,58 @@ scheduling:
   max-duration-seconds: 60
 ```
 
-확인:
+Verify:
 
 - one-shot delay
 - repeating interval/duration
-- overlap 없음
-- owner만 cancel 가능
-- 실행 전 scheduling disable / policy revoke / de-op / logout 차단
-- ERROR/TIMEOUT/OUTCOME_UNKNOWN 이후 반복 중단
-- restart 후 schedule 복구되지 않음
+- no overlap
+- only the owner can cancel
+- execution blocked if scheduling is disabled, policy is revoked, requester is de-opped, or requester logs out before execution
+- repetition stops after ERROR/TIMEOUT/OUTCOME_UNKNOWN
+- schedules are not restored after restart
 
 ## 7. ACTIVE E2E
 
-안전한 초기값은 `READ_TALK` + scheduling disabled다.
+The safe initial baseline is `READ_TALK` with scheduling disabled.
 
-확인:
+Verify:
 
-- 일반 공개 채팅은 원래대로 표시
-- Jev `IGNORE` 시 무응답
-- `START_CONVERSATION` + confidence threshold 통과 시 세션 생성
-- 1초 classification interval
-- proactive classifier 동시 1개
-- cooldown 적용
-- 분류 중 PASSIVE 전환/audience revoke/direct-session 생성 시 activation drop
-- proactive request에는 mutation/scheduling control Tool 없음
+- ordinary public chat remains visible as usual
+- no response when Jev returns `IGNORE`
+- create a session only when `START_CONVERSATION` passes the confidence threshold
+- 1-second classification interval
+- at most one proactive classifier in flight
+- cooldown enforced
+- drop activation if mode changes to PASSIVE, audience is revoked, or a direct session appears during classification
+- proactive requests expose no mutation/scheduling-control Tools
 
-## 8. Audit/operational logging 확인
+## 8. Audit and Operational Logging Verification
 
 Audit:
 
-- mutation `PRE_EXECUTION` 존재
-- post result 존재
+- mutation `PRE_EXECUTION` record exists
+- post-result record exists
 - `requestId/toolCallId/actionId` correlation
-- scheduled run마다 새 `toolCallId/actionId`
-- provider key/Authorization/raw prompt/raw chat 없음
+- every scheduled run gets a new `toolCallId/actionId`
+- no Provider key, Authorization header, raw prompt, or raw chat
 
 Operational log:
 
-- request/Jev/Luna/Tool/schedule/proactive lifecycle 확인
-- Audit health 변화 시 `audit.degraded/unhealthy/recovered`
-- 같은 Audit health 상태가 매 poll마다 반복 출력되지 않음
-- `/jm status`에 runtime, interaction, execution, scheduling, AI queue, proactive in-flight, Audit health가 표시됨
+- request/Jev/Luna/Tool/schedule/proactive lifecycle events appear
+- Audit health changes emit `audit.degraded/unhealthy/recovered`
+- unchanged Audit health is not logged again on every poll
+- `/jm status` shows runtime, interaction, execution, scheduling, AI queue, proactive in-flight, and Audit health
 
 ## 9. Release gate
 
-릴리스 전 최소 기준:
+Minimum pre-release gate:
 
 - `./gradlew build` PASS
-- 3개 플랫폼 clean boot PASS
-- Paper/Fabric/NeoForge 핵심 gameplay smoke PASS
-- non-OP mutation 차단 PASS
-- proactive mutation 차단 PASS
+- clean boot PASS on all three platforms
+- core gameplay smoke PASS on Paper/Fabric/NeoForge
+- non-OP mutation blocking PASS
+- proactive mutation blocking PASS
 - scheduling reauthorization PASS
-- Audit secret leakage 없음
-- shutdown/restart lifecycle 이상 없음
-- credentials가 있는 릴리스 검증에서는 live Jev/Luna PASS
+- no Audit secret leakage
+- no shutdown/restart lifecycle anomalies
+- when release-validation credentials are available, live Jev/Luna PASS

@@ -1,8 +1,8 @@
-# Build and verification
+# Build and Verification
 
-갱신일: 2026-09-27
+Last updated: 2026-09-27
 
-## 기준
+## Baseline
 
 - Java: 21
 - Gradle Wrapper: 8.14.5
@@ -17,19 +17,19 @@
 - OpenAI Java SDK: 4.69.2
 - Jev: TypeSafe HTTPS API through the Java classifier
 
-E14 이후 production build/runtime에는 Node.js/npm이 필요하지 않는다.
+Production builds and runtime no longer require Node.js/npm after E14.
 
-## 전체 빌드
+## Full Build
 
 ```bash
 ./gradlew build
 ```
 
-CI도 동일한 Java/Gradle build를 실행하며, E16에서는 추가로 세 플랫폼 clean-server boot smoke를 실행한다.
+CI runs the same Java/Gradle build. Since E16, it also runs clean-server boot smoke tests for all three platforms.
 
-## 배포 artifact
+## Deployment Artifacts
 
-E16 이후 플랫폼별 배포 파일은 다음 이름으로 생성된다.
+Since E16, platform-specific deployment files are generated with these names:
 
 ```text
 minecraft/paper/build/libs/jarvisminecraft-paper.jar
@@ -37,35 +37,35 @@ minecraft/fabric/build/libs/jarvisminecraft-fabric.jar
 minecraft/neoforge/build/libs/jarvisminecraft-neoforge.jar
 ```
 
-각 artifact는 `minecraft/common`의 Embedded Brain과 공식 OpenAI Java SDK runtime을 포함한다. SDK 및 runtime dependency package는 `io.github.kardane.jarvisminecraft.internal.shaded` 아래로 relocation해 Minecraft/Paper/Fabric/NeoForge의 Jackson/OkHttp/Kotlin classpath와 분리한다. Minecraft가 제공하는 Gson은 artifact에 중복 포함하지 않는다.
+Each artifact includes the Embedded Brain from `minecraft/common` and the official OpenAI Java SDK runtime. SDK and runtime dependency packages are relocated under `io.github.kardane.jarvisminecraft.internal.shaded` to isolate them from Minecraft/Paper/Fabric/NeoForge Jackson, OkHttp, and Kotlin classpaths. Gson provided by Minecraft is not bundled again.
 
-루트 `verifyE16Artifacts` task가 필수 Embedded Brain class, relocated SDK class, unrelocated conflict package 부재, Node/JavaScript runtime asset 부재를 검사한다.
+The root `verifyE16Artifacts` task checks required Embedded Brain classes, relocated SDK classes, the absence of unrelocated conflicting packages, and the absence of Node/JavaScript runtime assets.
 
-## 주요 deterministic verification
+## Primary Deterministic Verification
 
-`minecraft/common:check`에는 Embedded Brain orchestration 검증과 E12 policy parity/safety verification이 포함된다.
+`minecraft/common:check` includes Embedded Brain orchestration verification and E12 policy parity/safety verification.
 
-플랫폼 모듈의 `check`는 각각 T06/T07/T08 계약 검증을 실행한다. Paper는 optional Provider T11~T14 검증도 포함한다.
+Each platform module's `check` task runs the T06/T07/T08 contract verification for that platform. Paper also includes optional Provider T11–T14 verification.
 
 ## Verification
 
-기본 gate는 `./gradlew build`이며 실제 provider 호출은 기본 CI에 포함하지 않는다.
+The default gate is `./gradlew build`. Real Provider calls are not part of default CI.
 
-개별 deterministic task, clean-server boot, live model, gameplay smoke와 release gate는 [testing.md](testing.md)를 기준으로 한다.
+Use [testing.md](testing.md) as the source of truth for individual deterministic tasks, clean-server boot tests, live-model checks, gameplay smoke tests, and release gates.
 
-## Dependency locking
+## Dependency Locking
 
-Gradle subproject는 committed dependency lock을 사용한다.
+Gradle subprojects use committed dependency locks.
 
 - `minecraft/common/gradle.lockfile`
 - `minecraft/paper/gradle.lockfile`
 - `minecraft/fabric/gradle.lockfile`
 - `minecraft/neoforge/gradle.lockfile`
 
-과거 `brain/package-lock.json`은 E14에서 Node Brain package와 함께 제거되었다.
+The former `brain/package-lock.json` was removed with the Node Brain package in E14.
 
-## Contract/evaluation assets
+## Contract and Evaluation Assets
 
-`protocol/schema`, `protocol/fixtures`, `evals`, `tests/acceptance/out`은 삭제하지 않는다. 다만 E14 이후 이 자산들은 별도 Node runtime의 실행 입력이 아니라 compatibility, regression, historical evidence 용도다.
+Do not delete `protocol/schema`, `protocol/fixtures`, `evals`, or `tests/acceptance/out`. After E14, these assets are used for compatibility, regression analysis, and historical evidence rather than as runtime input for a separate Node process.
 
-`GeneratedContractConstants.java`는 schema/policy source와 함께 committed contract artifact로 유지한다. source 상수를 변경할 때 같은 change에서 Java 상수와 E12 fixture 기대값을 함께 검토한다.
+`GeneratedContractConstants.java` remains a committed contract artifact alongside schema/policy sources. When source constants change, review the Java constants and E12 fixture expectations in the same change.

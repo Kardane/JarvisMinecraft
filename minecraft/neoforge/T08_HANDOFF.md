@@ -56,9 +56,9 @@ Model claims and permission-node strings are not accepted as operator evidence.
 
 Aliases:
 
-- 자비스
+- `자비스` — Korean wake-word literal (`Jarvis`);
 - jarvis, case-insensitive
-- 재비스
+- `재비스` — alternate Korean wake-word literal;
 
 Rules:
 
