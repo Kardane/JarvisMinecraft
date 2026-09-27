@@ -4,6 +4,7 @@
 #
 # List values use | as the separator.
 
+# PASSIVE: wake-word/session only. ACTIVE: may initiate from allowed public chat.
 jarvis.interaction.mode=PASSIVE
 jarvis.interaction.wake-words=자비스|jarvis|재비스
 jarvis.interaction.follow-up-seconds=120
@@ -12,8 +13,11 @@ jarvis.interaction.audience.mode=OP
 jarvis.interaction.audience.whitelist=
 jarvis.interaction.audience.blacklist=
 
+# ACTIVE-mode proactive settings.
 jarvis.interaction.proactive.context-messages=12
+# Server-wide cooldown after a proactive conversation starts.
 jarvis.interaction.proactive.cooldown-seconds=15
+# Minimum Jev START_CONVERSATION confidence.
 jarvis.interaction.proactive.confidence-threshold=0.75
 
 jarvis.model.name=gpt-6-luna
