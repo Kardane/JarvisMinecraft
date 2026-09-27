@@ -2,6 +2,7 @@ package io.github.kardane.jarvisminecraft.neoforge.platform;
 
 import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
 import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WeatherType;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
@@ -213,6 +214,86 @@ public final class MinecraftNeoForgePlatformAccess implements NeoForgePlatformAc
                 fromWorld,
                 toWorld,
                 completed
+            )
+        );
+    }
+
+    @Override
+    public Optional<WeatherMutationSnapshot> setWeather(
+        String worldId,
+        WeatherType weather,
+        int durationSeconds
+    ) {
+        requireServerThread();
+        Optional<ServerLevel> found = findWorld(worldId);
+        if (found.isEmpty()) {
+            return Optional.empty();
+        }
+
+        ServerLevel world = found.get();
+        int durationTicks = Math.multiplyExact(
+            durationSeconds,
+            20
+        );
+        switch (weather) {
+            case CLEAR ->
+                world.setWeatherParameters(
+                    durationTicks,
+                    0,
+                    false,
+                    false
+                );
+            case RAIN ->
+                world.setWeatherParameters(
+                    0,
+                    durationTicks,
+                    true,
+                    false
+                );
+            case THUNDER ->
+                world.setWeatherParameters(
+                    0,
+                    durationTicks,
+                    true,
+                    true
+                );
+        }
+
+        return Optional.of(
+            new WeatherMutationSnapshot(
+                worldId(world),
+                weather,
+                durationSeconds,
+                true
+            )
+        );
+    }
+
+    @Override
+    public Optional<TimeMutationSnapshot> setTimeOfDay(
+        String worldId,
+        int timeOfDay
+    ) {
+        requireServerThread();
+        Optional<ServerLevel> found = findWorld(worldId);
+        if (found.isEmpty()) {
+            return Optional.empty();
+        }
+
+        ServerLevel world = found.get();
+        long current = world.getDayTime();
+        long dayBase =
+            current - Math.floorMod(current, 24_000L);
+        world.setDayTime(dayBase + timeOfDay);
+
+        return Optional.of(
+            new TimeMutationSnapshot(
+                worldId(world),
+                (int) Math.floorMod(
+                    world.getDayTime(),
+                    24_000L
+                ),
+                true
             )
         );
     }

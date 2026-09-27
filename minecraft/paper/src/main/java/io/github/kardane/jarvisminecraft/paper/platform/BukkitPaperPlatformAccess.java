@@ -2,6 +2,7 @@ package io.github.kardane.jarvisminecraft.paper.platform;
 
 import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
 import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WeatherType;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -218,6 +219,84 @@ public final class BukkitPaperPlatformAccess implements PaperPlatformAccess {
                         Boolean.TRUE.equals(completed)
                     )
             );
+    }
+
+    @Override
+    public Optional<WeatherMutationSnapshot> setWeather(
+        String worldId,
+        WeatherType weather,
+        int durationSeconds
+    ) {
+        requireServerThread();
+        World world = server.getWorld(worldId);
+        if (world == null) {
+            return Optional.empty();
+        }
+
+        int durationTicks = Math.multiplyExact(
+            durationSeconds,
+            20
+        );
+        switch (weather) {
+            case CLEAR -> {
+                world.setStorm(false);
+                world.setThundering(false);
+                world.setWeatherDuration(0);
+                world.setThunderDuration(0);
+                world.setClearWeatherDuration(durationTicks);
+            }
+            case RAIN -> {
+                world.setClearWeatherDuration(0);
+                world.setStorm(true);
+                world.setThundering(false);
+                world.setWeatherDuration(durationTicks);
+                world.setThunderDuration(0);
+            }
+            case THUNDER -> {
+                world.setClearWeatherDuration(0);
+                world.setStorm(true);
+                world.setThundering(true);
+                world.setWeatherDuration(durationTicks);
+                world.setThunderDuration(durationTicks);
+            }
+        }
+
+        return Optional.of(
+            new WeatherMutationSnapshot(
+                world.getName(),
+                weather,
+                durationSeconds,
+                true
+            )
+        );
+    }
+
+    @Override
+    public Optional<TimeMutationSnapshot> setTimeOfDay(
+        String worldId,
+        int timeOfDay
+    ) {
+        requireServerThread();
+        World world = server.getWorld(worldId);
+        if (world == null) {
+            return Optional.empty();
+        }
+
+        long current = world.getFullTime();
+        long dayBase =
+            current - Math.floorMod(current, 24_000L);
+        world.setFullTime(dayBase + timeOfDay);
+
+        return Optional.of(
+            new TimeMutationSnapshot(
+                world.getName(),
+                (int) Math.floorMod(
+                    world.getTime(),
+                    24_000L
+                ),
+                true
+            )
+        );
     }
 
     @Override

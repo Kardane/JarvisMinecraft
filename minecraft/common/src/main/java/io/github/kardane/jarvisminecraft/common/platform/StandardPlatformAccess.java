@@ -22,16 +22,20 @@ public interface StandardPlatformAccess extends AdapterPlatformAccess {
 
     CompletionStage<TeleportSnapshot> teleportRequesterTo(UUID requesterUuid, UUID targetPlayerUuid);
 
-    Optional<WeatherMutationSnapshot> setWeather(
+    default Optional<WeatherMutationSnapshot> setWeather(
         String worldId,
         WeatherType weather,
         int durationSeconds
-    );
+    ) {
+        return Optional.empty();
+    }
 
-    Optional<TimeMutationSnapshot> setTimeOfDay(
+    default Optional<TimeMutationSnapshot> setTimeOfDay(
         String worldId,
         int timeOfDay
-    );
+    ) {
+        return Optional.empty();
+    }
 
     record PlayerSnapshot(UUID uuid, String name, boolean online, LocationSnapshot location) {}
 
