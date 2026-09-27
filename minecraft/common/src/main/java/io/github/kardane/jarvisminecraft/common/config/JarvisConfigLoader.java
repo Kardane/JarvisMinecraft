@@ -23,6 +23,8 @@ public final class JarvisConfigLoader {
         JarvisConfig.WaitingMessage defaultWaiting =
             defaultResponse.waitingMessage();
         JarvisConfig.Sound defaultSound = defaultResponse.sound();
+        JarvisConfig.ResponseMetrics defaultMetrics =
+            defaultResponse.metrics();
         JarvisConfig.Execution defaultExecution = defaults.execution();
         JarvisConfig.Scheduling defaultScheduling = defaults.scheduling();
         JarvisConfig.Logging defaultLogging = defaults.logging();
@@ -169,6 +171,18 @@ public final class JarvisConfigLoader {
                     source,
                     "jarvis.response.sound.pitch",
                     defaultSound.pitch()
+                )
+            ),
+            new JarvisConfig.ResponseMetrics(
+                bool(
+                    source,
+                    "jarvis.response.metrics.enabled",
+                    defaultMetrics.enabled()
+                ),
+                string(
+                    source,
+                    "jarvis.response.metrics.icon",
+                    defaultMetrics.icon()
                 )
             )
         );
