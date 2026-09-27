@@ -74,6 +74,39 @@ public final class JarvisFabricMod implements ModInitializer {
                                     return 1;
                                 })
                         )
+                        .then(
+                            CommandManager.literal("reload")
+                                .executes(context -> {
+                                    RuntimeState current = runtime;
+                                    if (current == null) {
+                                        context.getSource().sendError(
+                                            Text.literal("JARVIS runtime is not running.")
+                                        );
+                                        return 0;
+                                    }
+                                    RuntimeConfigurationManager.ReloadResult result =
+                                        current.runtimeConfiguration().reload();
+                                    if (result.success()) {
+                                        context.getSource().sendFeedback(
+                                                    () -> Text.literal(
+                                                        "[JARVIS] Configuration reloaded."
+                                                    ),
+                                                    false
+                                                );
+                                        logReloadSuccess(result);
+                                        return 1;
+                                    }
+                                    context.getSource().sendError(
+                                                    Text.literal(
+                                                        "[JARVIS] Reload failed; previous configuration remains active."
+                                                    )
+                                                );
+                                    LOGGER.warning(
+                                        "JARVIS configuration reload failed; previous configuration remains active."
+                                    );
+                                    return 0;
+                                })
+                        )
                 )
         );
         ServerLifecycleEvents.SERVER_STOPPING.register(this::onServerStopping);
@@ -102,6 +135,23 @@ public final class JarvisFabricMod implements ModInitializer {
                 current.chat().sweepSessions();
             }
         });
+    }
+
+    private void logReloadSuccess(
+        RuntimeConfigurationManager.ReloadResult result
+    ) {
+        LOGGER.info(
+            "JARVIS configuration reloaded: "
+                + result.activeConfig().toLogLine()
+                + ", personaPresent="
+                + result.activeContent().personaPresent()
+                + ", personaBytes="
+                + result.activeContent().personaBytes()
+                + ", knowledgeDocuments="
+                + result.activeContent().knowledgeDocuments()
+                + ", knowledgeBytes="
+                + result.activeContent().knowledgeBytes()
+        );
     }
 
     private void onServerStarted(MinecraftServer server) {
