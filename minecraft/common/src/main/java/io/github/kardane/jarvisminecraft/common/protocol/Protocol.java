@@ -56,6 +56,10 @@ public final class Protocol {
         WEATHER_SET("weather_set", "world.weather.set", true, Risk.LOW),
         @SerializedName("time_set")
         TIME_SET("time_set", "world.time.set", true, Risk.LOW),
+        @SerializedName("schedule_action")
+        SCHEDULE_ACTION("schedule_action", "action.schedule", true, Risk.LOW),
+        @SerializedName("cancel_scheduled_action")
+        CANCEL_SCHEDULED_ACTION("cancel_scheduled_action", "action.schedule", true, Risk.LOW),
         @SerializedName("lookup_area_history")
         LOOKUP_AREA_HISTORY("lookup_area_history", "history.lookup", false, Risk.READ_ONLY),
         @SerializedName("lookup_player_history")

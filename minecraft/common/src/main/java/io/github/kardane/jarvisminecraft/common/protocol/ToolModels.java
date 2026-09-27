@@ -18,13 +18,15 @@ public final class ToolModels {
     public sealed interface ToolArguments permits
         NoArguments, PagingArguments, GetPlayerByUuidArguments, GetPlayerByNameArguments,
         PlayerUuidArguments, NearbyArguments, WorldInfoArguments, TeleportArguments,
-        WeatherSetArguments, TimeSetArguments, AreaHistoryArguments, PlayerHistoryArguments, RegionsAtLocationArguments,
-        RegionInfoArguments, BuildPermissionArguments {
+        WeatherSetArguments, TimeSetArguments, ScheduleActionArguments,
+        CancelScheduledActionArguments, AreaHistoryArguments, PlayerHistoryArguments,
+        RegionsAtLocationArguments, RegionInfoArguments, BuildPermissionArguments {
     }
 
     public sealed interface ToolData permits
         ServerStatusData, OnlinePlayersData, PlayerData, PlayerLocationData,
-        NearbyPlayersData, WorldInfoData, TeleportData, WeatherSetData, TimeSetData, HistoryData,
+        NearbyPlayersData, WorldInfoData, TeleportData, WeatherSetData, TimeSetData,
+        ScheduledActionData, CancelScheduledActionData, HistoryData,
         RegionsAtLocationData, RegionInfoData, BuildPermissionData, CmiPlayerInfoData {
     }
 
@@ -68,6 +70,20 @@ public final class ToolModels {
     public record TimeSetArguments(
         String worldId,
         int timeOfDay
+    ) implements ToolArguments {
+    }
+
+    public record ScheduleActionArguments(
+        Protocol.ToolName tool,
+        ToolArguments arguments,
+        int delaySeconds,
+        Integer intervalSeconds,
+        Integer durationSeconds
+    ) implements ToolArguments {
+    }
+
+    public record CancelScheduledActionArguments(
+        UUID scheduleId
     ) implements ToolArguments {
     }
 
@@ -181,6 +197,24 @@ public final class ToolModels {
         String worldId,
         int timeOfDay,
         boolean completed
+    ) implements ToolData {
+    }
+
+    public record ScheduledActionData(
+        UUID scheduleId,
+        Protocol.ToolName tool,
+        int delaySeconds,
+        Integer intervalSeconds,
+        Integer durationSeconds,
+        Instant firstRunAt,
+        Instant expiresAt,
+        boolean accepted
+    ) implements ToolData {
+    }
+
+    public record CancelScheduledActionData(
+        UUID scheduleId,
+        boolean cancelled
     ) implements ToolData {
     }
 
