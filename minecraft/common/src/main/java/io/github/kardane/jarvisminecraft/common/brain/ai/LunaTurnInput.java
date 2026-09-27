@@ -2,6 +2,7 @@ package io.github.kardane.jarvisminecraft.common.brain.ai;
 
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
 import io.github.kardane.jarvisminecraft.common.brain.ConversationEntry;
+import io.github.kardane.jarvisminecraft.common.prompt.PromptContentSnapshot;
 
 import java.time.Instant;
 import java.util.List;
@@ -20,6 +21,7 @@ public record LunaTurnInput(
     int remainingToolCalls,
     int remainingModelRounds,
     ReasoningLevel reasoningLevel,
+    PromptContentSnapshot promptContent,
     Instant deadlineAt
 ) {
     public LunaTurnInput(
@@ -41,6 +43,32 @@ public record LunaTurnInput(
             remainingToolCalls,
             remainingModelRounds,
             ReasoningLevel.MEDIUM,
+            PromptContentSnapshot.empty(),
+            deadlineAt
+        );
+    }
+
+    public LunaTurnInput(
+        UUID requestId,
+        String requesterName,
+        List<ConversationEntry> history,
+        List<Capability> capabilities,
+        Set<ToolName> availableTools,
+        int remainingToolCalls,
+        int remainingModelRounds,
+        ReasoningLevel reasoningLevel,
+        Instant deadlineAt
+    ) {
+        this(
+            requestId,
+            requesterName,
+            history,
+            capabilities,
+            availableTools,
+            remainingToolCalls,
+            remainingModelRounds,
+            reasoningLevel,
+            PromptContentSnapshot.empty(),
             deadlineAt
         );
     }
@@ -69,6 +97,10 @@ public record LunaTurnInput(
         Objects.requireNonNull(
             reasoningLevel,
             "reasoningLevel"
+        );
+        Objects.requireNonNull(
+            promptContent,
+            "promptContent"
         );
         Objects.requireNonNull(deadlineAt, "deadlineAt");
         if (
