@@ -151,12 +151,44 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         var statusCommand = getCommand("jm");
         if (statusCommand != null) {
             statusCommand.setExecutor((sender, command, label, args) -> {
-                if (args.length != 1 || !"status".equalsIgnoreCase(args[0])) {
-                    sender.sendMessage("/jm status");
+                if (args.length != 1) {
+                    sender.sendMessage("/jm <status|reload>");
                     return true;
                 }
-                JarvisStatusFormatter.lines(brain.status())
-                    .forEach(sender::sendMessage);
+                if ("status".equalsIgnoreCase(args[0])) {
+                    JarvisStatusFormatter.lines(brain.status())
+                        .forEach(sender::sendMessage);
+                    return true;
+                }
+                if ("reload".equalsIgnoreCase(args[0])) {
+                    if (
+                        !sender.hasPermission(
+                            "jarvisminecraft.reload"
+                        )
+                    ) {
+                        sender.sendMessage(
+                            "You do not have permission to reload JARVIS."
+                        );
+                        return true;
+                    }
+                    RuntimeConfigurationManager.ReloadResult result =
+                        runtimeConfiguration.reload();
+                    if (result.success()) {
+                        sender.sendMessage(
+                            "[JARVIS] Configuration reloaded."
+                        );
+                        logReloadSuccess(result);
+                    } else {
+                        sender.sendMessage(
+                            "[JARVIS] Reload failed; previous configuration remains active."
+                        );
+                        getLogger().warning(
+                            "JARVIS configuration reload failed; previous configuration remains active."
+                        );
+                    }
+                    return true;
+                }
+                sender.sendMessage("/jm <status|reload>");
                 return true;
             });
         }
@@ -205,6 +237,23 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         interactions = null;
         configManager = null;
         runtimeConfiguration = null;
+    }
+
+    private void logReloadSuccess(
+        RuntimeConfigurationManager.ReloadResult result
+    ) {
+        getLogger().info(
+            "JARVIS configuration reloaded: "
+                + result.activeConfig().toLogLine()
+                + ", personaPresent="
+                + result.activeContent().personaPresent()
+                + ", personaBytes="
+                + result.activeContent().personaBytes()
+                + ", knowledgeDocuments="
+                + result.activeContent().knowledgeDocuments()
+                + ", knowledgeBytes="
+                + result.activeContent().knowledgeBytes()
+        );
     }
 
     private JarvisConfig loadRuntimeConfig() {
