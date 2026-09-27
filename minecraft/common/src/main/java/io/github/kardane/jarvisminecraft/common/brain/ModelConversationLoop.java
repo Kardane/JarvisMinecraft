@@ -13,10 +13,10 @@ import io.github.kardane.jarvisminecraft.common.runtime.ExecutionPolicy;
 
 import java.time.Clock;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Supplier;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -30,7 +30,7 @@ final class ModelConversationLoop {
     private static final String LUNA_FAILURE_TEXT =
         "현재 GPT-6 Luna 응답을 완료할 수 없습니다. 서버 상태나 작업 성공 여부를 추측하지 않았습니다.";
 
-    private final List<Capability> capabilities;
+    private final Supplier<List<Capability>> capabilities;
     private final ConversationHistoryStore history;
     private final LunaClient luna;
     private final ExecutionPolicy executionPolicy;
@@ -40,7 +40,7 @@ final class ModelConversationLoop {
     private final JarvisLog log;
 
     ModelConversationLoop(
-        List<Capability> capabilities,
+        Supplier<List<Capability>> capabilities,
         ConversationHistoryStore history,
         LunaClient luna,
         ExecutionPolicy executionPolicy,
@@ -49,8 +49,9 @@ final class ModelConversationLoop {
         Clock clock,
         JarvisLog log
     ) {
-        this.capabilities = List.copyOf(
-            Objects.requireNonNull(capabilities, "capabilities")
+        this.capabilities = Objects.requireNonNull(
+            capabilities,
+            "capabilities"
         );
         this.history = Objects.requireNonNull(history, "history");
         this.luna = Objects.requireNonNull(luna, "luna");
@@ -91,7 +92,7 @@ final class ModelConversationLoop {
                     request.requesterUuid(),
                     request.sessionId()
                 ),
-                currentCapabilities(),
+                capabilities.get(),
                 effectiveRouting.availableTools(),
                 budget.remainingToolCalls(),
                 budget.remainingModelRounds(),
@@ -278,27 +279,6 @@ final class ModelConversationLoop {
             routing.fallbackReason(),
             available
         );
-    }
-
-    private List<Capability> currentCapabilities() {
-        if (!tools.schedulingEnabled()) {
-            return capabilities;
-        }
-        for (Capability capability : capabilities) {
-            if ("action.schedule".equals(capability.name())) {
-                return capabilities;
-            }
-        }
-
-        List<Capability> expanded = new ArrayList<>(capabilities);
-        expanded.add(
-            new Capability(
-                "action.schedule",
-                "JarvisCommon",
-                "phase7"
-            )
-        );
-        return List.copyOf(expanded);
     }
 
     private void validateRoutedTools(
