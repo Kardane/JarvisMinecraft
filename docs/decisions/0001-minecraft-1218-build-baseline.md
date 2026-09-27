@@ -1,18 +1,18 @@
-# ADR-0001: Minecraft 1.21.8 빌드 기준선
+# ADR-0001: Minecraft 1.21.8 Build Baseline
 
-- 상태: Accepted
-- 일자: 2026-09-24
-- 관련 작업: T00
+- Status: Accepted
+- Date: 2026-09-24
+- Related work: T00
 
-## 맥락
+## Context
 
-Minecraft JARVIS는 Paper, Fabric, NeoForge 세 플랫폼을 하나의 공통 계약으로 지원해야 한다. 각 플랫폼의 최신 버전을 독립적으로 따라가면 공통 Java 버전, 매핑, 빌드 플러그인과 이벤트 API가 쉽게 어긋난다.
+Minecraft JARVIS must support Paper, Fabric, and NeoForge under one shared contract. If each platform independently tracks its newest version, the shared Java version, mappings, build plugins, and event APIs can easily diverge.
 
-작업명세서는 첫 공식 검증 대상을 Minecraft 1.21.8로 고정한다. "1.21.8 이상"은 이후 Minecraft 버전에 대한 바이너리 호환 보장을 의미하지 않는다.
+The work specification pins Minecraft 1.21.8 as the first official verification target. "1.21.8 or later" does not imply a binary-compatibility guarantee for later Minecraft versions.
 
-## 결정
+## Decision
 
-첫 G0/v0.1 검증 기준을 다음과 같이 고정한다.
+Pin the first G0/v0.1 verification baseline as follows:
 
 - Minecraft: 1.21.8
 - Java toolchain: 21
@@ -24,31 +24,31 @@ Minecraft JARVIS는 Paper, Fabric, NeoForge 세 플랫폼을 하나의 공통 �
 - Fabric Loom: 1.12.2
 - NeoForge: 21.8.52
 - ModDevGradle: 2.0.147
-- Folia: 초기 지원 범위에서 제외
+- Folia: excluded from the initial support scope
 
-T02에서 실제 dependency resolution 또는 compile이 실패할 경우 임의로 여러 버전을 올리지 않는다. 실패 근거를 남기고 가장 작은 호환 버전 조정만 수행하며 이 ADR과 compatibility 문서를 함께 갱신한다.
+If dependency resolution or compilation fails in T02, do not arbitrarily bump multiple versions. Record the failure evidence, make only the smallest compatibility adjustment, and update this ADR and the compatibility documentation together.
 
-## 결과
+## Consequences
 
-장점:
+Benefits:
 
-- 세 플랫폼의 첫 E2E 검증 기준이 명확해진다.
-- T01의 DTO/프로토콜 계약과 T02의 빌드 골격이 동일한 런타임 가정을 사용한다.
-- "최신 Minecraft 지원"을 근거 없이 선언하는 일을 방지한다.
+- Establishes a clear first E2E verification baseline across all three platforms.
+- Keeps the T01 DTO/protocol contract and T02 build skeleton on the same runtime assumptions.
+- Prevents unsupported claims of "latest Minecraft" compatibility.
 
-비용:
+Costs:
 
-- 새 Minecraft 버전은 별도 호환성 검증 없이 지원 목록에 추가할 수 없다.
-- Fabric/NeoForge 매핑/API 변경에 따라 플랫폼별 release cadence가 달라질 수 있다.
+- New Minecraft versions cannot be added to the support list without separate compatibility verification.
+- Platform release cadence may diverge as Fabric/NeoForge mappings and APIs change.
 
-## 검증 상태
+## Verification Status
 
-T00에서는 공식 문서/배포 저장소의 버전 존재를 조사했다. 실제 Gradle 멀티프로젝트 build와 각 dedicated server 기동은 아직 수행하지 않았으며 T02/T10에서 검증한다.
+T00 verified version availability through official documentation and distribution repositories. The actual Gradle multiproject build and dedicated-server startup were not yet run at that stage; those are verified in T02/T10.
 
-## 공식 근거
+## Official References
 
 - Paper 1.21.8 API: https://jd.papermc.io/paper/1.21.8/
 - Fabric Maven: https://maven.fabricmc.net/
-- NeoForge 1.21.8 시작 문서: https://docs.neoforged.net/docs/1.21.8/gettingstarted/
+- NeoForge 1.21.8 getting started: https://docs.neoforged.net/docs/1.21.8/gettingstarted/
 - NeoForge Maven: https://maven.neoforged.net/
 - Gradle releases: https://gradle.org/releases/
