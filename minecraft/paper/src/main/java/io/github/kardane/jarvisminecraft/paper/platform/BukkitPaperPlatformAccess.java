@@ -4,6 +4,7 @@ import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
 import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WeatherType;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.TextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
@@ -370,7 +371,20 @@ public final class BukkitPaperPlatformAccess implements PaperPlatformAccess {
             }
             output = output.append(part);
         }
-        return output.append(Component.text(message.body()));
+        output = output.append(Component.text(message.body()));
+        for (StyledChatMessage.HoverSegment segment : message.suffix()) {
+            output = output.append(
+                Component.text(segment.text())
+                    .hoverEvent(
+                        HoverEvent.showText(
+                            Component.text(
+                                segment.hoverText()
+                            )
+                        )
+                    )
+            );
+        }
+        return output;
     }
 
     private PlayerSnapshot snapshot(Player player) {
