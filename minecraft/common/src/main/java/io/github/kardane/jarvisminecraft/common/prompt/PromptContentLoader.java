@@ -25,20 +25,33 @@ public final class PromptContentLoader {
     private static final int READ_BUFFER_BYTES = 8 * 1024;
 
     private final Path configRoot;
+    private final boolean personalityEnabled;
+    private final boolean knowledgeEnabled;
     private final Limits limits;
 
     public PromptContentLoader(Path configRoot) {
-        this(configRoot, Limits.defaults());
+        this(configRoot, true, true, Limits.defaults());
     }
 
     public PromptContentLoader(
         Path configRoot,
         Limits limits
     ) {
+        this(configRoot, true, true, limits);
+    }
+
+    public PromptContentLoader(
+        Path configRoot,
+        boolean personalityEnabled,
+        boolean knowledgeEnabled,
+        Limits limits
+    ) {
         this.configRoot = Objects.requireNonNull(
             configRoot,
             "configRoot"
         ).toAbsolutePath().normalize();
+        this.personalityEnabled = personalityEnabled;
+        this.knowledgeEnabled = knowledgeEnabled;
         this.limits = Objects.requireNonNull(limits, "limits");
     }
 
@@ -56,8 +69,12 @@ public final class PromptContentLoader {
             configRoot,
             "Could not resolve the JARVIS configuration root."
         );
-        String persona = loadPersona(realRoot);
-        List<KnowledgeDocument> knowledge = loadKnowledge(realRoot);
+        String persona = personalityEnabled
+            ? loadPersona(realRoot)
+            : "";
+        List<KnowledgeDocument> knowledge = knowledgeEnabled
+            ? loadKnowledge(realRoot)
+            : List.of();
         return new PromptContentSnapshot(persona, knowledge);
     }
 
