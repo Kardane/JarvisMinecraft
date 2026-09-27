@@ -249,7 +249,7 @@ public final class EmbeddedBrain {
                 log
             );
         this.modelLoop = new ModelConversationLoop(
-            this.capabilities,
+            this::currentCapabilities,
             history,
             luna,
             executionPolicy,
