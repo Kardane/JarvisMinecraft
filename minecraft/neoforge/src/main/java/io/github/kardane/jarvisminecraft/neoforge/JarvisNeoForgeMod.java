@@ -192,7 +192,7 @@ public final class JarvisNeoForgeMod {
         brain.start();
         LOGGER.info(
             "JARVIS runtime policy config validated "
-                + "(interaction + reasoning + response + execution policy active; scheduling/admin pending): "
+                + "(interaction + proactive + reasoning + response + execution + scheduling policy active; admin commands pending): "
                 + JarvisConfigSummary.from(configManager.current()).toLogLine()
         );
         LOGGER.info(
