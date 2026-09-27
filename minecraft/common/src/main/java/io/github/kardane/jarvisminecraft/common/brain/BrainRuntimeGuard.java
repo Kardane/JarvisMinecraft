@@ -21,8 +21,12 @@ final class BrainRuntimeGuard {
         this.stopped = Objects.requireNonNull(stopped, "stopped");
     }
 
+    boolean stopped() {
+        return stopped.getAsBoolean();
+    }
+
     void assertRunning() {
-        if (stopped.getAsBoolean()) {
+        if (stopped()) {
             throw new ProtocolException(
                 ErrorCode.CANCELLED,
                 "Embedded Brain is stopped."
