@@ -174,7 +174,11 @@ public final class OpenAiLunaClient implements LunaClient {
             .parallelToolCalls(true)
             .reasoning(
                 Reasoning.builder()
-                    .effort(ReasoningEffort.MEDIUM)
+                    .effort(
+                        reasoningEffort(
+                            input.reasoningLevel()
+                        )
+                    )
                     .build()
             )
             .addInclude(ResponseIncludable.REASONING_ENCRYPTED_CONTENT)
@@ -185,6 +189,19 @@ public final class OpenAiLunaClient implements LunaClient {
             builder.addTool(toFunctionTool(definition));
         }
         return builder.build();
+    }
+
+    private ReasoningEffort reasoningEffort(
+        ReasoningLevel level
+    ) {
+        return switch (
+            Objects.requireNonNull(level, "level")
+        ) {
+            case NONE -> ReasoningEffort.NONE;
+            case LOW -> ReasoningEffort.LOW;
+            case MEDIUM -> ReasoningEffort.MEDIUM;
+            case HIGH -> ReasoningEffort.HIGH;
+        };
     }
 
     private FunctionTool toFunctionTool(LunaToolSchemas.Definition definition) {

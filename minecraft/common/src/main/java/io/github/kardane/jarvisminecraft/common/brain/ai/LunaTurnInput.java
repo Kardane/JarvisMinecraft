@@ -1,7 +1,7 @@
 package io.github.kardane.jarvisminecraft.common.brain.ai;
 
-import io.github.kardane.jarvisminecraft.common.brain.ConversationEntry;
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
+import io.github.kardane.jarvisminecraft.common.brain.ConversationEntry;
 
 import java.time.Instant;
 import java.util.List;
@@ -19,17 +19,65 @@ public record LunaTurnInput(
     Set<ToolName> availableTools,
     int remainingToolCalls,
     int remainingModelRounds,
+    ReasoningLevel reasoningLevel,
     Instant deadlineAt
 ) {
+    public LunaTurnInput(
+        UUID requestId,
+        String requesterName,
+        List<ConversationEntry> history,
+        List<Capability> capabilities,
+        Set<ToolName> availableTools,
+        int remainingToolCalls,
+        int remainingModelRounds,
+        Instant deadlineAt
+    ) {
+        this(
+            requestId,
+            requesterName,
+            history,
+            capabilities,
+            availableTools,
+            remainingToolCalls,
+            remainingModelRounds,
+            ReasoningLevel.MEDIUM,
+            deadlineAt
+        );
+    }
+
     public LunaTurnInput {
         Objects.requireNonNull(requestId, "requestId");
-        requesterName = Objects.requireNonNull(requesterName, "requesterName");
-        history = List.copyOf(Objects.requireNonNull(history, "history"));
-        capabilities = List.copyOf(Objects.requireNonNull(capabilities, "capabilities"));
-        availableTools = Set.copyOf(Objects.requireNonNull(availableTools, "availableTools"));
+        requesterName = Objects.requireNonNull(
+            requesterName,
+            "requesterName"
+        );
+        history = List.copyOf(
+            Objects.requireNonNull(history, "history")
+        );
+        capabilities = List.copyOf(
+            Objects.requireNonNull(
+                capabilities,
+                "capabilities"
+            )
+        );
+        availableTools = Set.copyOf(
+            Objects.requireNonNull(
+                availableTools,
+                "availableTools"
+            )
+        );
+        Objects.requireNonNull(
+            reasoningLevel,
+            "reasoningLevel"
+        );
         Objects.requireNonNull(deadlineAt, "deadlineAt");
-        if (remainingToolCalls < 0 || remainingModelRounds < 0) {
-            throw new IllegalArgumentException("Remaining Luna budgets must not be negative.");
+        if (
+            remainingToolCalls < 0
+                || remainingModelRounds < 0
+        ) {
+            throw new IllegalArgumentException(
+                "Remaining Luna budgets must not be negative."
+            );
         }
     }
 }

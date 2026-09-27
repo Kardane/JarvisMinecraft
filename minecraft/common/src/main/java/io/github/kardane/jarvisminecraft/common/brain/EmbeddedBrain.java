@@ -8,6 +8,8 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.JevInput;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaClient;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaTurnInput;
+import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningLevel;
+import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
@@ -48,6 +50,7 @@ public final class EmbeddedBrain {
     private final JevClassifier jev;
     private final DeterministicRoutePolicy routePolicy;
     private final LunaClient luna;
+    private final ReasoningPolicy reasoningPolicy;
     private final AuditSink audit;
     private final CommonRuntime.ExecutionRuntime toolRuntime;
     private final Clock clock;
@@ -67,6 +70,36 @@ public final class EmbeddedBrain {
         CommonRuntime.ExecutionRuntime toolRuntime,
         Clock clock
     ) {
+        this(
+            serverId,
+            capabilities,
+            sessions,
+            history,
+            scheduler,
+            jev,
+            routePolicy,
+            luna,
+            ReasoningPolicy.defaults(),
+            audit,
+            toolRuntime,
+            clock
+        );
+    }
+
+    public EmbeddedBrain(
+        String serverId,
+        List<Capability> capabilities,
+        ChatSessionManager sessions,
+        ConversationHistoryStore history,
+        AiRequestScheduler scheduler,
+        JevClassifier jev,
+        DeterministicRoutePolicy routePolicy,
+        LunaClient luna,
+        ReasoningPolicy reasoningPolicy,
+        AuditSink audit,
+        CommonRuntime.ExecutionRuntime toolRuntime,
+        Clock clock
+    ) {
         if (serverId == null || serverId.isBlank()) {
             throw new IllegalArgumentException("serverId must not be blank.");
         }
@@ -80,6 +113,10 @@ public final class EmbeddedBrain {
         this.jev = Objects.requireNonNull(jev, "jev");
         this.routePolicy = Objects.requireNonNull(routePolicy, "routePolicy");
         this.luna = Objects.requireNonNull(luna, "luna");
+        this.reasoningPolicy = Objects.requireNonNull(
+            reasoningPolicy,
+            "reasoningPolicy"
+        );
         this.audit = Objects.requireNonNull(audit, "audit");
         this.toolRuntime = Objects.requireNonNull(toolRuntime, "toolRuntime");
         this.clock = Objects.requireNonNull(clock, "clock");
@@ -171,8 +208,12 @@ public final class EmbeddedBrain {
                 ? toolRuntime.activeTools()
                 : Set.of();
             JevInput input = JevInput.fromConversation(
-                history.history(request.requesterUuid(), request.sessionId()),
-                capabilities
+                history.history(
+                    request.requesterUuid(),
+                    request.sessionId()
+                ),
+                capabilities,
+                request.mode()
             );
 
             Instant jevDeadline = earlier(
@@ -192,12 +233,30 @@ public final class EmbeddedBrain {
                                 classification.model()
                             )
                     ) {
-                        return routePolicy.errorFallback(activeTools);
+                        return new PlanningDecision(
+                            routePolicy.errorFallback(
+                                activeTools
+                            ),
+                            reasoningPolicy.fallback()
+                        );
                     }
-                    return routePolicy.route(classification, activeTools);
+                    return new PlanningDecision(
+                        routePolicy.route(
+                            classification,
+                            activeTools
+                        ),
+                        reasoningPolicy.resolve(
+                            classification
+                        )
+                    );
                 })
                 .thenCompose(
-                    routing -> modelLoop(request, budget, routing)
+                    plan -> modelLoop(
+                        request,
+                        budget,
+                        plan.routing(),
+                        plan.reasoningLevel()
+                    )
                 );
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
@@ -207,7 +266,8 @@ public final class EmbeddedBrain {
     private CompletionStage<Reply> modelLoop(
         ChatRequest request,
         RequestBudget budget,
-        DeterministicRoutePolicy.RoutingDecision routing
+        DeterministicRoutePolicy.RoutingDecision routing,
+        ReasoningLevel reasoningLevel
     ) {
         try {
             assertRunning();
@@ -222,6 +282,7 @@ public final class EmbeddedBrain {
                 routing.availableTools(),
                 budget.remainingToolCalls(),
                 budget.remainingModelRounds(),
+                reasoningLevel,
                 budget.deadlineAt()
             );
 
@@ -300,7 +361,12 @@ public final class EmbeddedBrain {
                         routing,
                         tools.calls()
                     ).thenCompose(
-                        ignored -> modelLoop(request, budget, routing)
+                        ignored -> modelLoop(
+                            request,
+                            budget,
+                            routing,
+                            reasoningLevel
+                        )
                     );
                 });
         } catch (RuntimeException failure) {
@@ -661,6 +727,19 @@ public final class EmbeddedBrain {
     }
 
     private record SessionKey(UUID requesterUuid, UUID sessionId) {
+    }
+
+    private record PlanningDecision(
+        DeterministicRoutePolicy.RoutingDecision routing,
+        ReasoningLevel reasoningLevel
+    ) {
+        private PlanningDecision {
+            Objects.requireNonNull(routing, "routing");
+            Objects.requireNonNull(
+                reasoningLevel,
+                "reasoningLevel"
+            );
+        }
     }
 
     private record ModelOutcome(LunaStep step, Throwable failure) {
