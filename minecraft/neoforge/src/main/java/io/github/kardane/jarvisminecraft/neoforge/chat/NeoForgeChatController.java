@@ -110,7 +110,14 @@ public final class NeoForgeChatController {
 
         switch (decision.kind()) {
             case PUBLIC_CHAT -> {
-                // Preserve normal NeoForge chat handling.
+                // Preserve normal chat and observe it for ACTIVE mode.
+                if (interactions.isAuthorized(identity)) {
+                    brain.considerProactive(
+                        requesterUuid,
+                        sender.getGameProfile().getName(),
+                        event.getRawText()
+                    );
+                }
             }
             case PUBLIC_ESCAPE ->
                 event.setMessage(Component.literal(decision.text()));

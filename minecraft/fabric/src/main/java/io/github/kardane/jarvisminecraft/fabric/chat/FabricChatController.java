@@ -101,7 +101,16 @@ public final class FabricChatController {
         }
 
         return switch (decision.kind()) {
-            case PUBLIC_CHAT -> true;
+            case PUBLIC_CHAT -> {
+                if (interactions.isAuthorized(identity)) {
+                    brain.considerProactive(
+                        requesterUuid,
+                        sender.getGameProfile().getName(),
+                        text
+                    );
+                }
+                yield true;
+            }
             case PUBLIC_ESCAPE -> true;
             case END -> {
                 brain.cancelSession(

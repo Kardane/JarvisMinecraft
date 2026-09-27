@@ -86,7 +86,9 @@ public final class PaperChatListener implements Listener {
 
         switch (decision.kind()) {
             case PUBLIC_CHAT -> {
-                // Leave Paper's normal chat path unchanged.
+                // Leave Paper's normal chat path unchanged, then observe it
+                // asynchronously for ACTIVE-mode proactive engagement.
+                observeProactive(identity, text);
             }
             case PUBLIC_ESCAPE ->
                 event.message(Component.text(decision.text()));
@@ -139,6 +141,27 @@ public final class PaperChatListener implements Listener {
             requesterUuid,
             CancelReason.CLIENT_DISCONNECTED
         );
+    }
+
+    private void observeProactive(
+        PlayerIdentity identity,
+        String text
+    ) {
+        if (!interactions.isAuthorized(identity)) {
+            return;
+        }
+        try {
+            scheduler.submit(() -> {
+                brain.considerProactive(
+                    identity.uuid(),
+                    identity.name(),
+                    text
+                );
+                return CompletableFuture.completedFuture(null);
+            });
+        } catch (RuntimeException ignored) {
+            // Server shutdown/scheduler rejection: normal chat still proceeds.
+        }
     }
 
     private boolean isCurrentlyAuthorized(UUID requesterUuid) {
