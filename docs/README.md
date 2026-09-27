@@ -10,6 +10,7 @@ The maintained documentation is separated by responsibility.
 - [tools.md](tools.md) — Tool catalog and boundaries
 - [protocol.md](protocol.md) — preserved protocol/fixture contract
 - [later-todo.md](later-todo.md) — work that is not yet implemented
+- [persona-knowledge-implementation-plan.md](persona-knowledge-implementation-plan.md) — proposed plan for configurable persona and server knowledge
 - [decisions/](decisions/) — active ADRs
 
 Historical date-specific verification reports were removed from the repository. Determine current status from the code, CI, the documents above, and committed regression assets.
