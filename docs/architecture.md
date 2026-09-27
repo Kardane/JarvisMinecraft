@@ -1,15 +1,15 @@
-# Minecraft JARVIS 아키텍처
+# Minecraft JARVIS Architecture
 
-갱신일: 2026-09-27  
-범위: Paper, Fabric, NeoForge Adapter와 JVM 내부 Embedded Brain의 현재 구조.
+Last updated: 2026-09-27  
+Scope: current Paper, Fabric, and NeoForge Adapter architecture and the in-JVM Embedded Brain.
 
-## 현재 구조
+## Current Architecture
 
-JARVIS는 별도 Node/Brain daemon 없이 Minecraft 서버 JVM 안에서 동작한다. 플랫폼 Adapter는 현재 온라인 플레이어 identity를 구성하고 `InteractionCoordinator`의 audience/호출어/session 정책을 통과한 입력만 `EmbeddedBrainGateway`로 전달한다. `EmbeddedBrainGateway`는 lifecycle/API façade이며 `EmbeddedBrainBootstrap`이 live runtime resource wiring, `GatewayRequestCoordinator`가 request 접수/완료 흐름, `ProactiveInteractionController`가 ACTIVE proactive admission, `GatewayReplyPresenter`가 server-thread delivery/progress/sound, `GatewayAuditHealthMonitor`가 audit health reporting을 담당한다. `EmbeddedBrain`은 request lifecycle facade로 남고, `RequestPlanner`가 Jev/route/reasoning, `ModelConversationLoop`가 Luna round/history, `ToolExecutionCoordinator`가 Tool policy/audit/runtime 실행, `ScheduledToolCoordinator`가 schedule 등록·취소·반복 실행을 담당한다. Minecraft Tool 권한은 interaction audience와 분리되어 있으며 현재는 online OP에게만 노출된다.
+JARVIS runs inside the Minecraft server JVM without a separate Node/Brain daemon. Platform Adapters construct the current online player identity and forward only input that passes `InteractionCoordinator` audience/wake-word/session policy to `EmbeddedBrainGateway`. `EmbeddedBrainGateway` is a lifecycle/API façade: `EmbeddedBrainBootstrap` owns live runtime resource wiring, `GatewayRequestCoordinator` owns request admission/completion flow, `ProactiveInteractionController` owns ACTIVE proactive admission, `GatewayReplyPresenter` owns server-thread delivery/progress/sound, and `GatewayAuditHealthMonitor` owns audit-health reporting. `EmbeddedBrain` remains the request-lifecycle façade; `RequestPlanner` owns Jev/route/reasoning, `ModelConversationLoop` owns Luna rounds/history, `ToolExecutionCoordinator` owns Tool policy/audit/runtime execution, and `ScheduledToolCoordinator` owns schedule registration/cancellation/repeated execution. Minecraft Tool authority is separate from interaction audience and is currently exposed only to online OPs.
 
 ```mermaid
 flowchart LR
-  P["설정상 허용된 온라인 플레이어"] --> AD["Minecraft Adapter / InteractionCoordinator"]
+  P["Configured eligible online player"] --> AD["Minecraft Adapter / InteractionCoordinator"]
   AD --> EB["EmbeddedBrainGateway / EmbeddedBrain"]
   EB --> JV["TypeSafe Jev HTTPS"]
   EB --> GPT["OpenAI GPT-6 Luna"]
@@ -21,47 +21,47 @@ flowchart LR
   AD --> P
 ```
 
-WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong, reconnect generation, 별도 Brain process registry는 E13/E14에서 제거되었다.
+WebSocket transport, shared-secret authentication, hello/capabilities handshake, ping/pong, reconnect generation, and the separate Brain process registry were removed in E13/E14.
 
-## 구성 요소
+## Components
 
-| 구성 요소 | 책임 |
+| Component | Responsibility |
 |---|---|
-| `minecraft/common` | lifecycle/API façade `EmbeddedBrainGateway`, `EmbeddedBrainBootstrap`, `GatewayRequestCoordinator`, `ProactiveInteractionController`, `GatewayReplyPresenter`, `GatewayAuditHealthMonitor`, lifecycle facade `EmbeddedBrain`, `RequestPlanner`, `ModelConversationLoop`, `ToolExecutionCoordinator`, `ScheduledToolCoordinator`, Jev/Luna client, conversation history, request budget/scheduler, audit, runtime-policy config snapshot/validation, `ToolSpec` 기반 Tool contract/argument validation, `CommonRuntime`, Tool registry, authority/deadline/deduplication |
+| `minecraft/common` | lifecycle/API façade `EmbeddedBrainGateway`, `EmbeddedBrainBootstrap`, `GatewayRequestCoordinator`, `ProactiveInteractionController`, `GatewayReplyPresenter`, `GatewayAuditHealthMonitor`, lifecycle façade `EmbeddedBrain`, `RequestPlanner`, `ModelConversationLoop`, `ToolExecutionCoordinator`, `ScheduledToolCoordinator`, Jev/Luna clients, conversation history, request budget/scheduler, audit, runtime-policy config snapshot/validation, `ToolSpec`-based Tool contract/argument validation, `CommonRuntime`, Tool registry, authority/deadline/deduplication |
 | `minecraft/paper` | Paper entrypoint, chat/session integration, scheduler/platform access, standard Tool, CoreProtect/WorldGuard/CMI optional Provider |
 | `minecraft/fabric` | Fabric dedicated-server entrypoint, chat controller, scheduler/platform access, standard Tool |
 | `minecraft/neoforge` | NeoForge dedicated-server entrypoint, chat controller, scheduler/platform access, tick sampler, standard Tool |
-| `protocol/schema`, `protocol/fixtures` | 과거 Remote wire contract와 호환성/회귀 분석을 위해 보존하는 정적 계약 자산 |
-| `evals` | Jev 평가 데이터와 E12 policy parity fixture |
-| `tests/acceptance/out` | T10에서 수집된 과거 live acceptance evidence snapshot |
+| `protocol/schema`, `protocol/fixtures` | static contract assets retained for compatibility/regression analysis of the historical Remote wire contract |
+| `evals` | Jev evaluation data and the E12 policy-parity fixture |
+| `tests/acceptance/out` | historical live-acceptance evidence snapshots collected in T10 |
 
-## 요청 흐름
+## Request Flow
 
-1. 플랫폼 Adapter가 현재 온라인 플레이어 identity를 만들고 `InteractionCoordinator`가 `OP / WHITELIST / ALL / BLACKLIST` audience, configurable wake word, active session, 종료/escape를 판정한다.
-2. `EmbeddedBrainGateway`는 API façade로서 `GatewayRequestCoordinator`에 요청을 위임한다. coordinator가 현재 identity와 interaction authorization을 다시 확인하고 request를 생성해 bounded `AiRequestScheduler`로 넘긴다. requester가 현재 OP가 아니면 request의 Tool set은 빈 집합으로 고정된다.
-3. `EmbeddedBrain`이 request budget/history/lifecycle을 준비하고 `RequestPlanner`에 planning을 위임한다. `ExecutionPolicy`가 현재 runtime config, requester Tool authority, interaction origin으로 active Tool set을 먼저 제한한다.
-4. `RequestPlanner`가 Jev에 latest message, short topic, interaction origin, capability 이름을 전달해 `engagement + route + reasoning`을 한 요청에서 판단한다.
-5. `DeterministicRoutePolicy`가 execution-filtered Tool set을 route category에 맞게 좁힌다. Jev 오류, `UNCERTAIN`, 저신뢰 fallback에서는 read-only Tool만 노출한다.
-6. `ReasoningPolicy`가 runtime config와 Jev 결과를 결합해 요청별 `NONE / LOW / MEDIUM / HIGH` 값을 확정하고, Luna의 모든 model round에 동일한 effort를 적용한다.
-7. `ModelConversationLoop`가 Luna round를 반복한다. Luna는 허용된 Tool schema만 보고 Tool call을 제안하며, 후속 model round와 `ToolExecutionCoordinator`의 실제 Tool 실행 직전에도 최신 `ExecutionPolicy`를 다시 적용한다.
-8. Tool shape/range/schema의 source of truth는 공용 `ToolSpec`이며, `ToolArgumentCodec`과 Luna function schema가 이를 함께 소비한다. 모델 출력은 `ToolArgumentCodec`을 통해 다시 strict parsing되며 실행 권한이 아니다.
-9. 상태 변경 Tool은 `ToolExecutionCoordinator`의 pre-execution audit 성공 후 최신 `ExecutionPolicy`를 한 번 더 통과해야 `CommonRuntime.ExecutionRuntime`으로 전달된다. `schedule_action` / `cancel_scheduled_action`과 반복 실행 lifecycle은 `ScheduledToolCoordinator`가 같은 audit/policy support를 사용해 처리한다.
-10. `CommonRuntime`이 current OP, active Tool, deadline, deduplication/action semantics를 재검사하고 플랫폼 scheduler에서 실제 Minecraft/Provider API를 호출한다.
-11. Tool result를 Luna가 해석해 최종 답을 만든다.
-12. `GatewayReplyPresenter`가 server thread로 돌아가 현재 interaction authorization과 active session을 다시 확인한 뒤 응답을 public chat으로 broadcast하고 optional progress/sound feedback을 처리한다. `EmbeddedBrainGateway`는 이 흐름의 lifecycle/API façade만 유지한다.
+1. The platform Adapter constructs the current online player identity, and `InteractionCoordinator` evaluates the `OP / WHITELIST / ALL / BLACKLIST` audience, configurable wake word, active session, and termination/escape handling.
+2. `EmbeddedBrainGateway` delegates to `GatewayRequestCoordinator` as an API façade. The coordinator re-checks current identity and interaction authorization, creates the request, and submits it to the bounded `AiRequestScheduler`. If the requester is not currently an OP, the request's Tool set is fixed to empty.
+3. `EmbeddedBrain` prepares request budget/history/lifecycle state and delegates planning to `RequestPlanner`. `ExecutionPolicy` first filters the active Tool set using current runtime configuration, requester Tool authority, and interaction origin.
+4. `RequestPlanner` sends the latest message, bounded short topic, interaction origin, and capability names to Jev so `engagement + route + reasoning` are decided in one classification request.
+5. `DeterministicRoutePolicy` narrows the execution-filtered Tool set to the route category. Jev errors, `UNCERTAIN`, and low-confidence fallback expose read-only Tools only.
+6. `ReasoningPolicy` combines runtime configuration with the Jev result to select `NONE / LOW / MEDIUM / HIGH` for the request and applies the same effort to every Luna model round.
+7. `ModelConversationLoop` runs Luna rounds. Luna sees only allowed Tool schemas, and the latest `ExecutionPolicy` is re-applied both on subsequent model rounds and immediately before actual Tool execution in `ToolExecutionCoordinator`.
+8. Shared `ToolSpec` is the source of truth for Tool shape/range/schema. `ToolArgumentCodec` and Luna function schemas consume it together. Model output is strictly parsed again through `ToolArgumentCodec` and is not execution authority.
+9. A state-changing Tool reaches `CommonRuntime.ExecutionRuntime` only after `ToolExecutionCoordinator` completes pre-execution audit and a fresh `ExecutionPolicy` check. `schedule_action` / `cancel_scheduled_action` and repeated execution lifecycle are handled by `ScheduledToolCoordinator` using the same audit/policy support.
+10. `CommonRuntime` re-checks current OP status, active Tool, deadline, deduplication/action semantics, then invokes the real Minecraft/Provider API through the platform scheduler.
+11. Luna interprets the Tool result and produces the final response.
+12. `GatewayReplyPresenter` returns to the server thread, re-checks current interaction authorization and active session, broadcasts the response to public chat, and handles optional progress/sound feedback. `EmbeddedBrainGateway` retains only the lifecycle/API façade for this flow.
 
-## 권한과 안전 불변조건
+## Authority and Safety Invariants
 
-- interaction admission의 source of truth는 현재 online identity + `AudiencePolicy`다. Minecraft Tool authority의 source of truth는 계속 현재 online + OP 상태다.
-- Jev/Luna 출력, requester UUID 문자열, capability 이름은 권한 증거가 아니다.
-- Tool은 현재 `ToolRegistry`에 실제 등록된 경우에만 활성화된다.
-- unknown/missing Tool argument field, 잘못된 UUID/range/selector는 거부한다.
-- session별 요청 직렬화와 bounded queue를 유지한다.
-- request당 Tool 최대 8회, 모델 왕복 최대 4회, 전체 deadline 30초를 유지한다.
-- 상태 변경 Tool은 audit fail-closed다.
-- 상태 변경 결과가 deadline 안에 확정되지 않으면 `OUTCOME_UNKNOWN`이며 자동 retry하지 않는다.
-- audience 탈락/deop/logout/session end 후 stale reply를 차단한다. Tool 실행은 별도로 current OP를 재확인한다.
-- optional Provider가 성공적으로 활성화되지 않으면 그 Provider Tool은 Luna에 노출하지 않는다.
+- The source of truth for interaction admission is the current online identity plus `AudiencePolicy`. The source of truth for Minecraft Tool authority remains current online + OP state.
+- Jev/Luna output, requester UUID strings, and capability names are not authority evidence.
+- A Tool is active only if it is actually registered in the current `ToolRegistry`.
+- Reject unknown/missing Tool argument fields and invalid UUID/range/selector values.
+- Preserve per-session request serialization and bounded queues.
+- Preserve at most 8 Tool calls per request, at most 4 model round trips, and a 30-second overall deadline.
+- State-changing Tools use fail-closed audit.
+- If a state-changing outcome is not determined before the deadline, return `OUTCOME_UNKNOWN` and do not retry automatically.
+- Block stale replies after audience removal, de-op, logout, or session end. Tool execution separately re-checks current OP status.
+- Do not expose a Provider Tool to Luna unless that optional Provider has been successfully activated.
 
 ## Runtime policy configuration
 
@@ -72,11 +72,11 @@ NeoForge read the optional
 `config/jarvisminecraft/jarvis.properties` file through the common
 properties source. Missing Fabric/NeoForge policy files use built-in defaults.
 
-각 runtime composition root는 `ConfigManager`를 하나만 생성해
+Each runtime composition root creates exactly one `ConfigManager` and shares it with
 `InteractionCoordinator`, `EmbeddedBrainGateway`, `ReasoningPolicy`,
-`ExecutionPolicy`, `SchedulingPolicy`, operational logging에 같은 인스턴스를
-공유한다. Gateway wiring은 interaction policy와 Brain policy가 서로 다른
-`ConfigManager`를 참조하는 구성을 거부한다.
+`ExecutionPolicy`, `SchedulingPolicy`, and operational logging.
+Gateway wiring rejects configurations where interaction policy and Brain policy refer to
+different `ConfigManager` instances.
 
 Phase 2 consumes the base interaction portion through
 `InteractionCoordinator`, `AudiencePolicy`, and `InvocationMatcher`.
@@ -166,72 +166,72 @@ Provider credentials and logical server identity remain in
 `ConfigManager.reload()` replaces the snapshot only after a complete
 successful parse, otherwise the previous valid snapshot remains active.
 
-## Session과 conversation state
+## Session and Conversation State
 
-`ChatSessionManager`가 session ID, TTL, active 여부, 종료와 invalidation을 단독 소유한다. Embedded Brain은 별도의 session TTL store를 만들지 않고 `ConversationHistoryStore`에 모델 대화 이력만 보관한다.
+`ChatSessionManager` exclusively owns session IDs, TTL, active state, termination, and invalidation. The Embedded Brain does not create a separate session TTL store; it stores only model conversation history in `ConversationHistoryStore`.
 
-기본 session TTL은 120초지만 `jarvis.interaction.follow-up-seconds`로 변경할 수 있다. 직접 호출어 기본값은 `자비스`, `jarvis`, `재비스`이며 `jarvis.interaction.wake-words`로 교체할 수 있다. 호출어는 메시지 시작의 독립 토큰으로만 인정한다. `대화 끝`과 `!내용`은 모델 호출 전에 로컬 처리한다.
+The default session TTL is 120 seconds and can be changed with `jarvis.interaction.follow-up-seconds`. The default direct wake words are `자비스`, `jarvis`, and `재비스`, replaceable via `jarvis.interaction.wake-words`. A wake word is accepted only as an independent token at the beginning of the message. The literal commands `대화 끝` and `!내용` are handled locally before any model call.
 
-`WHITELIST`와 `BLACKLIST`는 현재 접속 플레이어의 정확한 profile name을 대소문자 무시 비교한다. audience에서 허용된 비OP는 일반 Luna 대화는 가능하지만 request 단위 `toolsAllowed=false`가 적용되어 Minecraft Tool schema를 받지 않는다.
+`WHITELIST` and `BLACKLIST` compare the current online player's exact profile name case-insensitively. A non-OP admitted by the audience may use normal Luna conversation, but the request gets `toolsAllowed=false` and receives no Minecraft Tool schema.
 
-## Tool 경계
+## Tool Boundary
 
-정적 Tool metadata는 `Protocol.ToolName`, 현재 활성 Tool set은 `ToolRegistry`가 소유한다. 기존 v0.1 상태 변경 Tool은 요청자 본인을 온라인 대상 플레이어 위치로 이동하는 `teleport_staff`였고, Phase 6에서 구조화된 `weather_set`과 `time_set`을 추가했다.
+Static Tool metadata is owned by `Protocol.ToolName`; the currently active Tool set is owned by `ToolRegistry`. The original v0.1 state-changing Tool was `teleport_staff`, which moves the requester to the location of an online target player. Phase 6 added structured `weather_set` and `time_set` Tools.
 
-Phase 6 action Tool은 모두 `Risk.LOW`이며 raw command를 만들지 않는다. `weather_set`은 loaded world 한 곳의 `CLEAR / RAIN / THUNDER`를 1~3600초 범위로 설정하고, `time_set`은 loaded world 한 곳의 day count를 유지하면서 time-of-day 0~23999만 변경한다. 기본 `READ_TALK`에서는 세 state-changing Tool 모두 Luna에 노출되지 않는다.
+All Phase 6 action Tools are `Risk.LOW` and never construct raw commands. `weather_set` sets one loaded world to `CLEAR / RAIN / THUNDER` for 1–3600 seconds. `time_set` preserves the loaded world's day count while changing only time-of-day in the 0–23999 range. The default `READ_TALK` mode exposes none of these three state-changing Tools to Luna.
 
-CoreProtect, WorldGuard, CMI 기능은 Paper에서 optional Provider로 로딩하며 초기화 실패/의존성 부재 시 관련 Tool을 등록하지 않는다.
+CoreProtect, WorldGuard, and CMI features are loaded as optional Providers on Paper. Related Tools are not registered if initialization fails or a dependency is missing.
 
-## 운영 로깅
+## Operational Logging
 
-Operational logging Phase L1~L6가 공통 runtime에 연결되어 있다.
+Operational Logging Phases L1–L6 are connected to the shared runtime.
 
-- `JarvisLog` / `ConfiguredJarvisLog`가 공통 event/level/category gate를 담당하고 Paper/Fabric/NeoForge adapter가 각 플랫폼 console logger로 전달한다.
-- 기본 console 형식은 `[JARVIS] event key=value`이며 `LogSanitizer`가 sensitive key, OpenAI key pattern, Bearer token, 개행과 과도하게 긴 값을 정리한다.
-- `jarvis.logging.*` 설정으로 level, console, request lifecycle, Jev/Luna, Tool, proactive, health 항목을 제어한다. Phase L1~L6에서는 request, Jev/Luna, Tool/policy, scheduling, ACTIVE proactive, Audit health event가 runtime 경로에 연결되어 있다.
-- request path는 `request.accepted/completed/failed`, planning path는 `jev.completed/failed/fallback`, `routing.resolved`, `reasoning.resolved`, model path는 `luna.round_completed/failed`를 기록한다.
-- Tool/policy path는 `tool.exposure_resolved`, `tool.denied`, `tool.started`, `tool.completed`, `tool.outcome_unknown`를 기록한다. `ExecutionPolicy`는 `NO_REQUESTER_AUTHORITY / READ_TALK / NOT_ALLOWLISTED / DENYLISTED / PROACTIVE_MUTATION_BLOCK / POLICY_CHANGED / TOOL_INACTIVE` denial code를 제공한다.
-- scheduling path는 `schedule.created/run_started/run_completed/cancelled/aborted`를 기록하며 `scheduleId → runIndex → toolCallId/actionId` 상관관계를 유지한다. actor invalidation, policy revoke, audit failure, timeout/outcome-unknown, server stopping 등은 고정 reason code로 남긴다.
-- ACTIVE proactive path는 `proactive.candidate/accepted/ignored/failed`를 기록한다. ignored는 DEBUG이며 cooldown, in-flight 제한, Jev ignore, confidence threshold, actor/session 재검사 등 metadata reason만 남긴다.
-- Audit health reporter는 `jarvis.logging.health.interval-seconds` 주기로 health snapshot을 비교하고 상태/오류 코드 변화에만 `audit.degraded/unhealthy/recovered`를 기록한다. `/jm status`는 Paper/Fabric/NeoForge에서 OP 권한으로 runtime/config, AI queue, proactive in-flight, Audit health summary를 노출한다.
-- raw player chat, Luna prompt/response, Jev raw body는 operational field에 넣지 않는다. 기존 `AsyncJsonlAuditSink`와 mutation fail-closed semantics는 변경하지 않는다.
-- 기존 직접 생성/test 경로는 `NoOpJarvisLog`를 기본값으로 사용해 기능 동작을 바꾸지 않는다.
+- `JarvisLog` / `ConfiguredJarvisLog` own the shared event/level/category gates, and Paper/Fabric/NeoForge Adapters forward to each platform console logger.
+- The default console format is `[JARVIS] event key=value`. `LogSanitizer` removes sensitive keys, OpenAI key patterns, Bearer tokens, newlines, and excessively long values.
+- `jarvis.logging.*` controls level, console, request lifecycle, Jev/Luna, Tool, proactive, and health categories. In L1–L6, request, Jev/Luna, Tool/policy, scheduling, ACTIVE proactive, and Audit-health events are wired into runtime paths.
+- The request path logs `request.accepted/completed/failed`; the planning path logs `jev.completed/failed/fallback`, `routing.resolved`, and `reasoning.resolved`; the model path logs `luna.round_completed/failed`.
+- The Tool/policy path logs `tool.exposure_resolved`, `tool.denied`, `tool.started`, `tool.completed`, and `tool.outcome_unknown`. `ExecutionPolicy` exposes denial codes `NO_REQUESTER_AUTHORITY / READ_TALK / NOT_ALLOWLISTED / DENYLISTED / PROACTIVE_MUTATION_BLOCK / POLICY_CHANGED / TOOL_INACTIVE`.
+- The scheduling path logs `schedule.created/run_started/run_completed/cancelled/aborted` and preserves `scheduleId → runIndex → toolCallId/actionId` correlation. Actor invalidation, policy revoke, audit failure, timeout/outcome-unknown, and server stopping use fixed reason codes.
+- The ACTIVE proactive path logs `proactive.candidate/accepted/ignored/failed`. Ignored events are DEBUG and contain metadata reasons only, such as cooldown, in-flight limit, Jev ignore, confidence threshold, and actor/session re-checks.
+- The Audit health reporter compares health snapshots at `jarvis.logging.health.interval-seconds` and emits `audit.degraded/unhealthy/recovered` only when status or error code changes. `/jm status` is OP-only on Paper/Fabric/NeoForge and exposes runtime/config, AI queue, proactive in-flight, and Audit health summary.
+- Do not place raw player chat, Luna prompt/response, or Jev raw body in operational fields. Existing `AsyncJsonlAuditSink` and mutation fail-closed semantics are unchanged.
+- Existing direct-construction/test paths default to `NoOpJarvisLog` so functional behavior is unchanged.
 
-## AI와 스레드 경계
+## AI and Threading Boundary
 
-Jev와 Luna 네트워크 호출은 Minecraft server/tick thread를 점유하지 않는다. 플랫폼 API 호출만 각 플랫폼의 scheduler/execution context에서 수행한다. Jev에는 최신 사용자 메시지, bounded short topic, interaction origin, capability 이름만 전달한다. Luna에는 요청 처리에 필요한 bounded 대화, capability, 허용된 Tool schema/result만 전달한다. Progress delay는 JDK delayed executor에서 기다리고 실제 메시지/사운드 API 호출은 platform `ServerScheduler`로 되돌린다.
+Jev and Luna network calls do not occupy the Minecraft server/tick thread. Only platform API calls run in each platform's scheduler/execution context. Jev receives only the latest user message, bounded short topic, interaction origin, and capability names. Luna receives only the bounded conversation, capabilities, and allowed Tool schemas/results needed for request processing. Progress delay waits on the JDK delayed executor, while actual message/sound API calls return to the platform `ServerScheduler`.
 
-## 감사
+## Audit
 
-Embedded Brain의 `AsyncJsonlAuditSink`는 bounded queue, JSONL rotation/retention, masking과 health 상태를 제공한다. state-changing Tool의 pre-execution record가 실제 저장되지 않으면 실행을 거부한다. post-execution audit 실패는 이미 실행된 Tool을 retry하게 만들지 않는다.
+The Embedded Brain's `AsyncJsonlAuditSink` provides a bounded queue, JSONL rotation/retention, masking, and health state. If a pre-execution record for a state-changing Tool is not actually persisted, execution is denied. Post-execution audit failure never causes retry of an already executed Tool.
 
-## E12-E16 전환 결과
+## E12–E16 Migration Result
 
-- E12: Remote reference와 Embedded Java가 같은 shared parity fixture를 통과하도록 정책 회귀 테스트를 추가했다.
-- E13: WebSocket transport, shared-secret auth, protocol codec/message DTO, request-binding connection registry, 플랫폼 Remote wrapper/config를 제거했다.
-- E14: TypeScript/Node production Brain, WebSocket server/daemon/CLI, Node CI job을 제거했다.
-- E15: provider API key 두 개만 필수 설정으로 남기고, logical server ID는 플랫폼 data directory에 안정적으로 자동 생성/영속화한다.
-- E16: 공식 OpenAI Java SDK runtime을 플랫폼 artifact 안에 포함하고 dependency package를 내부 namespace로 relocation한다. Paper/Fabric/NeoForge 각각 단일 deployable artifact와 clean-server boot smoke를 검증한다.
-- protocol schema/fixtures, Jev 평가 데이터, E12 fixture, 과거 T10 evidence는 분석 및 회귀 기준으로 보존한다.
+- E12: added policy regression tests so the Remote reference and Embedded Java path pass the same shared parity fixture.
+- E13: removed WebSocket transport, shared-secret auth, protocol codec/message DTOs, the request-binding connection registry, and platform Remote wrappers/config.
+- E14: removed the TypeScript/Node production Brain, WebSocket server/daemon/CLI, and Node CI job.
+- E15: reduced required configuration to the two Provider API keys; logical server IDs are now generated and persisted stably in each platform data directory.
+- E16: bundled the official OpenAI Java SDK runtime inside platform artifacts and relocated dependency packages under an internal namespace. Paper/Fabric/NeoForge each have one deployable artifact and clean-server boot smoke coverage.
+- Protocol schemas/fixtures, Jev evaluation data, the E12 fixture, and historical T10 evidence are retained for analysis and regression baselines.
 
-과거 Remote 전송 계약과 T10 결과는 역사적 검증 자료다. 현재 production runtime path에는 Node process나 WebSocket 연결이 존재하지 않는다.
+The historical Remote transport contract and T10 results are historical verification material. The current production runtime path has no Node process or WebSocket connection.
 
-## 빌드와 운영
+## Build and Operations
 
-현재 production build 기준은 Java 21 + Gradle이다.
+The current production build baseline is Java 21 + Gradle.
 
 ```bash
 ./gradlew build
 ```
 
-실제 provider live smoke는 credentials가 있을 때 별도 실행한다.
+Run real Provider live smoke tests separately when credentials are available.
 
 ```bash
 OPENAI_API_KEY=... TYPESAFE_API_KEY=... \
   ./gradlew :minecraft:common:embeddedBrainLiveVerification
 ```
 
-구체적인 운영 설정과 장애 절차는 [operations.md](operations.md)를 따른다. Embedded 전환 결정은 [ADR-0007](decisions/0007-embedded-brain-boundary.md)에 기록한다.
+See [operations.md](operations.md) for concrete operational configuration and incident procedures. The Embedded migration decision is recorded in [ADR-0007](decisions/0007-embedded-brain-boundary.md).
 
 
 ## ACTIVE proactive flow — Phase 8
