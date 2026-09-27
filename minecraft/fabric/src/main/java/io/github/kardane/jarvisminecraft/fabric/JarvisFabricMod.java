@@ -189,7 +189,7 @@ public final class JarvisFabricMod implements ModInitializer {
 
         LOGGER.info(
             "JARVIS runtime policy config validated "
-                + "(interaction + reasoning + response policy active; execution policy pending): "
+                + "(interaction + reasoning + response + execution policy active; scheduling/admin pending): "
                 + JarvisConfigSummary.from(configManager.current()).toLogLine()
         );
         LOGGER.info(
