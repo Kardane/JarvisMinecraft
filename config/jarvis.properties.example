@@ -53,3 +53,13 @@ jarvis.execution.full.deny-tools=
 jarvis.scheduling.enabled=false
 jarvis.scheduling.max-delay-seconds=60
 jarvis.scheduling.max-duration-seconds=60
+
+# Operational console logging. Audit JSONL remains independent.
+jarvis.logging.level=INFO
+jarvis.logging.console.enabled=true
+jarvis.logging.request.lifecycle=true
+jarvis.logging.ai.jev=true
+jarvis.logging.ai.luna=true
+jarvis.logging.tool.lifecycle=true
+jarvis.logging.proactive.decisions=false
+jarvis.logging.health.interval-seconds=30
