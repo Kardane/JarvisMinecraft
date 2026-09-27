@@ -121,7 +121,14 @@ public final class AiRequestScheduler {
     }
 
     public synchronized Snapshot snapshot() {
-        return new Snapshot(queue.size(), activeCount, activeSessions.size(), shutdown);
+        return new Snapshot(
+            queue.size(),
+            maxQueuedTotal,
+            activeCount,
+            maxConcurrent,
+            activeSessions.size(),
+            shutdown
+        );
     }
 
     private boolean canStartImmediately(SessionKey key) {
@@ -237,7 +244,9 @@ public final class AiRequestScheduler {
 
     public record Snapshot(
         int queuedTotal,
+        int maxQueuedTotal,
         int activeRequests,
+        int maxConcurrent,
         int activeSessions,
         boolean shutdown
     ) {
