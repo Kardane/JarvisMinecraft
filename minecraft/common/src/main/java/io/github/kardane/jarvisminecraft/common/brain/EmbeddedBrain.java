@@ -720,13 +720,19 @@ public final class EmbeddedBrain {
         assertSession(request.requesterUuid(), request.sessionId());
         budget.assertLive(clock.instant());
 
-        if (
-            !executionPolicy.allows(
+        ExecutionPolicy.Decision initialDecision =
+            executionPolicy.evaluate(
                 call.tool(),
                 request.toolsAllowed(),
                 request.mode()
-            )
-        ) {
+            );
+        if (!initialDecision.allowed()) {
+            logToolDenied(
+                request,
+                call.tool(),
+                initialDecision.reason(),
+                null
+            );
             return CompletableFuture.failedFuture(
                 new ProtocolException(
                     ErrorCode.UNSUPPORTED,
@@ -787,13 +793,19 @@ public final class EmbeddedBrain {
             assertRunning();
             assertSession(request.requesterUuid(), request.sessionId());
 
-            if (
-                !executionPolicy.allows(
+            ExecutionPolicy.Decision currentDecision =
+                executionPolicy.evaluate(
                     call.tool(),
                     request.toolsAllowed(),
                     request.mode()
-                )
-            ) {
+                );
+            if (!currentDecision.allowed()) {
+                logToolDenied(
+                    request,
+                    call.tool(),
+                    ExecutionPolicy.DenialReason.POLICY_CHANGED,
+                    currentDecision.reason()
+                );
                 return CompletableFuture.failedFuture(
                     new ProtocolException(
                         ErrorCode.UNSUPPORTED,
@@ -801,6 +813,13 @@ public final class EmbeddedBrain {
                     )
                 );
             }
+
+            logToolStarted(
+                request,
+                call.tool(),
+                toolCallId,
+                actionId
+            );
 
             CommonRuntime.ToolInvocation invocation =
                 new CommonRuntime.ToolInvocation(
@@ -821,6 +840,15 @@ public final class EmbeddedBrain {
                     long latency = Math.max(
                         0L,
                         Duration.between(startedAt, clock.instant()).toMillis()
+                    );
+
+                    logToolCompleted(
+                        request,
+                        call.tool(),
+                        toolCallId,
+                        actionId,
+                        result,
+                        latency
                     );
 
                     CompletionStage<Void> postAudit = tryPostAudit(
