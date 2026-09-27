@@ -1,11 +1,17 @@
 package io.github.kardane.jarvisminecraft.neoforge.platform;
 
 import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
+import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.players.PlayerList;
+import net.minecraft.sounds.SoundSource;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -229,6 +235,60 @@ public final class MinecraftNeoForgePlatformAccess implements NeoForgePlatformAc
         server.getPlayerList().getPlayers().forEach(
             player -> player.sendSystemMessage(message, false)
         );
+    }
+
+    @Override
+    public void sendPublicStyled(StyledChatMessage message) {
+        requireServerThread();
+        Component rendered = renderStyled(message);
+        server.getPlayerList().getPlayers().forEach(
+            player -> player.sendSystemMessage(rendered, false)
+        );
+    }
+
+    @Override
+    public void playResponseSound(
+        UUID requesterUuid,
+        String soundId,
+        float volume,
+        float pitch
+    ) {
+        requireServerThread();
+        ServerPlayer player =
+            server.getPlayerList().getPlayer(requesterUuid);
+        ResourceLocation id = ResourceLocation.tryParse(soundId);
+        if (player == null || id == null) {
+            return;
+        }
+        BuiltInRegistries.SOUND_EVENT.getOptional(id).ifPresent(
+            sound -> player.playNotifySound(
+                sound,
+                SoundSource.MASTER,
+                volume,
+                pitch
+            )
+        );
+    }
+
+    private Component renderStyled(StyledChatMessage message) {
+        MutableComponent output = Component.empty();
+        for (StyledChatMessage.Segment segment : message.prefix()) {
+            Style style = Style.EMPTY;
+            if (segment.rgb() != null) {
+                style = style.withColor(segment.rgb());
+            }
+            style = style
+                .withObfuscated(segment.obfuscated())
+                .withBold(segment.bold())
+                .withStrikethrough(segment.strikethrough())
+                .withUnderlined(segment.underlined())
+                .withItalic(segment.italic());
+            output.append(
+                Component.literal(segment.text()).setStyle(style)
+            );
+        }
+        output.append(Component.literal(message.body()));
+        return output;
     }
 
     private Optional<ServerLevel> findWorld(String worldId) {

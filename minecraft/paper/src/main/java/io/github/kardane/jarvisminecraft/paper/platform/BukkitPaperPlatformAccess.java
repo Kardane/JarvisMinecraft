@@ -1,10 +1,14 @@
 package io.github.kardane.jarvisminecraft.paper.platform;
 
 import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
+import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
 import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Server;
+import org.bukkit.SoundCategory;
 import org.bukkit.World;
 import org.bukkit.entity.Player;
 import org.bukkit.event.player.PlayerTeleportEvent.TeleportCause;
@@ -231,6 +235,63 @@ public final class BukkitPaperPlatformAccess implements PaperPlatformAccess {
         requireServerThread();
         Component message = Component.text(MESSAGE_PREFIX + text);
         server.getOnlinePlayers().forEach(player -> player.sendMessage(message));
+    }
+
+    @Override
+    public void sendPublicStyled(StyledChatMessage message) {
+        requireServerThread();
+        Component rendered = renderStyled(message);
+        server.getOnlinePlayers().forEach(
+            player -> player.sendMessage(rendered)
+        );
+    }
+
+    @Override
+    public void playResponseSound(
+        UUID requesterUuid,
+        String soundId,
+        float volume,
+        float pitch
+    ) {
+        requireServerThread();
+        Player player = server.getPlayer(requesterUuid);
+        if (player == null || !player.isOnline()) {
+            return;
+        }
+        player.playSound(
+            player.getLocation(),
+            soundId,
+            SoundCategory.MASTER,
+            volume,
+            pitch
+        );
+    }
+
+    private Component renderStyled(StyledChatMessage message) {
+        Component output = Component.empty();
+        for (StyledChatMessage.Segment segment : message.prefix()) {
+            Component part = Component.text(segment.text());
+            if (segment.rgb() != null) {
+                part = part.color(TextColor.color(segment.rgb()));
+            }
+            if (segment.obfuscated()) {
+                part = part.decorate(TextDecoration.OBFUSCATED);
+            }
+            if (segment.bold()) {
+                part = part.decorate(TextDecoration.BOLD);
+            }
+            if (segment.strikethrough()) {
+                part = part.decorate(TextDecoration.STRIKETHROUGH);
+            }
+            if (segment.underlined()) {
+                part = part.decorate(TextDecoration.UNDERLINED);
+            }
+            if (segment.italic()) {
+                part = part.decorate(TextDecoration.ITALIC);
+            }
+            output = output.append(part);
+        }
+        return output.append(Component.text(message.body()));
     }
 
     private PlayerSnapshot snapshot(Player player) {

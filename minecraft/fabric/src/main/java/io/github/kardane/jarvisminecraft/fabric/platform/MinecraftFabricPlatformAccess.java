@@ -1,6 +1,7 @@
 package io.github.kardane.jarvisminecraft.fabric.platform;
 
 import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
+import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerManager;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -238,6 +239,60 @@ public final class MinecraftFabricPlatformAccess implements FabricPlatformAccess
         server.getPlayerManager().getPlayerList().forEach(
             player -> player.sendMessage(message, false)
         );
+    }
+
+    @Override
+    public void sendPublicStyled(StyledChatMessage message) {
+        requireServerThread();
+        Text rendered = renderStyled(message);
+        server.getPlayerManager().getPlayerList().forEach(
+            player -> player.sendMessage(rendered, false)
+        );
+    }
+
+    @Override
+    public void playResponseSound(
+        UUID requesterUuid,
+        String soundId,
+        float volume,
+        float pitch
+    ) {
+        requireServerThread();
+        ServerPlayerEntity player =
+            server.getPlayerManager().getPlayer(requesterUuid);
+        Identifier id = Identifier.tryParse(soundId);
+        if (player == null || id == null) {
+            return;
+        }
+        Registries.SOUND_EVENT.getOptionalValue(id).ifPresent(
+            sound -> player.playSoundToPlayer(
+                sound,
+                SoundCategory.MASTER,
+                volume,
+                pitch
+            )
+        );
+    }
+
+    private Text renderStyled(StyledChatMessage message) {
+        MutableText output = Text.empty();
+        for (StyledChatMessage.Segment segment : message.prefix()) {
+            Style style = Style.EMPTY;
+            if (segment.rgb() != null) {
+                style = style.withColor(segment.rgb());
+            }
+            style = style
+                .withObfuscated(segment.obfuscated())
+                .withBold(segment.bold())
+                .withStrikethrough(segment.strikethrough())
+                .withUnderline(segment.underlined())
+                .withItalic(segment.italic());
+            output.append(
+                Text.literal(segment.text()).setStyle(style)
+            );
+        }
+        output.append(Text.literal(message.body()));
+        return output;
     }
 
     private Optional<ServerWorld> findWorld(String worldId) {
