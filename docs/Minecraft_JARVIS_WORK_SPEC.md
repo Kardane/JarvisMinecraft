@@ -114,6 +114,28 @@ History/Region 조회는 v0.1.1 Tool catalog에 추가한다. 이력 기본 범�
 - 감사 필드: timestamp, serverId, requesterUuid, requestId, toolCallId/actionId, tool, risk, 검증된 인자 요약, outcome, source, latency, 모델 ID, fallback 사유. 비밀·전체 프롬프트는 저장하지 않는다.
 - v0.1 감사는 비동기 회전 JSONL, 기본 7일/총 100MiB. 변경 실행은 pre-execution 감사 기록을 안전하게 큐/저장할 수 없으면 거부한다. 큐 포화·디스크 오류를 무시하지 않고 health에 표시한다.
 
+### 3.6 후속 runtime policy foundation
+
+후속 interaction/execution 확장을 위한 Phase 1에서는 비밀이 아닌 runtime-policy
+설정의 immutable snapshot, strict validation, fail-safe reload 기반만 먼저 추가할
+수 있다. 이 기반 자체는 v0.1 권한·채팅·Tool 동작을 변경하지 않는다.
+
+- `PASSIVE/ACTIVE`, `OP/WHITELIST/ALL/BLACKLIST` 값은 후속 interaction
+  단계의 설정 vocabulary로만 적재한다. Phase 2 계약·검증이 완료되기 전에는
+  admission에 적용하지 않으며 현재 online OP-only 경계를 유지한다.
+- reasoning 설정은 후속 Jev/reasoning 단계가 연결되기 전에는 현재 Luna 호출
+  정책을 변경하지 않는다. 모델 이름은 계속 `gpt-6-luna`로 고정한다.
+- `READ_TALK/EXECUTE_LITE/EXECUTE` 값은 후속 ExecutionPolicy 단계가
+  연결되기 전에는 현재 Tool 노출을 변경하지 않는다. raw console command,
+  SQL, code execution을 허용하는 의미로 해석하지 않는다.
+- scheduling 설정은 foundation에서 기본 비활성이고 실제 예약 실행 경로를
+  만들지 않는다. 별도 scheduler/authority 재검증 계약 이후에만 활성화한다.
+- `docs/later-todo.md`의 `ADMIN` 아이디어는 현재 승인된 runtime contract가
+  아니다. 서버 파일 생성·수정·삭제는 별도 Work Spec/Tool 계약과 안전성
+  검토가 선행되기 전까지 구현하거나 config enum으로 활성화하지 않는다.
+- provider credential과 logical server identity는 `EmbeddedBrainSettings`에
+  유지하며 runtime-policy snapshot이나 status 요약에 복제하지 않는다.
+
 ## 4. 병렬 작업 단위
 
 T00/T01/T02는 공통 기반이므로 순서대로 병합한다. 이후 각 작업자는 동결된 계약과 fixture로 진행하며 다른 담당 디렉터리를 수정하지 않는다. 공유 API가 필요하면 T01 소유자에게 변경 요청하고 계약 버전을 함께 갱신한다.
