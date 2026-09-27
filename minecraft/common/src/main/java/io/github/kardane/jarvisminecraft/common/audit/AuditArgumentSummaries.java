@@ -51,6 +51,21 @@ public final class AuditArgumentSummaries {
                 "timeOfDay", value.timeOfDay()
             );
         }
+        if (arguments instanceof ScheduleActionArguments value) {
+            return map(
+                "tool", value.tool().wireName(),
+                "arguments", summarize(value.arguments()),
+                "delaySeconds", value.delaySeconds(),
+                "intervalSeconds", value.intervalSeconds(),
+                "durationSeconds", value.durationSeconds()
+            );
+        }
+        if (
+            arguments
+                instanceof CancelScheduledActionArguments value
+        ) {
+            return map("scheduleId", value.scheduleId());
+        }
         if (arguments instanceof AreaHistoryArguments value) {
             return map(
                 "center", location(value.center()),

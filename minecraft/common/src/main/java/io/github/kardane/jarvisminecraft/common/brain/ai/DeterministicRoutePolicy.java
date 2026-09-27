@@ -51,7 +51,9 @@ public final class DeterministicRoutePolicy {
                 ToolName.GET_WORLD_INFO,
                 ToolName.TELEPORT_STAFF,
                 ToolName.WEATHER_SET,
-                ToolName.TIME_SET
+                ToolName.TIME_SET,
+                ToolName.SCHEDULE_ACTION,
+                ToolName.CANCEL_SCHEDULED_ACTION
             )
         );
         routes.put(JevCategory.GENERAL, EnumSet.noneOf(ToolName.class));

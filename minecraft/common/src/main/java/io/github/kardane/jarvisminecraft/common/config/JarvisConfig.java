@@ -323,6 +323,15 @@ public record JarvisConfig(
                 wireName,
                 "execution.allowTools"
             );
+            if (
+                tool == ToolName.SCHEDULE_ACTION
+                    || tool == ToolName.CANCEL_SCHEDULED_ACTION
+            ) {
+                throw new IllegalArgumentException(
+                    "Scheduling control Tools are configured through jarvis.scheduling, not execution allow-tools: "
+                        + wireName
+                );
+            }
             if (!tool.stateChanging()) {
                 throw new IllegalArgumentException(
                     "execution allow-tools may contain only state-changing Tools: "
@@ -337,10 +346,19 @@ public record JarvisConfig(
             }
         }
         for (String wireName : filter.denyTools()) {
-            requireKnownTool(
+            ToolName tool = requireKnownTool(
                 wireName,
                 "execution.denyTools"
             );
+            if (
+                tool == ToolName.SCHEDULE_ACTION
+                    || tool == ToolName.CANCEL_SCHEDULED_ACTION
+            ) {
+                throw new IllegalArgumentException(
+                    "Scheduling control Tools are configured through jarvis.scheduling, not execution deny-tools: "
+                        + wireName
+                );
+            }
         }
     }
 

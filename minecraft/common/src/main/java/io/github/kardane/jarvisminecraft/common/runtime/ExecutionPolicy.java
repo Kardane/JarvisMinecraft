@@ -35,13 +35,13 @@ public final class ExecutionPolicy {
         EnumSet<ToolName> allowed =
             EnumSet.noneOf(ToolName.class);
 
-        JarvisConfig.Execution config =
-            configManager.current().execution();
+        JarvisConfig current = configManager.current();
+        JarvisConfig.Execution config = current.execution();
 
         for (ToolName tool : candidates) {
             if (
                 allows(
-                    config,
+                    current,
                     tool,
                     requesterToolAuthority,
                     interactionOrigin
@@ -59,7 +59,7 @@ public final class ExecutionPolicy {
         String interactionOrigin
     ) {
         return allows(
-            configManager.current().execution(),
+            configManager.current(),
             Objects.requireNonNull(tool, "tool"),
             requesterToolAuthority,
             interactionOrigin
@@ -67,12 +67,13 @@ public final class ExecutionPolicy {
     }
 
     private boolean allows(
-        JarvisConfig.Execution config,
+        JarvisConfig current,
         ToolName tool,
         boolean requesterToolAuthority,
         String interactionOrigin
     ) {
-        Objects.requireNonNull(config, "config");
+        Objects.requireNonNull(current, "current");
+        JarvisConfig.Execution config = current.execution();
         Objects.requireNonNull(
             interactionOrigin,
             "interactionOrigin"
@@ -80,6 +81,19 @@ public final class ExecutionPolicy {
 
         if (!requesterToolAuthority) {
             return false;
+        }
+
+        if (tool == ToolName.SCHEDULE_ACTION) {
+            return current.scheduling().enabled()
+                && config.mode()
+                    != JarvisConfig.ExecutionMode.READ_TALK
+                && !isProactive(interactionOrigin);
+        }
+        if (
+            tool
+                == ToolName.CANCEL_SCHEDULED_ACTION
+        ) {
+            return true;
         }
 
         JarvisConfig.ToolFilter filter = switch (config.mode()) {

@@ -72,6 +72,13 @@ public final class ToolArgumentCodec {
                     integer(arguments, "timeOfDay", 0, 23_999)
                 );
             }
+            case SCHEDULE_ACTION -> parseScheduleAction(arguments);
+            case CANCEL_SCHEDULED_ACTION -> {
+                exactFields(arguments, Set.of("scheduleId"));
+                yield new CancelScheduledActionArguments(
+                    uuid(arguments, "scheduleId")
+                );
+            }
             case LOOKUP_AREA_HISTORY -> {
                 exactFields(
                     arguments,
@@ -116,6 +123,76 @@ public final class ToolArgumentCodec {
                 );
             }
         };
+    }
+
+    private ToolArguments parseScheduleAction(
+        JsonObject arguments
+    ) {
+        exactFields(
+            arguments,
+            Set.of(
+                "tool",
+                "arguments",
+                "delaySeconds",
+                "intervalSeconds",
+                "durationSeconds"
+            )
+        );
+
+        ToolName nestedTool;
+        try {
+            nestedTool = ToolName.fromWire(
+                string(arguments, "tool", 1, 96)
+            );
+        } catch (ProtocolException failure) {
+            throw invalid("Scheduled Tool is not registered.");
+        }
+        if (
+            nestedTool != ToolName.TELEPORT_STAFF
+                && nestedTool != ToolName.WEATHER_SET
+                && nestedTool != ToolName.TIME_SET
+        ) {
+            throw invalid(
+                "Only structured LOW-risk action Tools may be scheduled."
+            );
+        }
+
+        Integer interval = nullableInteger(
+            arguments,
+            "intervalSeconds",
+            1,
+            60
+        );
+        Integer duration = nullableInteger(
+            arguments,
+            "durationSeconds",
+            1,
+            60
+        );
+        if ((interval == null) != (duration == null)) {
+            throw invalid(
+                "intervalSeconds and durationSeconds must both be null or both be set."
+            );
+        }
+        if (
+            interval != null
+                && duration < interval
+        ) {
+            throw invalid(
+                "durationSeconds must be at least intervalSeconds."
+            );
+        }
+
+        return new ScheduleActionArguments(
+            nestedTool,
+            parse(
+                nestedTool,
+                object(arguments, "arguments")
+            ),
+            integer(arguments, "delaySeconds", 1, 60),
+            interval,
+            duration
+        );
     }
 
     private ToolArguments parseGetPlayerArguments(JsonObject arguments) {
@@ -217,6 +294,23 @@ public final class ToolArgumentCodec {
         } catch (IllegalArgumentException e) {
             throw invalid(field + " is not a UUID.");
         }
+    }
+
+    private Integer nullableInteger(
+        JsonObject object,
+        String field,
+        int min,
+        int max
+    ) {
+        JsonElement element = required(object, field);
+        if (element.isJsonNull()) {
+            return null;
+        }
+        long value = primitiveLong(element, field);
+        if (value < min || value > max) {
+            throw invalid(field + " out of range.");
+        }
+        return (int) value;
     }
 
     private int integer(JsonObject object, String field, int min, int max) {
