@@ -149,7 +149,7 @@ public final class JarvisConfigVerificationMain {
         Properties properties = new Properties();
         properties.setProperty(
             "jarvis.knowledge.max-files",
-            "33"
+            "0"
         );
 
         boolean rejected = false;
@@ -162,7 +162,7 @@ public final class JarvisConfigVerificationMain {
         }
         require(
             rejected,
-            "Knowledge limits above the hard safety bound must be rejected."
+            "Knowledge limits must remain positive."
         );
 
         Properties inconsistent = new Properties();
