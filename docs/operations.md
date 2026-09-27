@@ -146,6 +146,7 @@ Runtime-policy groups:
 - `jarvis.response.*`
 - `jarvis.execution.*`
 - `jarvis.scheduling.*`
+- `jarvis.logging.*`
 
 The server ID is generated automatically unless the optional
 system-property/environment override is supplied.
@@ -233,6 +234,43 @@ The Java `AsyncJsonlAuditSink` writes bounded JSONL audit files. Its policy rema
 A state-changing Tool is executed only after its pre-execution audit record is successfully persisted. Queue saturation, filesystem failure, or audit write rejection causes the mutation to fail closed.
 
 Post-execution audit failure never triggers a Tool retry.
+
+## Operational logging
+
+Operational console logging is separate from the JSONL Audit.
+
+Default categories cover request lifecycle, Jev/Luna, Tool lifecycle, scheduling, ACTIVE proactive decisions, and Audit health transitions. Raw player chat, raw prompts/responses, provider keys, Authorization headers, and complete environment/config dumps are not operational log fields.
+
+Common settings:
+
+- `jarvis.logging.level`
+- `jarvis.logging.console.enabled`
+- `jarvis.logging.request.lifecycle`
+- `jarvis.logging.ai.jev`
+- `jarvis.logging.ai.luna`
+- `jarvis.logging.tool.lifecycle`
+- `jarvis.logging.proactive.decisions`
+- `jarvis.logging.health.interval-seconds`
+
+Audit health polling logs only state/error-code changes:
+
+- `audit.degraded`
+- `audit.unhealthy`
+- `audit.recovered`
+
+Operational logger failure is fail-open and must not change Tool semantics. Audit failure remains fail-closed for state-changing Tools.
+
+## Status command
+
+Paper/Fabric/NeoForge expose OP-only:
+
+```text
+/jm status
+```
+
+The status summary includes runtime state, interaction/audience/execution mode, scheduling state, AI queue/active counts, proactive in-flight state, and Audit health/queue/file summary. It never prints secrets or raw AI/chat content.
+
+`/jm reload` and `/jm test` are not implemented yet.
 
 ## Stored audit fields
 

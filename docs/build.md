@@ -47,16 +47,11 @@ minecraft/neoforge/build/libs/jarvisminecraft-neoforge.jar
 
 플랫폼 모듈의 `check`는 각각 T06/T07/T08 계약 검증을 실행한다. Paper는 optional Provider T11~T14 검증도 포함한다.
 
-## Live model verification
+## Verification
 
-실제 Jev/Luna provider smoke는 credentials가 있을 때 명시적으로 실행한다.
+기본 gate는 `./gradlew build`이며 실제 provider 호출은 기본 CI에 포함하지 않는다.
 
-```bash
-OPENAI_API_KEY=... TYPESAFE_API_KEY=... \
-  ./gradlew :minecraft:common:embeddedBrainLiveVerification
-```
-
-이 작업은 기본 CI에서 외부 provider를 호출하지 않는다.
+개별 deterministic task, clean-server boot, live model, gameplay smoke와 release gate는 [testing.md](testing.md)를 기준으로 한다.
 
 ## Dependency locking
 
