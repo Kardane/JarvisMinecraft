@@ -293,7 +293,18 @@ public final class EmbeddedBrain {
 
     public void cancelActor(UUID requesterUuid) {
         scheduler.cancelActor(requesterUuid);
-        scheduledActions.cancelActor(requesterUuid);
+        List<UUID> cancelledSchedules =
+            scheduledActions.cancelActor(requesterUuid);
+        for (UUID scheduleId : cancelledSchedules) {
+            log.warn(
+                JarvisEvents.SCHEDULE_ABORTED,
+                JarvisFields.of(
+                    "scheduleId", scheduleId,
+                    "requesterUuid", requesterUuid,
+                    "reason", "ACTOR_INVALIDATED"
+                )
+            );
+        }
         history.clearActor(requesterUuid);
 
         List<SessionKey> keys;
@@ -307,7 +318,18 @@ public final class EmbeddedBrain {
 
     public void stop() {
         stopped = true;
+        List<UUID> pendingSchedules =
+            scheduledActions.pendingScheduleIds();
         scheduledActions.close();
+        for (UUID scheduleId : pendingSchedules) {
+            log.warn(
+                JarvisEvents.SCHEDULE_ABORTED,
+                JarvisFields.of(
+                    "scheduleId", scheduleId,
+                    "reason", "SERVER_STOPPING"
+                )
+            );
+        }
         scheduler.shutdown();
         Set<UUID> requestIds = new HashSet<>();
         synchronized (activeRequestIds) {
@@ -652,6 +674,19 @@ public final class EmbeddedBrain {
             routing.availableTools(),
             request.toolsAllowed(),
             request.mode()
+        );
+        long mutationCount = available.stream()
+            .filter(ToolName::stateChanging)
+            .count();
+        log.debug(
+            JarvisEvents.TOOL_EXPOSURE_RESOLVED,
+            JarvisFields.of(
+                "requestId", request.requestId(),
+                "executionMode", executionPolicy.currentMode(),
+                "candidateCount", routing.availableTools().size(),
+                "allowedCount", available.size(),
+                "mutationCount", mutationCount
+            )
         );
         return new DeterministicRoutePolicy.RoutingDecision(
             routing.category(),
