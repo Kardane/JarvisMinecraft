@@ -8,6 +8,7 @@ import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
 import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationManager;
+import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationReloadService;
 import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
@@ -84,27 +85,39 @@ public final class JarvisFabricMod implements ModInitializer {
                                         );
                                         return 0;
                                     }
-                                    RuntimeConfigurationManager.ReloadResult result =
-                                        current.runtimeConfiguration().reload();
-                                    if (result.success()) {
-                                        context.getSource().sendFeedback(
-                                            () -> Text.literal(
-                                                "[JARVIS] Configuration reloaded."
-                                            ),
-                                            false
+                                    var source = context.getSource();
+                                    current.reloadService()
+                                        .reloadAsync()
+                                        .whenComplete((result, failure) ->
+                                            current.server().execute(() -> {
+                                                if (runtime != current) {
+                                                    return;
+                                                }
+                                                if (
+                                                    failure == null
+                                                        && result != null
+                                                        && result.success()
+                                                ) {
+                                                    source.sendFeedback(
+                                                        () -> Text.literal(
+                                                            "[JARVIS] Configuration reloaded."
+                                                        ),
+                                                        false
+                                                    );
+                                                    logReloadSuccess(result);
+                                                    return;
+                                                }
+                                                source.sendError(
+                                                    Text.literal(
+                                                        "[JARVIS] Reload failed; previous configuration remains active."
+                                                    )
+                                                );
+                                                LOGGER.warning(
+                                                    "JARVIS configuration reload failed; previous configuration remains active."
+                                                );
+                                            })
                                         );
-                                        logReloadSuccess(result);
-                                        return 1;
-                                    }
-                                    context.getSource().sendError(
-                                        Text.literal(
-                                            "[JARVIS] Reload failed; previous configuration remains active."
-                                        )
-                                    );
-                                    LOGGER.warning(
-                                        "JARVIS configuration reload failed; previous configuration remains active."
-                                    );
-                                    return 0;
+                                    return 1;
                                 })
                         )
                 )
@@ -281,6 +294,9 @@ public final class JarvisFabricMod implements ModInitializer {
             brain,
             chat,
             runtimeConfiguration,
+            new RuntimeConfigurationReloadService(
+                runtimeConfiguration
+            ),
             configManager
         );
         runtime = next;
@@ -328,9 +344,11 @@ public final class JarvisFabricMod implements ModInitializer {
         BrainGateway brain,
         FabricChatController chat,
         RuntimeConfigurationManager runtimeConfiguration,
+        RuntimeConfigurationReloadService reloadService,
         ConfigManager configManager
     ) {
         void close() {
+            reloadService.close();
             brain.stop();
         }
     }
