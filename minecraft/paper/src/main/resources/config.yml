@@ -49,14 +49,20 @@ jarvis:
       pitch: 1.0
 
   execution:
+    # READ_TALK: read-only Tools only.
+    # EXECUTE_LITE: read-only + explicitly allowed LOW-risk state-changing Tools.
+    # EXECUTE: read-only + explicitly allowed state-changing Tools.
     mode: READ_TALK
     actors: OP
 
     lite:
+      # Tool wire names only. Example: [teleport_staff]
       allow-tools: []
+      # deny-tools overrides allow-tools and may also hide read-only Tools.
       deny-tools: []
 
     full:
+      # State-changing Tool wire names must be explicitly listed.
       allow-tools: []
       deny-tools: []
 
