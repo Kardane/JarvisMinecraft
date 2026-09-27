@@ -1,13 +1,12 @@
 package io.github.kardane.jarvisminecraft.common.brain.ai;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolArgumentCodec;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolArguments;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolSpec;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -15,24 +14,22 @@ import java.util.Set;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
 
 public final class LunaToolSchemas {
-    private static final String UUID_PATTERN =
-        "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$";
-
     private final ToolArgumentCodec argumentCodec;
 
     public LunaToolSchemas(ToolArgumentCodec argumentCodec) {
-        this.argumentCodec = Objects.requireNonNull(argumentCodec, "argumentCodec");
+        this.argumentCodec = Objects.requireNonNull(
+            argumentCodec,
+            "argumentCodec"
+        );
     }
 
-    public List<Definition> definitions(Set<ToolName> activeTools) {
-        Objects.requireNonNull(activeTools, "activeTools");
-        List<Definition> output = new ArrayList<>();
-        for (ToolName tool : ToolName.values()) {
-            if (activeTools.contains(tool)) {
-                output.addAll(definitionsFor(tool));
-            }
-        }
-        return List.copyOf(output);
+    public List<Definition> definitions(
+        Set<ToolName> activeTools
+    ) {
+        return ToolSpec.definitions(activeTools)
+            .stream()
+            .map(Definition::from)
+            .toList();
     }
 
     public LunaStep.ToolCall translate(
@@ -40,446 +37,60 @@ public final class LunaToolSchemas {
         String argumentsJson,
         Set<ToolName> activeTools
     ) {
-        Objects.requireNonNull(functionName, "functionName");
-        Objects.requireNonNull(argumentsJson, "argumentsJson");
-        Objects.requireNonNull(activeTools, "activeTools");
+        Objects.requireNonNull(
+            functionName,
+            "functionName"
+        );
+        Objects.requireNonNull(
+            argumentsJson,
+            "argumentsJson"
+        );
+        Objects.requireNonNull(
+            activeTools,
+            "activeTools"
+        );
 
-        Definition definition = definitionByAiName(functionName);
+        ToolSpec.AiDefinition definition =
+            ToolSpec.definitionByAiName(functionName);
         if (!activeTools.contains(definition.coreTool())) {
-            throw new IllegalArgumentException("Luna requested an inactive Tool.");
+            throw new IllegalArgumentException(
+                "Luna requested an inactive Tool."
+            );
         }
 
         JsonElement parsed;
         try {
-            parsed = JsonParser.parseString(argumentsJson);
+            parsed = JsonParser.parseString(
+                argumentsJson
+            );
         } catch (RuntimeException failure) {
-            throw new IllegalArgumentException("Luna returned invalid Tool JSON.", failure);
+            throw new IllegalArgumentException(
+                "Luna returned invalid Tool JSON.",
+                failure
+            );
         }
         if (!parsed.isJsonObject()) {
-            throw new IllegalArgumentException("Luna Tool arguments must be an object.");
+            throw new IllegalArgumentException(
+                "Luna Tool arguments must be an object."
+            );
         }
 
-        ToolArguments arguments =
-            argumentCodec.parse(definition.coreTool(), parsed.getAsJsonObject());
-        return new LunaStep.ToolCall(definition.coreTool(), arguments);
+        ToolArguments arguments = argumentCodec.parse(
+            definition.coreTool(),
+            parsed.getAsJsonObject()
+        );
+        return new LunaStep.ToolCall(
+            definition.coreTool(),
+            arguments
+        );
     }
 
-    public ToolName coreToolForAiName(String functionName) {
-        return definitionByAiName(functionName).coreTool();
-    }
-
-    private List<Definition> definitionsFor(ToolName tool) {
-        return switch (tool) {
-            case GET_SERVER_STATUS -> List.of(
-                define(
-                    tool.wireName(),
-                    tool,
-                    "Read current server performance/status metrics.",
-                    objectSchema(new JsonObject(), List.of())
-                )
-            );
-            case GET_ONLINE_PLAYERS -> List.of(
-                define(
-                    tool.wireName(),
-                    tool,
-                    "List currently online players using bounded pagination.",
-                    objectSchema(
-                        properties(
-                            "cursor", nullableStringSchema(256),
-                            "limit", integerSchema(1, 100)
-                        ),
-                        List.of("cursor", "limit")
-                    )
-                )
-            );
-            case GET_PLAYER -> List.of(
-                define(
-                    "get_player_by_uuid",
-                    tool,
-                    "Resolve exactly one current player by UUID.",
-                    objectSchema(
-                        properties("playerUuid", uuidSchema()),
-                        List.of("playerUuid")
-                    )
-                ),
-                define(
-                    "get_player_by_name",
-                    tool,
-                    "Resolve exactly one current player by exact Minecraft name. Do not use fuzzy names.",
-                    objectSchema(
-                        properties("exactName", stringSchema(1, 16)),
-                        List.of("exactName")
-                    )
-                )
-            );
-            case GET_PLAYER_LOCATION -> List.of(
-                uuidTool(tool, "Read the current location of one online player.")
-            );
-            case GET_CMI_PLAYER_INFO -> List.of(
-                uuidTool(tool, "Read an online player's CMI nickname and AFK state.")
-            );
-            case GET_NEARBY_PLAYERS -> List.of(
-                define(
-                    tool.wireName(),
-                    tool,
-                    "List online players near a known server location.",
-                    objectSchema(
-                        properties(
-                            "center", locationSchema(),
-                            "radius", numberSchemaExclusiveMin(0, 64),
-                            "limit", integerSchema(1, 100)
-                        ),
-                        List.of("center", "radius", "limit")
-                    )
-                )
-            );
-            case GET_WORLD_INFO -> List.of(
-                define(
-                    tool.wireName(),
-                    tool,
-                    "Read supported information for a loaded world.",
-                    objectSchema(
-                        properties("worldId", stringSchema(1, 128)),
-                        List.of("worldId")
-                    )
-                )
-            );
-            case TELEPORT_STAFF -> List.of(
-                define(
-                    tool.wireName(),
-                    tool,
-                    "Teleport only the requesting operator to an online target player. Use only after an explicit move request.",
-                    objectSchema(
-                        properties("targetPlayerUuid", uuidSchema()),
-                        List.of("targetPlayerUuid")
-                    )
-                )
-            );
-            case WEATHER_SET -> List.of(
-                define(
-                    tool.wireName(),
-                    tool,
-                    "Set weather for one already loaded world after an explicit user request. Duration is 1 to 3600 seconds.",
-                    objectSchema(
-                        properties(
-                            "worldId", stringSchema(1, 128),
-                            "weather", enumStringSchema("CLEAR", "RAIN", "THUNDER"),
-                            "durationSeconds", integerSchema(1, 3_600)
-                        ),
-                        List.of("worldId", "weather", "durationSeconds")
-                    )
-                )
-            );
-            case TIME_SET -> List.of(
-                define(
-                    tool.wireName(),
-                    tool,
-                    "Set time-of-day for one already loaded world after an explicit user request. Value is 0 to 23999.",
-                    objectSchema(
-                        properties(
-                            "worldId", stringSchema(1, 128),
-                            "timeOfDay", integerSchema(0, 23_999)
-                        ),
-                        List.of("worldId", "timeOfDay")
-                    )
-                )
-            );
-            case SCHEDULE_ACTION -> List.of(
-                scheduleDefinition(
-                    "schedule_teleport_staff",
-                    tool,
-                    ToolName.TELEPORT_STAFF,
-                    objectSchema(
-                        properties("targetPlayerUuid", uuidSchema()),
-                        List.of("targetPlayerUuid")
-                    )
-                ),
-                scheduleDefinition(
-                    "schedule_weather_set",
-                    tool,
-                    ToolName.WEATHER_SET,
-                    objectSchema(
-                        properties(
-                            "worldId", stringSchema(1, 128),
-                            "weather", enumStringSchema("CLEAR", "RAIN", "THUNDER"),
-                            "durationSeconds", integerSchema(1, 3_600)
-                        ),
-                        List.of("worldId", "weather", "durationSeconds")
-                    )
-                ),
-                scheduleDefinition(
-                    "schedule_time_set",
-                    tool,
-                    ToolName.TIME_SET,
-                    objectSchema(
-                        properties(
-                            "worldId", stringSchema(1, 128),
-                            "timeOfDay", integerSchema(0, 23_999)
-                        ),
-                        List.of("worldId", "timeOfDay")
-                    )
-                )
-            );
-            case CANCEL_SCHEDULED_ACTION -> List.of(
-                define(
-                    tool.wireName(),
-                    tool,
-                    "Cancel one pending scheduled action owned by the requesting player.",
-                    objectSchema(
-                        properties("scheduleId", uuidSchema()),
-                        List.of("scheduleId")
-                    )
-                )
-            );
-            case LOOKUP_AREA_HISTORY -> List.of(
-                define(
-                    tool.wireName(),
-                    tool,
-                    "Read bounded CoreProtect history around a known location.",
-                    objectSchema(
-                        properties(
-                            "center", locationSchema(),
-                            "radius", integerSchema(0, 64),
-                            "lookbackSeconds", integerSchema(1, 86_400),
-                            "cursor", nullableStringSchema(256),
-                            "limit", integerSchema(1, 100)
-                        ),
-                        List.of("center", "radius", "lookbackSeconds", "cursor", "limit")
-                    )
-                )
-            );
-            case LOOKUP_PLAYER_HISTORY -> List.of(
-                define(
-                    tool.wireName(),
-                    tool,
-                    "Read bounded CoreProtect history for one player.",
-                    objectSchema(
-                        properties(
-                            "playerUuid", uuidSchema(),
-                            "lookbackSeconds", integerSchema(1, 86_400),
-                            "cursor", nullableStringSchema(256),
-                            "limit", integerSchema(1, 100)
-                        ),
-                        List.of("playerUuid", "lookbackSeconds", "cursor", "limit")
-                    )
-                )
-            );
-            case GET_REGIONS_AT_LOCATION -> List.of(
-                define(
-                    tool.wireName(),
-                    tool,
-                    "Read WorldGuard regions containing a known location.",
-                    objectSchema(
-                        properties("location", locationSchema()),
-                        List.of("location")
-                    )
-                )
-            );
-            case GET_REGION_INFO -> List.of(
-                define(
-                    tool.wireName(),
-                    tool,
-                    "Read one exact WorldGuard region by world and region id.",
-                    objectSchema(
-                        properties(
-                            "worldId", stringSchema(1, 128),
-                            "regionId", stringSchema(1, 128)
-                        ),
-                        List.of("worldId", "regionId")
-                    )
-                )
-            );
-            case CHECK_BUILD_PERMISSION -> List.of(
-                define(
-                    tool.wireName(),
-                    tool,
-                    "Ask WorldGuard whether one player may build at a location.",
-                    objectSchema(
-                        properties(
-                            "playerUuid", uuidSchema(),
-                            "location", locationSchema()
-                        ),
-                        List.of("playerUuid", "location")
-                    )
-                )
-            );
-        };
-    }
-
-    private Definition scheduleDefinition(
-        String name,
-        ToolName controlTool,
-        ToolName nestedTool,
-        JsonObject nestedArguments
+    public ToolName coreToolForAiName(
+        String functionName
     ) {
-        return define(
-            name,
-            controlTool,
-            "Schedule the explicit structured action " + nestedTool.wireName()
-                + ". delaySeconds is 1..60. For one-shot execution set intervalSeconds and durationSeconds to null. For repetition set both to 1..60 and durationSeconds >= intervalSeconds.",
-            objectSchema(
-                properties(
-                    "tool", constStringSchema(nestedTool.wireName()),
-                    "arguments", nestedArguments,
-                    "delaySeconds", integerSchema(1, 60),
-                    "intervalSeconds", nullableIntegerSchema(1, 60),
-                    "durationSeconds", nullableIntegerSchema(1, 60)
-                ),
-                List.of(
-                    "tool",
-                    "arguments",
-                    "delaySeconds",
-                    "intervalSeconds",
-                    "durationSeconds"
-                )
-            )
-        );
-    }
-
-    private Definition uuidTool(ToolName tool, String description) {
-        return define(
-            tool.wireName(),
-            tool,
-            description,
-            objectSchema(
-                properties("playerUuid", uuidSchema()),
-                List.of("playerUuid")
-            )
-        );
-    }
-
-    private Definition definitionByAiName(String name) {
-        for (ToolName tool : ToolName.values()) {
-            for (Definition definition : definitionsFor(tool)) {
-                if (definition.name().equals(name)) {
-                    return definition;
-                }
-            }
-        }
-        throw new IllegalArgumentException("Luna requested an unknown function Tool.");
-    }
-
-    private Definition define(
-        String name,
-        ToolName coreTool,
-        String description,
-        JsonObject parameters
-    ) {
-        return new Definition(name, coreTool, description, parameters);
-    }
-
-    private JsonObject locationSchema() {
-        return objectSchema(
-            properties(
-                "worldId", stringSchema(1, 128),
-                "x", numberSchema(-30_000_000, 30_000_000),
-                "y", numberSchema(-2_048, 4_096),
-                "z", numberSchema(-30_000_000, 30_000_000),
-                "yaw", numberSchema(-360, 360),
-                "pitch", numberSchema(-90, 90)
-            ),
-            List.of("worldId", "x", "y", "z", "yaw", "pitch")
-        );
-    }
-
-    private JsonObject objectSchema(JsonObject properties, List<String> required) {
-        JsonObject schema = new JsonObject();
-        schema.addProperty("type", "object");
-        schema.addProperty("additionalProperties", false);
-        schema.add("properties", properties);
-        JsonArray requiredArray = new JsonArray();
-        required.forEach(requiredArray::add);
-        schema.add("required", requiredArray);
-        return schema;
-    }
-
-    private JsonObject properties(Object... pairs) {
-        if (pairs.length % 2 != 0) {
-            throw new IllegalArgumentException("Schema property pairs must be even.");
-        }
-        JsonObject properties = new JsonObject();
-        for (int index = 0; index < pairs.length; index += 2) {
-            properties.add((String) pairs[index], (JsonElement) pairs[index + 1]);
-        }
-        return properties;
-    }
-
-    private JsonObject uuidSchema() {
-        JsonObject schema = new JsonObject();
-        schema.addProperty("type", "string");
-        schema.addProperty("pattern", UUID_PATTERN);
-        return schema;
-    }
-
-    private JsonObject stringSchema(int min, int max) {
-        JsonObject schema = new JsonObject();
-        schema.addProperty("type", "string");
-        schema.addProperty("minLength", min);
-        schema.addProperty("maxLength", max);
-        return schema;
-    }
-
-    private JsonObject constStringSchema(String value) {
-        JsonObject schema = new JsonObject();
-        schema.addProperty("type", "string");
-        schema.addProperty("const", value);
-        return schema;
-    }
-
-    private JsonObject enumStringSchema(String... values) {
-        JsonObject schema = new JsonObject();
-        schema.addProperty("type", "string");
-        JsonArray choices = new JsonArray();
-        for (String value : values) {
-            choices.add(value);
-        }
-        schema.add("enum", choices);
-        return schema;
-    }
-
-    private JsonObject nullableIntegerSchema(int min, int max) {
-        JsonObject schema = new JsonObject();
-        JsonArray types = new JsonArray();
-        types.add("integer");
-        types.add("null");
-        schema.add("type", types);
-        schema.addProperty("minimum", min);
-        schema.addProperty("maximum", max);
-        return schema;
-    }
-
-    private JsonObject nullableStringSchema(int max) {
-        JsonObject schema = new JsonObject();
-        JsonArray types = new JsonArray();
-        types.add("string");
-        types.add("null");
-        schema.add("type", types);
-        schema.addProperty("maxLength", max);
-        return schema;
-    }
-
-    private JsonObject integerSchema(int min, int max) {
-        JsonObject schema = new JsonObject();
-        schema.addProperty("type", "integer");
-        schema.addProperty("minimum", min);
-        schema.addProperty("maximum", max);
-        return schema;
-    }
-
-    private JsonObject numberSchema(double min, double max) {
-        JsonObject schema = new JsonObject();
-        schema.addProperty("type", "number");
-        schema.addProperty("minimum", min);
-        schema.addProperty("maximum", max);
-        return schema;
-    }
-
-    private JsonObject numberSchemaExclusiveMin(double min, double max) {
-        JsonObject schema = new JsonObject();
-        schema.addProperty("type", "number");
-        schema.addProperty("exclusiveMinimum", min);
-        schema.addProperty("maximum", max);
-        return schema;
+        return ToolSpec
+            .definitionByAiName(functionName)
+            .coreTool();
     }
 
     public record Definition(
@@ -490,9 +101,29 @@ public final class LunaToolSchemas {
     ) {
         public Definition {
             Objects.requireNonNull(name, "name");
-            Objects.requireNonNull(coreTool, "coreTool");
-            Objects.requireNonNull(description, "description");
-            parameters = Objects.requireNonNull(parameters, "parameters").deepCopy();
+            Objects.requireNonNull(
+                coreTool,
+                "coreTool"
+            );
+            Objects.requireNonNull(
+                description,
+                "description"
+            );
+            parameters = Objects.requireNonNull(
+                parameters,
+                "parameters"
+            ).deepCopy();
+        }
+
+        private static Definition from(
+            ToolSpec.AiDefinition definition
+        ) {
+            return new Definition(
+                definition.name(),
+                definition.coreTool(),
+                definition.description(),
+                definition.parameters()
+            );
         }
 
         @Override
