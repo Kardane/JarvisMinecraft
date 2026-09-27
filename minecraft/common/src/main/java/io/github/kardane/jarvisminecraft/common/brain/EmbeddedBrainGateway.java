@@ -16,6 +16,10 @@ import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
 import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisEvents;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisFields;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.NoOpJarvisLog;
 import io.github.kardane.jarvisminecraft.common.platform.AdapterPlatformAccess;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
@@ -59,6 +63,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     private final LunaClient ownedLuna;
     private final AsyncJsonlAuditSink ownedAudit;
     private final ExecutorService ownedAiExecutor;
+    private final JarvisLog log;
     private final AmbientConversationTracker ambientTracker =
         new AmbientConversationTracker();
     private final AtomicBoolean proactiveInFlight =
@@ -90,7 +95,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             clock,
             null,
             null,
-            null
+            null,
+            NoOpJarvisLog.INSTANCE
         );
     }
 
@@ -113,7 +119,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             clock,
             null,
             null,
-            null
+            null,
+            NoOpJarvisLog.INSTANCE
         );
     }
 
@@ -128,7 +135,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         Clock clock,
         LunaClient ownedLuna,
         AsyncJsonlAuditSink ownedAudit,
-        ExecutorService ownedAiExecutor
+        ExecutorService ownedAiExecutor,
+        JarvisLog log
     ) {
         this.brain = Objects.requireNonNull(brain, "brain");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
@@ -153,6 +161,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         this.ownedLuna = ownedLuna;
         this.ownedAudit = ownedAudit;
         this.ownedAiExecutor = ownedAiExecutor;
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     public static EmbeddedBrainGateway live(
@@ -233,7 +242,42 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         AdapterPlatformAccess platform,
         Clock clock
     ) {
+        return live(
+            serverId,
+            capabilities,
+            openAiApiKey,
+            typesafeApiKey,
+            auditDirectory,
+            sessions,
+            interactions,
+            configManager,
+            registry,
+            commonRuntime,
+            serverScheduler,
+            platform,
+            clock,
+            NoOpJarvisLog.INSTANCE
+        );
+    }
+
+    public static EmbeddedBrainGateway live(
+        String serverId,
+        List<Capability> capabilities,
+        String openAiApiKey,
+        String typesafeApiKey,
+        Path auditDirectory,
+        ChatSessionManager sessions,
+        InteractionCoordinator interactions,
+        ConfigManager configManager,
+        ToolRegistry registry,
+        CommonRuntime commonRuntime,
+        ServerScheduler serverScheduler,
+        AdapterPlatformAccess platform,
+        Clock clock,
+        JarvisLog log
+    ) {
         Objects.requireNonNull(configManager, "configManager");
+        Objects.requireNonNull(log, "log");
         Objects.requireNonNull(registry, "registry");
         Objects.requireNonNull(commonRuntime, "commonRuntime");
 
@@ -282,7 +326,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 serverId,
                 registry.tools()
             ),
-            clock
+            clock,
+            log
         );
 
         return new EmbeddedBrainGateway(
@@ -296,7 +341,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             clock,
             luna,
             audit,
-            aiExecutor
+            aiExecutor,
+            log
         );
     }
 
@@ -377,6 +423,16 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             currentPlayer.operator()
         );
 
+        log.debug(
+            JarvisEvents.REQUEST_ACCEPTED,
+            JarvisFields.of(
+                "requestId", request.requestId(),
+                "sessionId", sessionId,
+                "requesterUuid", requesterUuid,
+                "origin", mode
+            )
+        );
+
         JarvisConfig.Response responseConfig =
             configManager.current().response();
 
@@ -384,6 +440,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         try {
             processing = brain.submit(request);
         } catch (RuntimeException failure) {
+            logRequestFailure(request, failure);
             return CompletableFuture.completedFuture(false);
         }
 
@@ -400,6 +457,22 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         processing.whenComplete((reply, failure) -> {
             progress.complete();
             if (failure == null) {
+                log.info(
+                    JarvisEvents.REQUEST_COMPLETED,
+                    JarvisFields.of(
+                        "requestId", request.requestId(),
+                        "sessionId", request.sessionId(),
+                        "requesterUuid", request.requesterUuid(),
+                        "origin", request.mode(),
+                        "latencyMs", Math.max(
+                            0L,
+                            Duration.between(
+                                request.receivedAt(),
+                                clock.instant()
+                            ).toMillis()
+                        )
+                    )
+                );
                 deliverReply(
                     requesterUuid,
                     sessionId,
@@ -407,6 +480,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                     responseConfig
                 );
             } else {
+                logRequestFailure(request, failure);
                 deliverFailure(
                     requesterUuid,
                     sessionId,
@@ -659,6 +733,34 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         Objects.requireNonNull(reason, "reason");
         sessions.end(requesterUuid, sessionId);
         brain.cancelSession(requesterUuid, sessionId);
+    }
+
+    private void logRequestFailure(
+        EmbeddedBrain.ChatRequest request,
+        Throwable failure
+    ) {
+        Throwable cause = unwrap(failure);
+        ErrorCode code = cause instanceof ProtocolException protocol
+            ? protocol.code()
+            : ErrorCode.INTERNAL;
+        log.warn(
+            JarvisEvents.REQUEST_FAILED,
+            JarvisFields.of(
+                "requestId", request.requestId(),
+                "sessionId", request.sessionId(),
+                "requesterUuid", request.requesterUuid(),
+                "origin", request.mode(),
+                "errorCode", code,
+                "errorClass", cause.getClass().getSimpleName(),
+                "latencyMs", Math.max(
+                    0L,
+                    Duration.between(
+                        request.receivedAt(),
+                        clock.instant()
+                    ).toMillis()
+                )
+            )
+        );
     }
 
     private void deliverReply(
