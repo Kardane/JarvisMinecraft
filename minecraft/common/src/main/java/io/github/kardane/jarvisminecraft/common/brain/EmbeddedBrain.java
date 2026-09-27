@@ -16,6 +16,7 @@ import io.github.kardane.jarvisminecraft.common.brain.Capability;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 import io.github.kardane.jarvisminecraft.common.runtime.AuditSink;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
+import io.github.kardane.jarvisminecraft.common.runtime.ExecutionPolicy;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -51,6 +52,7 @@ public final class EmbeddedBrain {
     private final DeterministicRoutePolicy routePolicy;
     private final LunaClient luna;
     private final ReasoningPolicy reasoningPolicy;
+    private final ExecutionPolicy executionPolicy;
     private final AuditSink audit;
     private final CommonRuntime.ExecutionRuntime toolRuntime;
     private final Clock clock;
@@ -80,6 +82,7 @@ public final class EmbeddedBrain {
             routePolicy,
             luna,
             ReasoningPolicy.defaults(),
+            ExecutionPolicy.defaults(),
             audit,
             toolRuntime,
             clock
@@ -96,6 +99,7 @@ public final class EmbeddedBrain {
         DeterministicRoutePolicy routePolicy,
         LunaClient luna,
         ReasoningPolicy reasoningPolicy,
+        ExecutionPolicy executionPolicy,
         AuditSink audit,
         CommonRuntime.ExecutionRuntime toolRuntime,
         Clock clock
@@ -116,6 +120,10 @@ public final class EmbeddedBrain {
         this.reasoningPolicy = Objects.requireNonNull(
             reasoningPolicy,
             "reasoningPolicy"
+        );
+        this.executionPolicy = Objects.requireNonNull(
+            executionPolicy,
+            "executionPolicy"
         );
         this.audit = Objects.requireNonNull(audit, "audit");
         this.toolRuntime = Objects.requireNonNull(toolRuntime, "toolRuntime");
@@ -204,9 +212,11 @@ public final class EmbeddedBrain {
                 )
             );
 
-            Set<ToolName> activeTools = request.toolsAllowed()
-                ? toolRuntime.activeTools()
-                : Set.of();
+            Set<ToolName> activeTools = executionPolicy.filter(
+                toolRuntime.activeTools(),
+                request.toolsAllowed(),
+                request.mode()
+            );
             JevInput input = JevInput.fromConversation(
                 history.history(
                     request.requesterUuid(),
@@ -274,12 +284,15 @@ public final class EmbeddedBrain {
             assertSession(request.requesterUuid(), request.sessionId());
             budget.consumeModelRound(clock.instant());
 
+            DeterministicRoutePolicy.RoutingDecision effectiveRouting =
+                currentRouting(request, routing);
+
             LunaTurnInput input = new LunaTurnInput(
                 request.requestId(),
                 request.requesterName(),
                 history.history(request.requesterUuid(), request.sessionId()),
                 capabilities,
-                routing.availableTools(),
+                effectiveRouting.availableTools(),
                 budget.remainingToolCalls(),
                 budget.remainingModelRounds(),
                 reasoningLevel,
@@ -287,7 +300,7 @@ public final class EmbeddedBrain {
             );
 
             CompletionStage<LunaStep> model = withDeadline(
-                luna.next(input, routing),
+                luna.next(input, effectiveRouting),
                 budget.deadlineAt(),
                 ErrorCode.TIMEOUT,
                 "Model response exceeded the request deadline."
@@ -347,7 +360,11 @@ public final class EmbeddedBrain {
                     );
 
                     for (LunaStep.ToolCall call : tools.calls()) {
-                        if (!routing.availableTools().contains(call.tool())) {
+                        if (
+                            !effectiveRouting.availableTools().contains(
+                                call.tool()
+                            )
+                        ) {
                             throw new ProtocolException(
                                 ErrorCode.INVALID_ARGUMENT,
                                 "Model requested a Tool outside the routed allowlist."
@@ -358,7 +375,7 @@ public final class EmbeddedBrain {
                     return executeToolsSequentially(
                         request,
                         budget,
-                        routing,
+                        effectiveRouting,
                         tools.calls()
                     ).thenCompose(
                         ignored -> modelLoop(
@@ -372,6 +389,22 @@ public final class EmbeddedBrain {
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
         }
+    }
+
+    private DeterministicRoutePolicy.RoutingDecision currentRouting(
+        ChatRequest request,
+        DeterministicRoutePolicy.RoutingDecision routing
+    ) {
+        Set<ToolName> available = executionPolicy.filter(
+            routing.availableTools(),
+            request.toolsAllowed(),
+            request.mode()
+        );
+        return new DeterministicRoutePolicy.RoutingDecision(
+            routing.category(),
+            routing.fallbackReason(),
+            available
+        );
     }
 
     private CompletionStage<Void> executeToolsSequentially(
@@ -398,6 +431,21 @@ public final class EmbeddedBrain {
         assertRunning();
         assertSession(request.requesterUuid(), request.sessionId());
         budget.assertLive(clock.instant());
+
+        if (
+            !executionPolicy.allows(
+                call.tool(),
+                request.toolsAllowed(),
+                request.mode()
+            )
+        ) {
+            return CompletableFuture.failedFuture(
+                new ProtocolException(
+                    ErrorCode.UNSUPPORTED,
+                    "Tool is no longer allowed by the current execution policy."
+                )
+            );
+        }
 
         Instant sentAt = clock.instant();
         Instant toolDeadline = earlier(

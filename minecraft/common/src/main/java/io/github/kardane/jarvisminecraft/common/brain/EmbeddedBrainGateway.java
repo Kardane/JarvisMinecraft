@@ -18,6 +18,7 @@ import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolArgumentCodec;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
+import io.github.kardane.jarvisminecraft.common.runtime.ExecutionPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 
@@ -258,6 +259,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             new DeterministicRoutePolicy(),
             luna,
             new ReasoningPolicy(configManager),
+            new ExecutionPolicy(configManager),
             audit,
             commonRuntime.openRuntime(
                 UUID.randomUUID(),

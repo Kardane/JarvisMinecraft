@@ -5,6 +5,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 
+import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.Risk;
+import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
+
 public record JarvisConfig(
     Interaction interaction,
     Model model,
@@ -263,6 +266,8 @@ public record JarvisConfig(
             Objects.requireNonNull(actors, "execution.actors");
             Objects.requireNonNull(lite, "execution.lite");
             Objects.requireNonNull(full, "execution.full");
+            validateExecutionFilter(lite, true);
+            validateExecutionFilter(full, false);
         }
     }
 
@@ -307,6 +312,50 @@ public record JarvisConfig(
                 "scheduling.maxDurationSeconds"
             );
         }
+    }
+
+    private static void validateExecutionFilter(
+        ToolFilter filter,
+        boolean lite
+    ) {
+        for (String wireName : filter.allowTools()) {
+            ToolName tool = requireKnownTool(
+                wireName,
+                "execution.allowTools"
+            );
+            if (!tool.stateChanging()) {
+                throw new IllegalArgumentException(
+                    "execution allow-tools may contain only state-changing Tools: "
+                        + wireName
+                );
+            }
+            if (lite && tool.risk() != Risk.LOW) {
+                throw new IllegalArgumentException(
+                    "execution.lite.allow-tools may contain only LOW-risk Tools: "
+                        + wireName
+                );
+            }
+        }
+        for (String wireName : filter.denyTools()) {
+            requireKnownTool(
+                wireName,
+                "execution.denyTools"
+            );
+        }
+    }
+
+    private static ToolName requireKnownTool(
+        String wireName,
+        String field
+    ) {
+        for (ToolName tool : ToolName.values()) {
+            if (tool.wireName().equals(wireName)) {
+                return tool;
+            }
+        }
+        throw new IllegalArgumentException(
+            field + " contains an unknown Tool: " + wireName
+        );
     }
 
     private static List<String> normalizedList(
