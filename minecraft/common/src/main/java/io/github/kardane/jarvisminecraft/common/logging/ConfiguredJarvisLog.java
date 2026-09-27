@@ -23,23 +23,17 @@ public final class ConfiguredJarvisLog implements JarvisLog {
 
     @Override
     public void debug(String event, Map<String, ?> fields) {
-        if (enabled(JarvisLogLevel.DEBUG, event)) {
-            delegate.debug(event, fields);
-        }
+        emit(JarvisLogLevel.DEBUG, event, null, fields);
     }
 
     @Override
     public void info(String event, Map<String, ?> fields) {
-        if (enabled(JarvisLogLevel.INFO, event)) {
-            delegate.info(event, fields);
-        }
+        emit(JarvisLogLevel.INFO, event, null, fields);
     }
 
     @Override
     public void warn(String event, Map<String, ?> fields) {
-        if (enabled(JarvisLogLevel.WARN, event)) {
-            delegate.warn(event, fields);
-        }
+        emit(JarvisLogLevel.WARN, event, null, fields);
     }
 
     @Override
@@ -48,8 +42,27 @@ public final class ConfiguredJarvisLog implements JarvisLog {
         Throwable failure,
         Map<String, ?> fields
     ) {
-        if (enabled(JarvisLogLevel.ERROR, event)) {
-            delegate.error(event, failure, fields);
+        emit(JarvisLogLevel.ERROR, event, failure, fields);
+    }
+
+    private void emit(
+        JarvisLogLevel level,
+        String event,
+        Throwable failure,
+        Map<String, ?> fields
+    ) {
+        try {
+            if (!enabled(level, event)) {
+                return;
+            }
+            switch (level) {
+                case DEBUG -> delegate.debug(event, fields);
+                case INFO -> delegate.info(event, fields);
+                case WARN -> delegate.warn(event, fields);
+                case ERROR -> delegate.error(event, failure, fields);
+            }
+        } catch (RuntimeException ignored) {
+            // Operational logging must never change runtime or Tool semantics.
         }
     }
 
