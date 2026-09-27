@@ -8,6 +8,8 @@ import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
+import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
@@ -19,6 +21,7 @@ import io.github.kardane.jarvisminecraft.paper.platform.BukkitPaperPlatformAcces
 import io.github.kardane.jarvisminecraft.paper.platform.PaperPlatformAccess;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperServerScheduler;
 import io.github.kardane.jarvisminecraft.paper.integrations.IntegrationRegistry;
+import io.github.kardane.jarvisminecraft.paper.logging.PaperJarvisLog;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -93,6 +96,10 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         }
 
         configManager = loadedConfigManager;
+        JarvisLog operationalLog = new ConfiguredJarvisLog(
+            configManager,
+            new PaperJarvisLog(getLogger())
+        );
 
         Clock clock = Clock.systemUTC();
         platform = new BukkitPaperPlatformAccess(getServer());
@@ -126,7 +133,8 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             commonRuntime,
             serverScheduler,
             platform,
-            clock
+            clock,
+            operationalLog
         );
 
         getServer().getPluginManager().registerEvents(
