@@ -49,6 +49,16 @@
         "name": "player.cmi_profile",
         "source": "CMI",
         "version": "9.8.9.6"
+      },
+      {
+        "name": "world.weather.set",
+        "source": "Paper",
+        "version": "1.21.8"
+      },
+      {
+        "name": "world.time.set",
+        "source": "Paper",
+        "version": "1.21.8"
       }
     ],
     "tools": [
@@ -57,6 +67,8 @@
       "get_player",
       "get_player_location",
       "teleport_staff",
+      "time_set",
+      "weather_set",
       "lookup_area_history",
       "lookup_player_history",
       "get_regions_at_location",

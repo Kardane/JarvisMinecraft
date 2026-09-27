@@ -35,7 +35,11 @@
     "tool-result-regions-at-location.json",
     "tool-result-server-status.json",
     "tool-result-teleport.json",
-    "tool-result-world-info.json"
+    "tool-result-world-info.json",
+    "tool-request-weather-set.json",
+    "tool-request-time-set.json",
+    "tool-result-weather-set.json",
+    "tool-result-time-set.json"
   ],
   "invalid": [
     {
@@ -77,6 +81,14 @@
     {
       "file": "cmi-player-info-missing-player-uuid.json",
       "reason": "CMI player profile lookup requires one explicit player UUID."
+    },
+    {
+      "file": "weather-set-missing-action-id.json",
+      "reason": "State-changing weather_set requires actionId."
+    },
+    {
+      "file": "time-set-out-of-range.json",
+      "reason": "time_set timeOfDay is limited to 0 through 23999."
     }
   ]
 }
