@@ -114,12 +114,12 @@ History/Region 조회는 v0.1.1 Tool catalog에 추가한다. 이력 기본 범�
 - 감사 필드: timestamp, serverId, requesterUuid, requestId, toolCallId/actionId, tool, risk, 검증된 인자 요약, outcome, source, latency, 모델 ID, fallback 사유. 비밀·전체 프롬프트는 저장하지 않는다.
 - v0.1 감사는 비동기 회전 JSONL, 기본 7일/총 100MiB. 변경 실행은 pre-execution 감사 기록을 안전하게 큐/저장할 수 없으면 거부한다. 큐 포화·디스크 오류를 무시하지 않고 health에 표시한다.
 
-### 3.6 후속 runtime policy Phase 1-3
+### 3.6 후속 runtime policy Phase 1-4
 
 Phase 1은 비밀이 아닌 runtime-policy의 immutable snapshot, strict validation,
 fail-safe reload 기반을 추가했다. Phase 2는 interaction policy를 실제
 chat admission/session 경로에 연결했고, Phase 3는 Jev decision과 Luna
-reasoning policy를 연결한다.
+reasoning policy를 연결했다. Phase 4는 response UX policy를 연결한다.
 
 - 기본 audience는 계속 `OP`다. 운영자가 명시적으로 설정하면
   `WHITELIST / ALL / BLACKLIST`가 새 JARVIS 대화 진입과 기존 session 유지
@@ -141,6 +141,13 @@ reasoning policy를 연결한다.
   사용한다. 고정 config 값은 Jev보다 우선하고, Jev 오류/invalid output이면
   concrete `fallback`을 사용한다. 한 Brain request의 모든 Luna round는 같은
   reasoning level을 사용한다. 모델 이름은 계속 `gpt-6-luna`로 고정한다.
+- response prefix의 legacy `&` style code는 관리자가 설정한 prefix에만
+  적용한다. Luna가 생성한 body의 `&` 문자열은 formatting instruction으로
+  해석하지 않는다.
+- waiting message는 threshold 이후 최대 1회만 public chat으로 전달한다. 최종
+  응답 완료 후 늦게 도착한 waiting message는 completion gate에서 폐기한다.
+- response sound는 최종/error 응답 시 requester 한 명에게만 재생하며 playback
+  실패는 이미 완료된 응답을 실패로 바꾸지 않는다.
 - `READ_TALK/EXECUTE_LITE/EXECUTE` 값은 후속 ExecutionPolicy 단계가
   연결되기 전에는 Tool 범위를 넓히지 않는다. raw console command, SQL,
   code execution을 허용하는 의미로 해석하지 않는다.

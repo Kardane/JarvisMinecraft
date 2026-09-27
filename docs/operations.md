@@ -47,8 +47,19 @@ Phase 3 applies `jarvis.model.reasoning.*`:
 
 The resolved effort remains fixed across all Luna rounds in that request.
 
-Response styling/sound, execution-mode Tool filtering, scheduling, and
-`/jm reload` remain pending later phases.
+Phase 4 applies `jarvis.response.*`:
+
+- `prefix`: AI/error/progress prefix. Legacy `&` formatting is parsed only
+  here, never from model output.
+- `waiting-message.enabled/threshold-ms/messages`: show at most one delayed
+  public progress message while a request is still running.
+- `sound.enabled/id/volume/pitch`: after a final/error response, play the
+  configured sound only to the requester.
+
+Session-start/end notices still use the legacy platform notice path.
+
+Execution-mode Tool filtering, scheduling, and `/jm reload` remain pending
+later phases.
 
 A failed initial runtime-policy parse stops JARVIS startup. `ConfigManager`
 already provides fail-safe snapshot replacement semantics for the later reload
@@ -133,6 +144,7 @@ InteractionCoordinator
   -> DeterministicRoutePolicy
   -> ReasoningPolicy
   -> Luna
+  -> ProgressNotifier / StyledChatMessage
   -> AuditSink
   -> CommonRuntime.ExecutionRuntime
   -> Platform Tool
@@ -192,7 +204,16 @@ requests.
 
 ### Luna failure
 
-Return the fixed safe failure response. Do not invent server state or claim a Tool succeeded.
+Return the fixed safe failure response with the configured response prefix.
+Do not invent server state or claim a Tool succeeded. If response sound is
+enabled, requester-only sound feedback applies to this response too.
+
+### Progress feedback
+
+Progress is scheduled only after the configured threshold. Completion marks the
+progress handle first. Before actual public delivery, current interaction
+authorization, active session, and completion state are checked again. Progress
+feedback does not play the final-response sound.
 
 ### Audit failure
 

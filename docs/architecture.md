@@ -90,8 +90,21 @@ rounds. Jev engagement is collected and validated now, but admitted
 `DIRECT/FOLLOW_UP` requests are not suppressed by it. Proactive
 `START_CONVERSATION/IGNORE` behavior remains a later ACTIVE-mode phase.
 
-Response styling/sound, execution-mode Tool filtering, scheduling, and admin
-reload commands are still not wired.
+Phase 4 now consumes the response portion. AI final/error replies and delayed
+progress messages use a platform-neutral `StyledChatMessage`. Only the
+configured prefix interprets legacy Minecraft ampersand codes
+(`&0..&f`, `&k..&o`, `&r`); model-generated body text remains plain.
+
+If a request exceeds `waiting-message.threshold-ms`, one progress message is
+queued. Completion marks the progress handle before final delivery, and the
+server-thread delivery path checks it again so a late progress message cannot
+appear after the final response.
+
+When response sound is enabled, final/error chat stays public while the sound
+is played only to the requester. Sound feedback failure is non-critical.
+
+Execution-mode Tool filtering, scheduling, and admin reload commands are still
+not wired.
 
 Provider credentials and logical server identity remain in
 `EmbeddedBrainSettings`; they are not copied into `JarvisConfig`.
@@ -114,7 +127,7 @@ CoreProtect, WorldGuard, CMI 기능은 Paper에서 optional Provider로 로딩�
 
 ## AI와 스레드 경계
 
-Jev와 Luna 네트워크 호출은 Minecraft server/tick thread를 점유하지 않는다. 플랫폼 API 호출만 각 플랫폼의 scheduler/execution context에서 수행한다. Jev에는 최신 사용자 메시지, bounded short topic, interaction origin, capability 이름만 전달한다. Luna에는 요청 처리에 필요한 bounded 대화, capability, 허용된 Tool schema/result만 전달한다.
+Jev와 Luna 네트워크 호출은 Minecraft server/tick thread를 점유하지 않는다. 플랫폼 API 호출만 각 플랫폼의 scheduler/execution context에서 수행한다. Jev에는 최신 사용자 메시지, bounded short topic, interaction origin, capability 이름만 전달한다. Luna에는 요청 처리에 필요한 bounded 대화, capability, 허용된 Tool schema/result만 전달한다. Progress delay는 JDK delayed executor에서 기다리고 실제 메시지/사운드 API 호출은 platform `ServerScheduler`로 되돌린다.
 
 ## 감사
 
