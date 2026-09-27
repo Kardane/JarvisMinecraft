@@ -316,6 +316,10 @@ public final class EmbeddedBrain {
         keys.forEach(this::clearTracked);
     }
 
+    public AiRequestScheduler.Snapshot schedulerSnapshot() {
+        return scheduler.snapshot();
+    }
+
     public void stop() {
         stopped = true;
         List<UUID> pendingSchedules =
