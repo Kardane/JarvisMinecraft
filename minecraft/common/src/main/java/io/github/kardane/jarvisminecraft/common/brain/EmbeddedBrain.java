@@ -13,14 +13,21 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.CancelScheduledActionArguments;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.CancelScheduledActionData;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ScheduleActionArguments;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ScheduledActionData;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 import io.github.kardane.jarvisminecraft.common.runtime.AuditSink;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ExecutionPolicy;
+import io.github.kardane.jarvisminecraft.common.runtime.ScheduledActionService;
+import io.github.kardane.jarvisminecraft.common.runtime.SchedulingPolicy;
 
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -53,6 +60,8 @@ public final class EmbeddedBrain {
     private final LunaClient luna;
     private final ReasoningPolicy reasoningPolicy;
     private final ExecutionPolicy executionPolicy;
+    private final SchedulingPolicy schedulingPolicy;
+    private final ScheduledActionService scheduledActions;
     private final AuditSink audit;
     private final CommonRuntime.ExecutionRuntime toolRuntime;
     private final Clock clock;
@@ -104,6 +113,42 @@ public final class EmbeddedBrain {
         CommonRuntime.ExecutionRuntime toolRuntime,
         Clock clock
     ) {
+        this(
+            serverId,
+            capabilities,
+            sessions,
+            history,
+            scheduler,
+            jev,
+            routePolicy,
+            luna,
+            reasoningPolicy,
+            executionPolicy,
+            SchedulingPolicy.defaults(),
+            new ScheduledActionService(clock),
+            audit,
+            toolRuntime,
+            clock
+        );
+    }
+
+    public EmbeddedBrain(
+        String serverId,
+        List<Capability> capabilities,
+        ChatSessionManager sessions,
+        ConversationHistoryStore history,
+        AiRequestScheduler scheduler,
+        JevClassifier jev,
+        DeterministicRoutePolicy routePolicy,
+        LunaClient luna,
+        ReasoningPolicy reasoningPolicy,
+        ExecutionPolicy executionPolicy,
+        SchedulingPolicy schedulingPolicy,
+        ScheduledActionService scheduledActions,
+        AuditSink audit,
+        CommonRuntime.ExecutionRuntime toolRuntime,
+        Clock clock
+    ) {
         if (serverId == null || serverId.isBlank()) {
             throw new IllegalArgumentException("serverId must not be blank.");
         }
@@ -124,6 +169,14 @@ public final class EmbeddedBrain {
         this.executionPolicy = Objects.requireNonNull(
             executionPolicy,
             "executionPolicy"
+        );
+        this.schedulingPolicy = Objects.requireNonNull(
+            schedulingPolicy,
+            "schedulingPolicy"
+        );
+        this.scheduledActions = Objects.requireNonNull(
+            scheduledActions,
+            "scheduledActions"
         );
         this.audit = Objects.requireNonNull(audit, "audit");
         this.toolRuntime = Objects.requireNonNull(toolRuntime, "toolRuntime");
@@ -170,6 +223,7 @@ public final class EmbeddedBrain {
 
     public void cancelActor(UUID requesterUuid) {
         scheduler.cancelActor(requesterUuid);
+        scheduledActions.cancelActor(requesterUuid);
         history.clearActor(requesterUuid);
 
         List<SessionKey> keys;
@@ -183,6 +237,7 @@ public final class EmbeddedBrain {
 
     public void stop() {
         stopped = true;
+        scheduledActions.close();
         scheduler.shutdown();
         Set<UUID> requestIds = new HashSet<>();
         synchronized (activeRequestIds) {
@@ -212,8 +267,15 @@ public final class EmbeddedBrain {
                 )
             );
 
+            EnumSet<ToolName> candidates =
+                EnumSet.noneOf(ToolName.class);
+            candidates.addAll(toolRuntime.activeTools());
+            candidates.add(ToolName.SCHEDULE_ACTION);
+            candidates.add(
+                ToolName.CANCEL_SCHEDULED_ACTION
+            );
             Set<ToolName> activeTools = executionPolicy.filter(
-                toolRuntime.activeTools(),
+                candidates,
                 request.toolsAllowed(),
                 request.mode()
             );
@@ -447,6 +509,26 @@ public final class EmbeddedBrain {
             );
         }
 
+        if (call.tool() == ToolName.SCHEDULE_ACTION) {
+            return scheduleAction(
+                request,
+                budget,
+                routing,
+                call
+            );
+        }
+        if (
+            call.tool()
+                == ToolName.CANCEL_SCHEDULED_ACTION
+        ) {
+            return cancelScheduledAction(
+                request,
+                budget,
+                routing,
+                call
+            );
+        }
+
         Instant sentAt = clock.instant();
         Instant toolDeadline = earlier(
             budget.deadlineAt(),
@@ -552,6 +634,414 @@ public final class EmbeddedBrain {
                     });
                 });
         });
+    }
+
+    private CompletionStage<Void> scheduleAction(
+        ChatRequest request,
+        RequestBudget budget,
+        DeterministicRoutePolicy.RoutingDecision routing,
+        LunaStep.ToolCall call
+    ) {
+        ScheduleActionArguments arguments =
+            (ScheduleActionArguments) call.arguments();
+        schedulingPolicy.validateRegistration(arguments);
+
+        if (
+            !toolRuntime.activeTools().contains(
+                arguments.tool()
+            )
+                || !executionPolicy.allows(
+                    arguments.tool(),
+                    request.toolsAllowed(),
+                    request.mode()
+                )
+        ) {
+            return CompletableFuture.failedFuture(
+                new ProtocolException(
+                    ErrorCode.UNSUPPORTED,
+                    "Nested scheduled Tool is not currently allowed."
+                )
+            );
+        }
+
+        Instant sentAt = clock.instant();
+        Instant deadline = earlier(
+            budget.deadlineAt(),
+            sentAt.plus(TOOL_TIMEOUT)
+        );
+        UUID toolCallId = UUID.randomUUID();
+        UUID actionId = UUID.randomUUID();
+
+        return requirePreAudit(
+            auditEvent(
+                request,
+                routing,
+                call,
+                toolCallId,
+                actionId,
+                "PRE_EXECUTION",
+                "BrainPolicy",
+                0L
+            ),
+            earlier(
+                deadline,
+                sentAt.plus(PRE_AUDIT_TIMEOUT)
+            )
+        ).thenCompose(ignored -> {
+            assertRunning();
+            assertSession(
+                request.requesterUuid(),
+                request.sessionId()
+            );
+            schedulingPolicy.validateRegistration(
+                arguments
+            );
+            if (
+                !executionPolicy.allows(
+                    call.tool(),
+                    request.toolsAllowed(),
+                    request.mode()
+                )
+                    || !toolRuntime.activeTools().contains(
+                        arguments.tool()
+                    )
+                    || !executionPolicy.allows(
+                        arguments.tool(),
+                        request.toolsAllowed(),
+                        request.mode()
+                    )
+            ) {
+                return CompletableFuture.failedFuture(
+                    new ProtocolException(
+                        ErrorCode.UNSUPPORTED,
+                        "Schedule was denied by the current policy."
+                    )
+                );
+            }
+
+            ToolResult result;
+            try {
+                ScheduledActionService.Snapshot snapshot =
+                    scheduledActions.schedule(
+                        request.requesterUuid(),
+                        arguments,
+                        runIndex -> runScheduledAction(
+                            request,
+                            routing,
+                            arguments,
+                            runIndex
+                        )
+                    );
+                result = ToolResult.ok(
+                    new ScheduledActionData(
+                        snapshot.scheduleId(),
+                        arguments.tool(),
+                        arguments.delaySeconds(),
+                        arguments.intervalSeconds(),
+                        arguments.durationSeconds(),
+                        snapshot.firstRunAt(),
+                        arguments.durationSeconds() == null
+                            ? null
+                            : snapshot.expiresAt(),
+                        true
+                    ),
+                    clock.instant(),
+                    "JarvisScheduler"
+                );
+            } catch (RuntimeException failure) {
+                result = ToolResult.error(
+                    ErrorCode.BUSY,
+                    "Scheduled action could not be registered.",
+                    false,
+                    clock.instant(),
+                    "JarvisScheduler"
+                );
+            }
+
+            return recordControlResult(
+                request,
+                budget,
+                routing,
+                call,
+                toolCallId,
+                actionId,
+                result,
+                sentAt
+            );
+        });
+    }
+
+    private CompletionStage<Void> cancelScheduledAction(
+        ChatRequest request,
+        RequestBudget budget,
+        DeterministicRoutePolicy.RoutingDecision routing,
+        LunaStep.ToolCall call
+    ) {
+        CancelScheduledActionArguments arguments =
+            (CancelScheduledActionArguments)
+                call.arguments();
+
+        Instant sentAt = clock.instant();
+        Instant deadline = earlier(
+            budget.deadlineAt(),
+            sentAt.plus(TOOL_TIMEOUT)
+        );
+        UUID toolCallId = UUID.randomUUID();
+        UUID actionId = UUID.randomUUID();
+
+        return requirePreAudit(
+            auditEvent(
+                request,
+                routing,
+                call,
+                toolCallId,
+                actionId,
+                "PRE_EXECUTION",
+                "BrainPolicy",
+                0L
+            ),
+            earlier(
+                deadline,
+                sentAt.plus(PRE_AUDIT_TIMEOUT)
+            )
+        ).thenCompose(ignored -> {
+            assertRunning();
+            assertSession(
+                request.requesterUuid(),
+                request.sessionId()
+            );
+            if (
+                !executionPolicy.allows(
+                    call.tool(),
+                    request.toolsAllowed(),
+                    request.mode()
+                )
+            ) {
+                return CompletableFuture.failedFuture(
+                    new ProtocolException(
+                        ErrorCode.UNSUPPORTED,
+                        "Schedule cancellation is no longer allowed."
+                    )
+                );
+            }
+
+            boolean cancelled = scheduledActions.cancel(
+                request.requesterUuid(),
+                arguments.scheduleId()
+            );
+            ToolResult result = cancelled
+                ? ToolResult.ok(
+                    new CancelScheduledActionData(
+                        arguments.scheduleId(),
+                        true
+                    ),
+                    clock.instant(),
+                    "JarvisScheduler"
+                )
+                : ToolResult.error(
+                    ErrorCode.NOT_FOUND,
+                    "Pending scheduled action was not found for this requester.",
+                    false,
+                    clock.instant(),
+                    "JarvisScheduler"
+                );
+
+            return recordControlResult(
+                request,
+                budget,
+                routing,
+                call,
+                toolCallId,
+                actionId,
+                result,
+                sentAt
+            );
+        });
+    }
+
+    private CompletionStage<Void> recordControlResult(
+        ChatRequest request,
+        RequestBudget budget,
+        DeterministicRoutePolicy.RoutingDecision routing,
+        LunaStep.ToolCall call,
+        UUID toolCallId,
+        UUID actionId,
+        ToolResult result,
+        Instant startedAt
+    ) {
+        long latency = Math.max(
+            0L,
+            Duration.between(
+                startedAt,
+                clock.instant()
+            ).toMillis()
+        );
+        return tryPostAudit(
+            auditEvent(
+                request,
+                routing,
+                call,
+                toolCallId,
+                actionId,
+                result.status().name(),
+                result.source(),
+                latency
+            ),
+            earlier(
+                budget.deadlineAt(),
+                clock.instant().plus(
+                    POST_AUDIT_TIMEOUT
+                )
+            )
+        ).thenApply(ignored -> {
+            assertSession(
+                request.requesterUuid(),
+                request.sessionId()
+            );
+            history.append(
+                request.requesterUuid(),
+                request.sessionId(),
+                new ConversationEntry.ToolMessage(
+                    call.tool(),
+                    toolCallId,
+                    result,
+                    request.requestId(),
+                    clock.instant()
+                )
+            );
+            return null;
+        });
+    }
+
+    private CompletionStage<Boolean> runScheduledAction(
+        ChatRequest origin,
+        DeterministicRoutePolicy.RoutingDecision routing,
+        ScheduleActionArguments schedule,
+        int runIndex
+    ) {
+        if (
+            stopped
+                || !schedulingPolicy.stillAllowed(
+                    schedule
+                )
+                || !toolRuntime.activeTools().contains(
+                    schedule.tool()
+                )
+                || !executionPolicy.allows(
+                    schedule.tool(),
+                    origin.toolsAllowed(),
+                    "SCHEDULED"
+                )
+        ) {
+            return CompletableFuture.completedFuture(
+                false
+            );
+        }
+
+        LunaStep.ToolCall nested =
+            new LunaStep.ToolCall(
+                schedule.tool(),
+                schedule.arguments()
+            );
+        Instant sentAt = clock.instant();
+        Instant deadline =
+            sentAt.plus(TOOL_TIMEOUT);
+        UUID toolCallId = UUID.randomUUID();
+        UUID actionId = UUID.randomUUID();
+
+        CompletionStage<Void> preAudit =
+            requirePreAudit(
+                auditEvent(
+                    origin,
+                    routing,
+                    nested,
+                    toolCallId,
+                    actionId,
+                    "SCHEDULED_PRE_EXECUTION_"
+                        + runIndex,
+                    "JarvisScheduler",
+                    0L
+                ),
+                earlier(
+                    deadline,
+                    sentAt.plus(
+                        PRE_AUDIT_TIMEOUT
+                    )
+                )
+            );
+
+        return preAudit.thenCompose(ignored -> {
+            if (
+                stopped
+                    || !schedulingPolicy.stillAllowed(
+                        schedule
+                    )
+                    || !toolRuntime.activeTools().contains(
+                        schedule.tool()
+                    )
+                    || !executionPolicy.allows(
+                        schedule.tool(),
+                        origin.toolsAllowed(),
+                        "SCHEDULED"
+                    )
+            ) {
+                return CompletableFuture.completedFuture(
+                    false
+                );
+            }
+
+            CommonRuntime.ToolInvocation invocation =
+                new CommonRuntime.ToolInvocation(
+                    sentAt,
+                    deadline,
+                    origin.requesterUuid(),
+                    origin.requestId(),
+                    origin.sessionId(),
+                    toolCallId,
+                    actionId,
+                    schedule.tool(),
+                    schedule.arguments()
+                );
+            Instant startedAt = clock.instant();
+
+            return toolRuntime.execute(invocation)
+                .thenCompose(result -> {
+                    long latency = Math.max(
+                        0L,
+                        Duration.between(
+                            startedAt,
+                            clock.instant()
+                        ).toMillis()
+                    );
+                    return tryPostAudit(
+                        auditEvent(
+                            origin,
+                            routing,
+                            nested,
+                            toolCallId,
+                            actionId,
+                            "SCHEDULED_"
+                                + result.status().name(),
+                            result.source(),
+                            latency
+                        ),
+                        clock.instant().plus(
+                            POST_AUDIT_TIMEOUT
+                        )
+                    ).thenApply(postIgnored ->
+                        result.status()
+                            == io.github.kardane.jarvisminecraft.common.protocol.Protocol.ResultStatus.OK
+                            || result.status()
+                            == io.github.kardane.jarvisminecraft.common.protocol.Protocol.ResultStatus.EMPTY
+                    );
+                });
+        }).handle(
+            (keepGoing, failure) ->
+                failure == null
+                    && Boolean.TRUE.equals(
+                        keepGoing
+                    )
+        );
     }
 
     private CompletionStage<Void> requirePreAudit(
