@@ -9,6 +9,7 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
+import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationManager;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.prompt.PromptContentLoader;
 import io.github.kardane.jarvisminecraft.common.prompt.PromptContentManager;
@@ -39,54 +40,132 @@ final class EmbeddedBrainBootstrap {
         String typesafeApiKey,
         Path auditDirectory,
         ChatSessionManager sessions,
+        RuntimeConfigurationManager runtimeConfiguration,
+        ToolRegistry registry,
+        CommonRuntime commonRuntime,
+        Clock clock,
+        JarvisLog log
+    ) {
+        Objects.requireNonNull(
+            runtimeConfiguration,
+            "runtimeConfiguration"
+        );
+        return createInternal(
+            serverId,
+            capabilities,
+            openAiApiKey,
+            typesafeApiKey,
+            auditDirectory,
+            sessions,
+            runtimeConfiguration.configManager(),
+            runtimeConfiguration.promptContentManager(),
+            registry,
+            commonRuntime,
+            clock,
+            log
+        );
+    }
+
+    static LiveRuntime create(
+        String serverId,
+        List<Capability> capabilities,
+        String openAiApiKey,
+        String typesafeApiKey,
+        Path auditDirectory,
+        ChatSessionManager sessions,
         ConfigManager configManager,
         ToolRegistry registry,
         CommonRuntime commonRuntime,
         Clock clock,
         JarvisLog log
     ) {
+        Objects.requireNonNull(
+            configManager,
+            "configManager"
+        );
+        JarvisConfig initialConfig =
+            configManager.current();
+        PromptContentManager promptContent =
+            new PromptContentManager(
+                promptLoader(
+                    promptContentRoot(auditDirectory),
+                    initialConfig
+                )
+            );
+        return createInternal(
+            serverId,
+            capabilities,
+            openAiApiKey,
+            typesafeApiKey,
+            auditDirectory,
+            sessions,
+            configManager,
+            promptContent,
+            registry,
+            commonRuntime,
+            clock,
+            log
+        );
+    }
+
+    private static LiveRuntime createInternal(
+        String serverId,
+        List<Capability> capabilities,
+        String openAiApiKey,
+        String typesafeApiKey,
+        Path auditDirectory,
+        ChatSessionManager sessions,
+        ConfigManager configManager,
+        PromptContentManager promptContent,
+        ToolRegistry registry,
+        CommonRuntime commonRuntime,
+        Clock clock,
+        JarvisLog log
+    ) {
         Objects.requireNonNull(serverId, "serverId");
-        Objects.requireNonNull(capabilities, "capabilities");
-        Objects.requireNonNull(auditDirectory, "auditDirectory");
+        Objects.requireNonNull(
+            capabilities,
+            "capabilities"
+        );
+        Objects.requireNonNull(
+            auditDirectory,
+            "auditDirectory"
+        );
         Objects.requireNonNull(sessions, "sessions");
-        Objects.requireNonNull(configManager, "configManager");
+        Objects.requireNonNull(
+            configManager,
+            "configManager"
+        );
+        Objects.requireNonNull(
+            promptContent,
+            "promptContent"
+        );
         Objects.requireNonNull(registry, "registry");
-        Objects.requireNonNull(commonRuntime, "commonRuntime");
+        Objects.requireNonNull(
+            commonRuntime,
+            "commonRuntime"
+        );
         Objects.requireNonNull(clock, "clock");
         Objects.requireNonNull(log, "log");
 
-        JarvisConfig initialConfig = configManager.current();
-        PromptContentLoader.Limits promptLimits =
-            new PromptContentLoader.Limits(
-                PromptContentLoader.Limits.DEFAULT_PERSONA_MAX_BYTES,
-                initialConfig.knowledge().maxFiles(),
-                initialConfig.knowledge().maxFileBytes(),
-                initialConfig.knowledge().maxTotalBytes()
+        ExecutorService aiExecutor =
+            Executors.newFixedThreadPool(
+                AiRequestScheduler.DEFAULT_MAX_CONCURRENT,
+                runnable -> {
+                    Thread thread = new Thread(
+                        runnable,
+                        "jarvis-embedded-ai"
+                    );
+                    thread.setDaemon(true);
+                    return thread;
+                }
             );
-        PromptContentManager promptContent =
-            new PromptContentManager(
-                new PromptContentLoader(
-                    promptContentRoot(auditDirectory),
-                    initialConfig.personality().enabled(),
-                    initialConfig.knowledge().enabled(),
-                    promptLimits
-                )
-            );
-
-        ExecutorService aiExecutor = Executors.newFixedThreadPool(
-            AiRequestScheduler.DEFAULT_MAX_CONCURRENT,
-            runnable -> {
-                Thread thread = new Thread(
-                    runnable,
-                    "jarvis-embedded-ai"
-                );
-                thread.setDaemon(true);
-                return thread;
-            }
-        );
 
         AsyncJsonlAuditSink audit =
-            new AsyncJsonlAuditSink(auditDirectory, clock);
+            new AsyncJsonlAuditSink(
+                auditDirectory,
+                clock
+            );
         LunaClient luna = new OpenAiLunaClient(
             openAiApiKey,
             new ToolArgumentCodec()
@@ -138,12 +217,33 @@ final class EmbeddedBrainBootstrap {
         }
     }
 
+    private static PromptContentLoader promptLoader(
+        Path configRoot,
+        JarvisConfig config
+    ) {
+        JarvisConfig.Knowledge knowledge =
+            config.knowledge();
+        return new PromptContentLoader(
+            configRoot,
+            config.personality().enabled(),
+            knowledge.enabled(),
+            new PromptContentLoader.Limits(
+                PromptContentLoader.Limits
+                    .DEFAULT_PERSONA_MAX_BYTES,
+                knowledge.maxFiles(),
+                knowledge.maxFileBytes(),
+                knowledge.maxTotalBytes()
+            )
+        );
+    }
+
     private static Path promptContentRoot(
         Path auditDirectory
     ) {
-        Path normalized = auditDirectory
-            .toAbsolutePath()
-            .normalize();
+        Path normalized = Objects.requireNonNull(
+            auditDirectory,
+            "auditDirectory"
+        ).toAbsolutePath().normalize();
         Path parent = normalized.getParent();
         if (parent == null) {
             throw new IllegalArgumentException(
@@ -168,7 +268,10 @@ final class EmbeddedBrainBootstrap {
                 "promptContent"
             );
             Objects.requireNonNull(audit, "audit");
-            Objects.requireNonNull(aiExecutor, "aiExecutor");
+            Objects.requireNonNull(
+                aiExecutor,
+                "aiExecutor"
+            );
         }
 
         void closeOwnedResources() {
