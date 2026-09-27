@@ -51,17 +51,17 @@ ChatSessionManager
   ↓
 EmbeddedBrain
   ↓
-Jev
+RequestPlanner → Jev → DeterministicRoutePolicy
   ↓
-DeterministicRoutePolicy
-  ↓
-Luna
+ModelConversationLoop → Luna
   ↓
 Tool proposal
   ↓
 ToolArgumentCodec
   ↓
 route / active Tool 확인
+  ↓
+ToolExecutionCoordinator / ScheduledToolCoordinator
   ↓
 pre-execution AuditSink
   ↓
