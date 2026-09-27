@@ -39,14 +39,15 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 
 1. 플랫폼 Adapter가 현재 온라인 플레이어 identity를 만들고 `InteractionCoordinator`가 `OP / WHITELIST / ALL / BLACKLIST` audience, configurable wake word, active session, 종료/escape를 판정한다.
 2. `EmbeddedBrainGateway`가 현재 identity와 interaction authorization을 다시 확인하고 request를 생성해 bounded `AiRequestScheduler`로 넘긴다. requester가 현재 OP가 아니면 request의 Tool set은 빈 집합으로 고정된다.
-3. Jev가 latest message, short topic, capability 이름만 받아 category를 분류한다.
-4. `DeterministicRoutePolicy`가 active Tool set을 category에 맞게 좁힌다. Jev 오류, `UNCERTAIN`, 저신뢰 fallback에서는 read-only Tool만 노출한다.
-5. Luna는 허용된 Tool schema만 보고 Tool call을 제안한다.
-6. Tool 인자는 공용 `ToolArgumentCodec`으로 다시 strict parsing된다. 모델 출력은 실행 권한이 아니다.
-7. 상태 변경 Tool은 pre-execution audit 성공 후에만 `CommonRuntime.ExecutionRuntime`으로 전달된다.
-8. `CommonRuntime`이 current OP, active Tool, deadline, deduplication/action semantics를 재검사하고 플랫폼 scheduler에서 실제 Minecraft/Provider API를 호출한다.
-9. Tool result를 Luna가 해석해 최종 답을 만든다.
-10. `EmbeddedBrainGateway`는 server thread로 돌아가 현재 interaction authorization과 active session을 다시 확인한 뒤 응답을 public chat으로 broadcast한다.
+3. Jev가 latest message, short topic, interaction origin, capability 이름을 받아 `engagement + route + reasoning`을 한 요청에서 판단한다.
+4. `DeterministicRoutePolicy`가 active Tool set을 route category에 맞게 좁힌다. Jev 오류, `UNCERTAIN`, 저신뢰 fallback에서는 read-only Tool만 노출한다.
+5. `ReasoningPolicy`가 runtime config와 Jev 결과를 결합해 요청별 `NONE / LOW / MEDIUM / HIGH` 값을 확정하고, Luna의 모든 model round에 동일한 effort를 적용한다.
+6. Luna는 허용된 Tool schema만 보고 Tool call을 제안한다.
+7. Tool 인자는 공용 `ToolArgumentCodec`으로 다시 strict parsing된다. 모델 출력은 실행 권한이 아니다.
+8. 상태 변경 Tool은 pre-execution audit 성공 후에만 `CommonRuntime.ExecutionRuntime`으로 전달된다.
+9. `CommonRuntime`이 current OP, active Tool, deadline, deduplication/action semantics를 재검사하고 플랫폼 scheduler에서 실제 Minecraft/Provider API를 호출한다.
+10. Tool result를 Luna가 해석해 최종 답을 만든다.
+11. `EmbeddedBrainGateway`는 server thread로 돌아가 현재 interaction authorization과 active session을 다시 확인한 뒤 응답을 public chat으로 broadcast한다.
 
 ## 권한과 안전 불변조건
 
@@ -76,8 +77,21 @@ Wake words, follow-up TTL, and `OP / WHITELIST / ALL / BLACKLIST` admission
 are live. `ACTIVE` currently retains the same direct-invocation/follow-up
 path as `PASSIVE`; proactive ambient-chat initiation remains a later phase.
 
-Reasoning, response styling/sound, execution-mode Tool filtering, scheduling,
-and admin reload commands are still not wired.
+Phase 3 now consumes the model reasoning portion. `JdkJevClassifier` asks
+three typed choice questions in parallel: `engagement`, `route`, and
+`reasoning`. `ReasoningPolicy` applies the following precedence:
+
+1. concrete config mode (`NONE / LOW / MEDIUM / HIGH`) wins;
+2. `AUTO` uses the validated Jev reasoning choice;
+3. Jev error/invalid model/output uses the configured concrete fallback.
+
+The chosen effort is fixed for the whole Brain request, including later Tool
+rounds. Jev engagement is collected and validated now, but admitted
+`DIRECT/FOLLOW_UP` requests are not suppressed by it. Proactive
+`START_CONVERSATION/IGNORE` behavior remains a later ACTIVE-mode phase.
+
+Response styling/sound, execution-mode Tool filtering, scheduling, and admin
+reload commands are still not wired.
 
 Provider credentials and logical server identity remain in
 `EmbeddedBrainSettings`; they are not copied into `JarvisConfig`.
@@ -100,7 +114,7 @@ CoreProtect, WorldGuard, CMI 기능은 Paper에서 optional Provider로 로딩�
 
 ## AI와 스레드 경계
 
-Jev와 Luna 네트워크 호출은 Minecraft server/tick thread를 점유하지 않는다. 플랫폼 API 호출만 각 플랫폼의 scheduler/execution context에서 수행한다. 외부 AI에는 요청 처리에 필요한 최소 대화, capability 이름, Tool schema, bounded Tool result만 전달한다.
+Jev와 Luna 네트워크 호출은 Minecraft server/tick thread를 점유하지 않는다. 플랫폼 API 호출만 각 플랫폼의 scheduler/execution context에서 수행한다. Jev에는 최신 사용자 메시지, bounded short topic, interaction origin, capability 이름만 전달한다. Luna에는 요청 처리에 필요한 bounded 대화, capability, 허용된 Tool schema/result만 전달한다.
 
 ## 감사
 

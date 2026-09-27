@@ -114,11 +114,12 @@ History/Region 조회는 v0.1.1 Tool catalog에 추가한다. 이력 기본 범�
 - 감사 필드: timestamp, serverId, requesterUuid, requestId, toolCallId/actionId, tool, risk, 검증된 인자 요약, outcome, source, latency, 모델 ID, fallback 사유. 비밀·전체 프롬프트는 저장하지 않는다.
 - v0.1 감사는 비동기 회전 JSONL, 기본 7일/총 100MiB. 변경 실행은 pre-execution 감사 기록을 안전하게 큐/저장할 수 없으면 거부한다. 큐 포화·디스크 오류를 무시하지 않고 health에 표시한다.
 
-### 3.6 후속 runtime policy Phase 1-2
+### 3.6 후속 runtime policy Phase 1-3
 
 Phase 1은 비밀이 아닌 runtime-policy의 immutable snapshot, strict validation,
-fail-safe reload 기반을 추가했다. Phase 2는 그중 interaction policy를 실제
-chat admission/session 경로에 연결한다.
+fail-safe reload 기반을 추가했다. Phase 2는 interaction policy를 실제
+chat admission/session 경로에 연결했고, Phase 3는 Jev decision과 Luna
+reasoning policy를 연결한다.
 
 - 기본 audience는 계속 `OP`다. 운영자가 명시적으로 설정하면
   `WHITELIST / ALL / BLACKLIST`가 새 JARVIS 대화 진입과 기존 session 유지
@@ -133,8 +134,13 @@ chat admission/session 경로에 연결한다.
 - interaction audience와 Minecraft Tool authority는 분리한다. audience에 의해
   허용된 비OP request는 Luna 대화는 가능하지만 Tool set을 빈 집합으로
   고정한다. `CommonRuntime`의 current online OP 검사는 그대로 유지한다.
-- reasoning 설정은 후속 Jev/reasoning 단계가 연결되기 전에는 현재 Luna 호출
-  정책을 변경하지 않는다. 모델 이름은 계속 `gpt-6-luna`로 고정한다.
+- Jev는 Phase 3부터 `engagement / route / reasoning` 세 choice를 한 요청에서
+  반환한다. direct/follow-up 요청의 engagement 값은 미래 proactive 기능을
+  위한 신호이며 현재 응답을 억제하는 권한으로 사용하지 않는다.
+- reasoning `AUTO`는 Jev의 validated `NONE / LOW / MEDIUM / HIGH` 선택을
+  사용한다. 고정 config 값은 Jev보다 우선하고, Jev 오류/invalid output이면
+  concrete `fallback`을 사용한다. 한 Brain request의 모든 Luna round는 같은
+  reasoning level을 사용한다. 모델 이름은 계속 `gpt-6-luna`로 고정한다.
 - `READ_TALK/EXECUTE_LITE/EXECUTE` 값은 후속 ExecutionPolicy 단계가
   연결되기 전에는 Tool 범위를 넓히지 않는다. raw console command, SQL,
   code execution을 허용하는 의미로 해석하지 않는다.

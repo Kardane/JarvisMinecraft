@@ -39,8 +39,16 @@ credentials. Phase 2 applies the interaction subset at runtime:
 invocations and active-session follow-ups; proactive ambient-chat initiation is
 not implemented yet.
 
-Reasoning selection, response styling/sound, execution-mode Tool filtering,
-scheduling, and `/jm reload` remain pending later phases.
+Phase 3 applies `jarvis.model.reasoning.*`:
+
+- `mode=AUTO`: use Jev's validated reasoning choice for the request;
+- `mode=NONE/LOW/MEDIUM/HIGH`: force that effort regardless of Jev;
+- if Jev fails while mode is `AUTO`, use `fallback`.
+
+The resolved effort remains fixed across all Luna rounds in that request.
+
+Response styling/sound, execution-mode Tool filtering, scheduling, and
+`/jm reload` remain pending later phases.
 
 A failed initial runtime-policy parse stops JARVIS startup. `ConfigManager`
 already provides fail-safe snapshot replacement semantics for the later reload
@@ -121,8 +129,9 @@ InteractionCoordinator
   -> ChatSessionManager
   -> EmbeddedBrainGateway
   -> AiRequestScheduler
-  -> Jev
+  -> Jev (engagement + route + reasoning)
   -> DeterministicRoutePolicy
+  -> ReasoningPolicy
   -> Luna
   -> AuditSink
   -> CommonRuntime.ExecutionRuntime
@@ -169,7 +178,17 @@ Do not store provider secrets, full hidden reasoning, IP addresses, unrelated pr
 
 ### Jev failure
 
-Jev timeout/error/uncertain or configured low confidence activates the deterministic fallback route. Only currently active read-only Tools are exposed to Luna. State-changing Tools are withheld.
+Jev timeout/error/invalid output/model mismatch activates the deterministic
+fallback route. Only currently active read-only Tools are exposed to Luna and,
+when reasoning mode is `AUTO`, the configured reasoning fallback is used.
+
+A valid `UNCERTAIN` route or configured low-confidence abstention also keeps
+the deterministic read-only fallback route. A valid Jev reasoning choice may
+still be used for that request.
+
+Jev engagement is recorded in `JevClassification`, but Phase 3 does not use
+`IGNORE` or `START_CONVERSATION` to alter already-admitted DIRECT/FOLLOW_UP
+requests.
 
 ### Luna failure
 
