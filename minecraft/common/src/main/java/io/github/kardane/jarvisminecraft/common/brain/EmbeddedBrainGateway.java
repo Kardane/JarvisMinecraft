@@ -83,8 +83,6 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         EmbeddedBrain brain,
         ChatSessionManager sessions,
         InteractionCoordinator interactions,
-        ConfigManager configManager,
-        ProgressNotifier progressNotifier,
         AdapterPlatformAccess platform,
         ServerScheduler serverScheduler,
         Clock clock
@@ -108,6 +106,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         EmbeddedBrain brain,
         ChatSessionManager sessions,
         InteractionCoordinator interactions,
+        ConfigManager configManager,
+        ProgressNotifier progressNotifier,
         AdapterPlatformAccess platform,
         ServerScheduler serverScheduler,
         Clock clock,
