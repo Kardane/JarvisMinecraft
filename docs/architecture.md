@@ -72,6 +72,12 @@ NeoForge read the optional
 `config/jarvisminecraft/jarvis.properties` file through the common
 properties source. Missing Fabric/NeoForge policy files use built-in defaults.
 
+각 runtime composition root는 `ConfigManager`를 하나만 생성해
+`InteractionCoordinator`, `EmbeddedBrainGateway`, `ReasoningPolicy`,
+`ExecutionPolicy`, `SchedulingPolicy`, operational logging에 같은 인스턴스를
+공유한다. Gateway wiring은 interaction policy와 Brain policy가 서로 다른
+`ConfigManager`를 참조하는 구성을 거부한다.
+
 Phase 2 consumes the base interaction portion through
 `InteractionCoordinator`, `AudiencePolicy`, and `InvocationMatcher`.
 Wake words, follow-up TTL, and `OP / WHITELIST / ALL / BLACKLIST` admission
