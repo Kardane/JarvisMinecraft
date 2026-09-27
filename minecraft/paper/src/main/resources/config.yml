@@ -31,6 +31,8 @@ jarvis:
       fallback: MEDIUM
 
   response:
+    # Legacy Minecraft ampersand codes are supported in the prefix only.
+    # Example: "&5[JARVIS]&r "
     prefix: "[JARVIS] "
     waiting-message:
       enabled: true

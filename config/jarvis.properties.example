@@ -20,6 +20,8 @@ jarvis.model.name=gpt-6-luna
 jarvis.model.reasoning.mode=AUTO
 jarvis.model.reasoning.fallback=MEDIUM
 
+# Legacy Minecraft ampersand codes are supported in the prefix only.
+# Example: jarvis.response.prefix=&5[JARVIS]&r 
 jarvis.response.prefix=[JARVIS] 
 jarvis.response.waiting-message.enabled=true
 jarvis.response.waiting-message.threshold-ms=1800
