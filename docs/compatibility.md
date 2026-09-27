@@ -1,51 +1,51 @@
-# T00 호환성·재사용 조사
+# T00 Compatibility and Reuse Survey
 
-작성일: 2026-09-24  
-상태: **T00 문서 조사 완료 / T01 착수 가능, 빌드·실서버·유료 API live 검증은 아직 수행하지 않음**
+Date: 2026-09-24  
+Status: **T00 documentation survey complete / T01 may begin; build, real-server, and paid-API live verification not yet performed**
 
-## 1. 조사 범위와 판정 규칙
+## 1. Scope and Decision Rules
 
-T00은 구현 단계가 아니다. Minecraft 1.21.8을 첫 검증 기준으로 삼아 플랫폼, 빌드 도구, AI SDK, Paper Provider의 **재사용 가능한 공개 API와 호환 경계**를 고정한다.
+T00 is not an implementation phase. It establishes Minecraft 1.21.8 as the first verification baseline and fixes the **reusable public APIs and compatibility boundaries** for platforms, build tooling, AI SDKs, and Paper Providers.
 
-상태 표기:
+Status labels:
 
-| 상태 | 의미 |
+| Status | Meaning |
 |---|---|
-| CONFIRMED | 공식 문서, 공식 Maven/패키지 저장소 또는 upstream 저장소로 존재와 API 계약을 확인함 |
-| PINNED | T02 빌드 골격에서 사용할 고정 버전. 실제 멀티모듈 빌드는 아직 하지 않음 |
-| RUNTIME UNVERIFIED | 실제 Minecraft 서버 기동/이벤트/플러그인 조합은 아직 검증하지 않음 |
-| LIVE UNVERIFIED | 실제 외부 AI 계정/API 호출은 아직 하지 않음 |
-| BLOCKED | 라이선스·공개 API·정확한 조합을 더 확인하기 전 기능 활성화 금지 |
+| CONFIRMED | Existence and API contract verified from official documentation, official Maven/package repositories, or upstream repositories |
+| PINNED | Fixed version to use for the T02 build skeleton. The actual multimodule build had not yet been run at T00 |
+| RUNTIME UNVERIFIED | Actual Minecraft server startup/event/plugin combinations had not yet been verified |
+| LIVE UNVERIFIED | No real external AI account/API call had yet been made |
+| BLOCKED | Feature activation prohibited until licensing, public API, or exact combination is verified |
 
-## 2. 기준 버전 매트릭스
+## 2. Baseline Version Matrix
 
-### 2.1 공통 런타임/빌드
+### 2.1 Shared Runtime / Build
 
-| 항목 | T00 고정값 | 상태 | 근거/메모 |
+| Item | T00 Pin | Status | Evidence / Notes |
 |---|---:|---|---|
-| Minecraft | 1.21.8 | PINNED | 작업명세 기준. 1.21.8 이후 버전의 바이너리 호환을 의미하지 않음 |
-| JVM | Java 21 (64-bit) | PINNED | NeoForge 1.21.6-1.21.8 공식 문서가 Java 21을 요구. Paper/Fabric도 동일 toolchain으로 통일 |
-| Gradle Wrapper | 8.14.5 | PINNED | Gradle 공식 Releases의 최신 8.14.x 패치. Loom/ModDevGradle과의 실제 동시 빌드는 T02에서 검증 |
-| Brain Node.js | Node 24 LTS | PINNED | OpenAI Node SDK 정책상 권장 런타임. TypeSafe SDK의 Node 20+ 요구도 충족 |
+| Minecraft | 1.21.8 | PINNED | Work-specification baseline; does not imply binary compatibility with versions after 1.21.8 |
+| JVM | Java 21 (64-bit) | PINNED | Official NeoForge 1.21.6–1.21.8 documentation requires Java 21. Paper/Fabric use the same toolchain |
+| Gradle Wrapper | 8.14.5 | PINNED | Latest 8.14.x patch in official Gradle Releases. Actual joint build with Loom/ModDevGradle is verified in T02 |
+| Brain Node.js | Node 24 LTS | PINNED | Recommended runtime under OpenAI Node SDK policy; also satisfies TypeSafe SDK Node 20+ requirement |
 
-Gradle 9 계열이 현재 존재하더라도 T00에서는 채택하지 않는다. 세 Minecraft 빌드 플러그인의 공통 기반을 먼저 안정화하기 위해 8.14.x 최신 패치를 사용하고, 변경은 T02의 실제 빌드 증거로만 허용한다.
+Even though Gradle 9 exists, T00 does not adopt it. Use the latest 8.14.x patch to stabilize the common baseline across the three Minecraft build plugins first. Changes are allowed only from actual T02 build evidence.
 
 ### 2.2 Paper
 
-| 항목 | T00 고정값 | 상태 |
+| Item | T00 Pin | Status |
 |---|---:|---|
-| 서버 대상 | Paper 1.21.8 | PINNED / RUNTIME UNVERIFIED |
+| Server target | Paper 1.21.8 | PINNED / RUNTIME UNVERIFIED |
 | compile API | io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT | CONFIRMED |
 | Java | 21 | PINNED |
-| 채팅 진입점 후보 | AsyncChatEvent | CONFIRMED |
-| OP 판정 | Player/ServerOperator.isOp() | CONFIRMED |
-| Folia | 미지원 | 고정 요구사항 |
+| Candidate chat entrypoint | AsyncChatEvent | CONFIRMED |
+| OP check | Player/ServerOperator.isOp() | CONFIRMED |
+| Folia | unsupported | fixed requirement |
 
-Paper 1.21.8 Javadocs가 1.21.8-R0.1-SNAPSHOT API를 제공한다. Paper 채팅 문서는 AsyncChatEvent가 비동기이며 해당 핸들러에서 Bukkit API를 직접 사용하는 것은 안전하지 않다고 명시한다. 따라서 **채팅 텍스트를 접수/차단하는 작업과 서버 상태·플레이어·월드 접근을 분리**하고, Bukkit 객체 접근은 Paper scheduler를 통해 안전한 서버 스레드에서 수행한다.
+Paper 1.21.8 Javadocs provide the 1.21.8-R0.1-SNAPSHOT API. Paper chat documentation states that AsyncChatEvent may be asynchronous and that directly using Bukkit APIs in that handler is unsafe. Therefore, **separate chat-text admission/broadcast behavior from server/player/world access**, and perform Bukkit-object access on a safe server thread through the Paper scheduler.
 
-OP 권한 근거는 LLM이나 별도 permission node가 아니라 서버가 제공하는 isOp() 결과다. 접수 전/Tool 실행 직전/결과 전달 직전에 재검사한다.
+OP authority comes from the server-provided isOp() result, not from the LLM or a separate permission node. Re-check before admission, immediately before Tool execution, and immediately before result delivery.
 
-공식 근거:
+Official references:
 - https://jd.papermc.io/paper/1.21.8/
 - https://docs.papermc.io/paper/dev/chat-events/
 - https://jd.papermc.io/paper/1.21.8/org/bukkit/permissions/ServerOperator.html
@@ -54,7 +54,7 @@ OP 권한 근거는 LLM이나 별도 permission node가 아니라 서버가 제�
 
 ### 2.3 Fabric
 
-| 항목 | T00 고정값 | 상태 |
+| Item | T00 Pin | Status |
 |---|---:|---|
 | Minecraft | 1.21.8 | PINNED |
 | Fabric Loader | 0.17.2 | PINNED / RUNTIME UNVERIFIED |
@@ -62,16 +62,16 @@ OP 권한 근거는 LLM이나 별도 permission node가 아니라 서버가 제�
 | Yarn | 1.21.8+build.1 | CONFIRMED / PINNED |
 | Fabric Loom | 1.12.2 | CONFIRMED / PINNED |
 | Java | 21 | PINNED |
-| 채팅 진입점 후보 | ServerMessageEvents.ALLOW_CHAT_MESSAGE | CONFIRMED |
-| OP 판정 | PlayerManager.isOperator(GameProfile) | CONFIRMED |
+| Candidate chat entrypoint | ServerMessageEvents.ALLOW_CHAT_MESSAGE | CONFIRMED |
+| OP check | PlayerManager.isOperator(GameProfile) | CONFIRMED |
 
-Fabric API 0.133.4+1.21.8의 ServerMessageEvents.ALLOW_CHAT_MESSAGE는 반환값으로 플레이어 채팅의 서버 broadcast를 막을 수 있다. JARVIS 직접 호출도 입력 메시지를 공개 채팅에 남기므로 승인된 호출에서는 broadcast를 허용한다.
+Fabric API 0.133.4+1.21.8 `ServerMessageEvents.ALLOW_CHAT_MESSAGE` can suppress server broadcast of player chat via its return value. Direct JARVIS invocations also remain visible in public chat, so approved invocations allow broadcast.
 
-주의: 공식 Javadoc은 해당 callback의 스레드 계약을 명시적으로 설명하지 않는다. T07에서는 callback이 실제 dedicated server thread에서 실행되는지 검증하고, **문서로 보장되지 않은 스레드 안전성을 전제로 삼지 않는다.** Minecraft world/player 객체는 서버 실행 큐에서 스냅샷으로 변환한다.
+Caution: the official Javadoc does not explicitly document the callback threading contract. T07 verifies whether the callback actually runs on the dedicated-server thread, and **must not assume thread safety that is not documented**. Convert Minecraft world/player objects to snapshots from the server execution queue.
 
-OP 판정은 1.21.8 Yarn의 PlayerManager.isOperator(GameProfile)을 사용한다. permission 레벨만으로 JARVIS 접근을 열지 않는다.
+Use Yarn 1.21.8 `PlayerManager.isOperator(GameProfile)` for the OP check. Do not grant JARVIS access based only on permission level.
 
-공식 근거:
+Official references:
 - https://maven.fabricmc.net/net/fabricmc/fabric-api/fabric-api/0.133.4%2B1.21.8/
 - https://maven.fabricmc.net/docs/fabric-api-0.133.4%2B1.21.8/net/fabricmc/fabric/api/message/v1/ServerMessageEvents.html
 - https://maven.fabricmc.net/net/fabricmc/yarn/1.21.8%2Bbuild.1/
@@ -84,46 +84,46 @@ OP 판정은 1.21.8 Yarn의 PlayerManager.isOperator(GameProfile)을 사용한�
 
 ### 2.4 NeoForge
 
-| 항목 | T00 고정값 | 상태 |
+| Item | T00 Pin | Status |
 |---|---:|---|
 | Minecraft | 1.21.8 | PINNED |
 | NeoForge | 21.8.52 | CONFIRMED / PINNED |
 | ModDevGradle | 2.0.147 | CONFIRMED / PINNED |
 | Java | 21 | CONFIRMED / PINNED |
-| 채팅 진입점 후보 | ServerChatEvent | CONFIRMED, 정확한 21.8.52 signature는 T02/T08 compile 검증 |
-| OP 판정 | MinecraftServer PlayerList의 operator list | PINNED, 정확한 mapped signature는 T02 compile 검증 |
+| Candidate chat entrypoint | ServerChatEvent | CONFIRMED; exact 21.8.52 signature verified by T02/T08 compilation |
+| OP check | MinecraftServer PlayerList operator list | PINNED; exact mapped signature verified by T02 compilation |
 
-NeoForge 공식 1.21.6-1.21.8 문서는 Java 21 64-bit를 요구한다. 21.8.52 artifact가 NeoForged 공식 Maven에 존재한다. ModDevGradle 2.0.147은 Gradle Plugin Portal에서 확인했다.
+Official NeoForge 1.21.6–1.21.8 documentation requires 64-bit Java 21. The 21.8.52 artifact exists in the official NeoForged Maven repository. ModDevGradle 2.0.147 was verified in the Gradle Plugin Portal.
 
-NeoForge의 ServerChatEvent는 logical server에서 동작하고 취소 가능한 이벤트로 유지되고 있다. 다만 T00 조사에서 공식 1.21.8 API 문서의 상세 signature를 충분히 고정하지 못했으므로 T02/T08에서 **21.8.52 소스/compile 결과를 authority로 재검증**한다.
+NeoForge `ServerChatEvent` runs on the logical server and remains cancellable. The T00 survey did not fully pin the detailed 1.21.8 API signature from official documentation, so T02/T08 **re-validate against the 21.8.52 source/compile result as authority**.
 
-공식 근거:
+Official references:
 - https://docs.neoforged.net/docs/1.21.8/gettingstarted/
 - https://maven.neoforged.net/releases/net/neoforged/neoforge/21.8.52/
 - https://plugins.gradle.org/plugin/net.neoforged.moddev/2.0.147
 - https://github.com/neoforged/NeoForge
 - https://github.com/neoforged/ModDevGradle
 
-## 3. Brain AI SDK/모델 고정
+## 3. Brain AI SDK / Model Pins
 
-| 항목 | T00 고정값 | 상태 | 메모 |
+| Item | T00 Pin | Status | Notes |
 |---|---:|---|---|
-| OpenAI JS SDK | openai 7.22.0 | CONFIRMED / PINNED | 2026-09-22 immutable release에서 GPT-6 Sol/Luna identifiers 추가 |
-| OpenAI 모델 | gpt-6-luna | CONFIRMED / LIVE UNVERIFIED | Responses API + function calling 사용 |
-| reasoning effort | medium | PINNED | Luna 공식 기본값이지만 동작 재현성을 위해 명시 |
+| OpenAI JS SDK | openai 7.22.0 | CONFIRMED / PINNED | 2026-09-22 immutable release that added GPT-6 Sol/Luna identifiers |
+| OpenAI model | gpt-6-luna | CONFIRMED / LIVE UNVERIFIED | Uses Responses API + function calling |
+| reasoning effort | medium | PINNED | Luna official default, explicitly pinned for reproducibility |
 | TypeSafe JS SDK | @typesafe-ai/sdk 0.6.0 | CONFIRMED / PINNED |
-| TypeSafe 모델 | jev-1.13.0 | CONFIRMED / LIVE UNVERIFIED | alias가 아니라 versioned ID 고정 |
-| Brain Node | 24 LTS | PINNED | OpenAI 권장 + TypeSafe Node 20+ 만족 |
+| TypeSafe model | jev-1.13.0 | CONFIRMED / LIVE UNVERIFIED | versioned ID pinned instead of an alias |
+| Brain Node | 24 LTS | PINNED | OpenAI recommendation + satisfies TypeSafe Node 20+ |
 
-OpenAI GPT-6 Luna 공식 모델 페이지는 Responses API의 function calling을 지원하며 reasoning.effort로 none/low/medium/high/xhigh/max를 지원한다. T00은 medium으로 고정한다.
+The official OpenAI GPT-6 Luna model page documents Responses API function calling and `reasoning.effort` values `none/low/medium/high/xhigh/max`. T00 pins `medium`.
 
-OpenAI SDK 7.22.0은 GPT-6 Luna 식별자를 명시적으로 추가한 첫 확인 릴리스이므로 이 버전으로 고정한다. 자동 minor/major 업그레이드는 금지한다.
+OpenAI SDK 7.22.0 is the first verified release that explicitly added the GPT-6 Luna identifier, so this version is pinned. Automatic minor/major upgrades are prohibited.
 
-TypeSafe Models 문서는 현재 안정 Jev를 jev-1.13.0으로 명시하고 jev-latest가 해당 버전을 가리킨다고 설명한다. alias는 향후 이동할 수 있으므로 제품 평가지표가 달라지지 않도록 versioned ID를 사용한다. 한국어/CJK는 영어 대비 성능이 동일하다고 보장되지 않으므로 A09 평가 전 confidence threshold를 안전 정책으로 사용하지 않는다.
+TypeSafe Models documentation identifies `jev-1.13.0` as the current stable Jev and notes that `jev-latest` points to it. Because aliases may move, use the versioned ID so product evaluation metrics do not silently change. Korean/CJK performance is not guaranteed to match English, so do not use the confidence threshold as an authority policy before A09 evaluation.
 
-TypeSafe SDK 0.6.0은 2026-09-15 공개된 초기 계열 SDK이며 최근 issue가 존재한다. SDK 자체 retry와 JARVIS retry를 중첩하지 않고, 3초 deadline·조회 전용 fallback·변경 도구 미노출 정책을 유지한다.
+TypeSafe SDK 0.6.0 is an early SDK release published on 2026-09-15 and has recent issues. Do not stack SDK retries with JARVIS retries; preserve the 3-second deadline, read-only fallback, and mutation-Tool suppression policy.
 
-공식 근거:
+Official references:
 - https://developers.openai.com/api/docs/models/gpt-6-luna
 - https://developers.openai.com/api/docs/guides/function-calling
 - https://github.com/openai/openai-node/releases/tag/v7.22.0
@@ -133,127 +133,127 @@ TypeSafe SDK 0.6.0은 2026-09-15 공개된 초기 계열 SDK이며 최근 issue�
 - https://github.com/typesafe-ai/typesafe-sdk-js/releases/tag/v0.6.0
 - https://www.npmjs.com/package/%40typesafe-ai/sdk
 
-**Live 상태:** OPENAI_API_KEY/TYPESAFE_API_KEY를 사용한 유료 live 호출은 T00에서 수행하지 않았다. A10은 T05/T10에서 별도 증거로 남긴다.
+**Live status:** No paid live call using OPENAI_API_KEY/TYPESAFE_API_KEY was made in T00. A10 evidence is captured separately in T05/T10.
 
-## 4. Paper Provider 재사용 조사
+## 4. Paper Provider Reuse Survey
 
 ### 4.1 CoreProtect
 
-| 항목 | 판정 |
+| Item | Decision |
 |---|---|
 | T00 compile target | net.coreprotect:coreprotect:24.0, provided/compileOnly |
 | API | v12 |
-| API 호환 범위 | CoreProtect 24.0+ |
-| 현재 사용자 서버 예시 | CoreProtect 24.1 |
-| 라이선스 | Artistic-2.0 |
-| v0.1 | 미사용 |
-| v0.1.1 | 조회만 사용 |
-| v0.2 | 승인형 rollback 후보, 별도 계약 필요 |
+| API compatibility range | CoreProtect 24.0+ |
+| Example current user server | CoreProtect 24.1 |
+| License | Artistic-2.0 |
+| v0.1 | unused |
+| v0.1.1 | query-only |
+| v0.2 | candidate approval-based rollback; separate contract required |
 
-CoreProtect 공식 API v12 문서는 plugin 24.0+를 요구하고 APIVersion() >= 12와 isEnabled() 확인 예제를 제공한다. JARVIS는 plugin 존재만으로 capability를 켜지 않고 **플러그인 타입 + API enabled + APIVersion >= 12**를 확인한다.
+CoreProtect API v12 documentation requires plugin 24.0+ and provides examples checking `APIVersion() >= 12` and `isEnabled()`. JARVIS does not enable the capability from plugin presence alone; it verifies **plugin type + API enabled + APIVersion >= 12**.
 
-performRollback()은 API v12 문서에서 async 호출을 요구한다. v0.1.1은 read-only lookup만 포함하지만 DB 조회를 tick thread에서 기다리지 않는다는 공통 원칙을 적용한다. Bukkit Block/Location/Player에서 필요한 값은 안전한 서버 스레드에서 제한된 DTO로 캡처한 뒤, Provider의 DB 작업을 별도 executor로 넘긴다.
+`performRollback()` requires asynchronous invocation according to API v12 documentation. v0.1.1 includes read-only lookup only, but follows the shared rule of never waiting for DB queries on the tick thread. Capture required values from Bukkit Block/Location/Player into bounded DTOs on a safe server thread, then hand Provider DB work to a separate executor.
 
-공식 근거:
+Official references:
 - https://docs.coreprotect.net/api/
 - https://docs.coreprotect.net/api/version/v12/
 - https://github.com/PlayPro/CoreProtect
 
 ### 4.2 WorldGuard
 
-| 항목 | 판정 |
+| Item | Decision |
 |---|---|
-| T00 사용자 서버 예시 | WorldGuard 7.0.18 |
-| 검증 compile target | WorldGuard 7.0.14 + WorldEdit 7.3.16, Java 21 / Minecraft 1.21.8 |
+| T00 example user server | WorldGuard 7.0.18 |
+| Verified compile target | WorldGuard 7.0.14 + WorldEdit 7.3.16, Java 21 / Minecraft 1.21.8 |
 | API major | 7.x |
-| 필수 companion | WorldEdit |
-| 라이선스 | LGPL-3.0-or-later |
-| v0.1 | 미사용 |
-| v0.1.1 | region/flags/build protection 조회 |
-| 변경 작업 | 미지원 |
+| Required companion | WorldEdit |
+| License | LGPL-3.0-or-later |
+| v0.1 | unused |
+| v0.1.1 | region/flags/build-protection queries |
+| Mutation operations | unsupported |
 
-EngineHub는 7.x 안에서 API 안정성을 높게 유지한다고 문서화한다. 이 checkout에서는 WorldGuard 7.0.14와 WorldEdit 7.3.16을 Java 21/Minecraft 1.21.8 기준으로 compileOnly 검증했다. 기존 사용자 서버 예시인 WorldGuard 7.0.18은 이 빌드 기준과 아직 맞지 않으므로, 해당 버전의 runtime 호환성은 Paper smoke test 전까지 확인되지 않은 상태로 둔다.
+EngineHub documents strong API stability within 7.x. This checkout compileOnly-verifies WorldGuard 7.0.14 and WorldEdit 7.3.16 against Java 21/Minecraft 1.21.8. The example user-server version WorldGuard 7.0.18 does not match that build target yet, so its runtime compatibility remains unverified until the Paper smoke test.
 
-보호 판정은 직접 owner/priority/flag를 재구현하지 않고 RegionQuery.testState를 사용한다. WorldGuard 문서는 **RegionQuery가 bypass permission을 자동 확인하지 않는다**고 경고하므로 요청자의 bypass가 의미 있는 질문에서는 SessionManager.hasBypass를 별도로 확인해야 한다.
+Use `RegionQuery.testState` rather than reimplementing owner/priority/flag logic for protection decisions. WorldGuard documentation warns that **RegionQuery does not automatically check bypass permission**, so questions where requester bypass matters must separately consult `SessionManager.hasBypass`.
 
-WorldGuard API 자료구조가 thread-safe하더라도 Bukkit Player/World adapter와 server 객체 접근은 같은 것으로 취급하지 않는다. v0.1.1 초기 구현은 해당 adaptation/query를 서버 스레드에서 짧게 수행하고 즉시 DTO로 변환한다. 실제 비용이 문제가 될 때만 공식 thread 계약과 부하 측정을 근거로 분리한다.
+Even if WorldGuard API data structures are thread-safe, do not treat Bukkit Player/World adapters and server-object access as equivalent. The initial v0.1.1 implementation performs this adaptation/query briefly on the server thread and immediately converts to DTOs. Split it only if actual cost becomes a problem and official threading contracts plus load measurements justify it.
 
-공식 근거:
+Official references:
 - https://worldguard.enginehub.org/en/latest/developer/dependency/
 - https://worldguard.enginehub.org/en/latest/developer/regions/protection-query/
 - https://github.com/EngineHub/WorldGuard
 
 ### 4.3 CMI
 
-| 항목 | 판정 |
+| Item | Decision |
 |---|---|
-| 사용자 서버 예시 | CMI 9.8.9.6 + CMILib 1.5.9.9 |
-| 공개 CMI-API 문서 버전 | 9.8.6.4 |
-| dependency 방식 | JitPack + provided (공식 API guide) |
-| 라이선스 | API license는 타 플러그인 코드 사용에 Zrips의 구체적 허가를 요구; 사용자가 해당 허가를 받았다고 확인 |
-| dependency | `com.github.Zrips:CMI-API:9.8.6.4` compileOnly; JARVIS 배포 JAR에 포함하지 않음 |
-| v0.1/v0.1.1 | 기본 capability 없음; CMI가 있을 때만 선택 Tool 활성화 |
-| T14 | 온라인 nickname/AFK Tool 구현; runtime smoke 대기 |
+| Example user server | CMI 9.8.9.6 + CMILib 1.5.9.9 |
+| Public CMI-API documentation version | 9.8.6.4 |
+| Dependency method | JitPack + provided (official API guide) |
+| License | CMI-API license requires specific permission from Zrips for code use by other plugins; user confirmed such permission |
+| Dependency | `com.github.Zrips:CMI-API:9.8.6.4` compileOnly; not bundled in the JARVIS distribution JAR |
+| v0.1/v0.1.1 | no baseline capability; optional Tool enabled only when CMI is present |
+| T14 | online nickname/AFK Tool implemented; runtime smoke pending |
 
-CMI 공식 API 페이지는 CMI-API 9.8.6.4를 provided dependency로 안내한다. 그러나 사용자가 보유한 CMI runtime은 9.8.9.6이며, **공개 API artifact와 해당 runtime 조합의 호환을 공식 문서만으로 증명하지 못했다.**
+The official CMI API page documents CMI-API 9.8.6.4 as a provided dependency. The user's CMI runtime is 9.8.9.6, however, and **official documentation alone does not prove compatibility between that runtime and the public API artifact**.
 
-공식 CMI-API 9.8.6.4의 [`resources/LICENSE`](https://github.com/Zrips/CMI-API/blob/9.8.6.4/resources/LICENSE)는 Zrips가 유지하는 플러그인이 아닌 곳에서의 코드 사용에 Zrips의 구체적인 허가를 요구한다. 사용자는 Zrips의 명시적 허가를 받았다고 확인했다. 이 checkout에는 허가 증빙 사본이 저장되어 있지 않으며, 구현은 공식 API만 compileOnly로 참조하고 API binary를 JARVIS에 포함하지 않는다.
+The official CMI-API 9.8.6.4 [`resources/LICENSE`](https://github.com/Zrips/CMI-API/blob/9.8.6.4/resources/LICENSE) requires specific permission from Zrips for code use outside plugins maintained by Zrips. The user confirmed explicit permission from Zrips. No copy of that permission is stored in this checkout. The implementation references only the official API as compileOnly and does not include the API binary in JARVIS.
 
-CMI 문서는 offline player 정보 로드가 대량 실행 시 서버에 부담을 줄 수 있다고 경고한다. T14는 현재 온라인 플레이어 조회만 제공하며 offline lookup, play time, warning은 제외한다. API의 일반 thread-safety 계약도 명시되지 않았으므로 Bukkit/CMI 객체 접근은 서버 스레드로 제한한다. nickname 색상 코드와 제어 문자를 제거하고 64 UTF-16 단위로 제한한다.
+CMI documentation warns that bulk offline-player information loads can burden the server. T14 exposes only currently online player lookup and excludes offline lookup, play time, and warnings. Because no general API thread-safety contract is documented, Bukkit/CMI object access is limited to the server thread. Nickname color/control codes are removed and output is capped at 64 UTF-16 units.
 
-T14 상태, 사용자 허가 확인 경계, runtime smoke 절차는 [`T14_HANDOFF.md`](../minecraft/paper/src/main/java/io/github/kardane/jarvisminecraft/paper/integrations/cmi/T14_HANDOFF.md)에 기록했다. capability는 CMI와 CMILib가 활성화되고 API probe가 성공할 때만 광고한다. 대상 서버의 binary compatibility는 smoke test로 확인해야 한다.
+T14 status, the user-permission confirmation boundary, and runtime-smoke procedure are recorded in [`T14_HANDOFF.md`](../minecraft/paper/src/main/java/io/github/kardane/jarvisminecraft/paper/integrations/cmi/T14_HANDOFF.md). The capability is advertised only when CMI and CMILib are active and the API probe succeeds. Binary compatibility on the target server must be confirmed by smoke testing.
 
-공식 근거:
+Official references:
 - https://www.zrips.net/cmi/api/
 - https://github.com/Zrips/CMI-API/releases/tag/9.8.6.4
 - https://github.com/Zrips/CMI-API/blob/9.8.6.4/resources/LICENSE
 
-## 5. 라이선스·재배포 정책
+## 5. License and Redistribution Policy
 
-| 구성요소 | upstream 라이선스 | JARVIS 처리 |
+| Component | Upstream License | JARVIS Treatment |
 |---|---|---|
-| Paper | GPL-3.0 계열, 일부 contributor code MIT | compileOnly, Paper 자체 미번들 |
-| Fabric Loader | Apache-2.0 | loader 미번들 |
-| Fabric API | Apache-2.0 | 플랫폼 mod dependency로 선언 |
-| Fabric Loom | MIT | 빌드 전용 |
-| NeoForge | LGPL-2.1 | 플랫폼 dependency, NeoForge 자체 미번들 |
-| ModDevGradle | LGPL-2.1 | 빌드 전용 |
+| Paper | GPL-3.0 family, some contributor code MIT | compileOnly; Paper itself not bundled |
+| Fabric Loader | Apache-2.0 | loader not bundled |
+| Fabric API | Apache-2.0 | declared as platform mod dependency |
+| Fabric Loom | MIT | build-only |
+| NeoForge | LGPL-2.1 | platform dependency; NeoForge itself not bundled |
+| ModDevGradle | LGPL-2.1 | build-only |
 | OpenAI JS SDK | Apache-2.0 | Brain npm dependency |
 | TypeSafe JS SDK | MIT | Brain npm dependency |
-| CoreProtect | Artistic-2.0 | provided/compileOnly, plugin 미번들 |
-| WorldGuard | LGPL-3.0-or-later | compileOnly, plugin 미번들 |
-| CMI / CMI-API | CMI-API license가 타 플러그인의 코드 사용에 Zrips의 구체적 허가 요구; 사용자가 허가를 받았다고 확인 | CMI-API는 compileOnly, CMI/CMILib는 미번들; runtime smoke 대기 |
+| CoreProtect | Artistic-2.0 | provided/compileOnly; plugin not bundled |
+| WorldGuard | LGPL-3.0-or-later | compileOnly; plugin not bundled |
+| CMI / CMI-API | CMI-API license requires specific permission from Zrips for code use by other plugins; user confirmed permission | CMI-API is compileOnly; CMI/CMILib not bundled; runtime smoke pending |
 
-이 표는 법률 자문이 아니라 빌드/배포 경계 결정이다. JARVIS release artifact에 타사 서버/plugin/mod binary를 shade하지 않는 것을 기본값으로 한다.
+This table is a build/distribution boundary decision, not legal advice. By default, JARVIS release artifacts do not shade third-party server/plugin/mod binaries.
 
-## 6. 스레드·권한 경계
+## 6. Threading and Authority Boundaries
 
-| 대상 | T00 정책 |
+| Target | T00 Policy |
 |---|---|
-| AI HTTP/WebSocket/disk/DB | Minecraft tick thread에서 대기 금지 |
-| Paper ChatEvent | 서버 스레드에서 OP/세션을 확인하고 입력 채팅을 공개 유지; AI 요청과 네트워크 작업은 비동기 처리 |
-| Fabric chat callback | 공식 thread 명시 부족. 서버 객체 접근은 server execute/scheduler 경계 안에서 수행 |
-| NeoForge ServerChatEvent | logical server event. world/player state 접근·변경은 server execution context에서만 수행 |
-| CoreProtect DB lookup | server-thread snapshot 후 비동기 Provider 작업 |
-| CoreProtect rollback | v0.2 전 미지원; API 요구대로 async + 승인/저널 계약 필요 |
-| WorldGuard query | 초기에는 server-thread short query → DTO; bypass 별도 검사 |
-| CMI | 문서상 일반 thread-safety 미확인. server-thread only로 시작 |
-| OP 검증 | 모델 값 금지. 플랫폼의 실제 operator registry/API를 authoritative source로 사용 |
+| AI HTTP/WebSocket/disk/DB | never wait on the Minecraft tick thread |
+| Paper ChatEvent | check OP/session on the server thread and keep admitted input chat public; process AI requests and network work asynchronously |
+| Fabric chat callback | official threading semantics are insufficiently documented; access server objects only inside server execute/scheduler boundaries |
+| NeoForge ServerChatEvent | logical-server event; access/mutate world/player state only in the server execution context |
+| CoreProtect DB lookup | server-thread snapshot followed by asynchronous Provider work |
+| CoreProtect rollback | unsupported before v0.2; requires async execution plus approval/journal contract per API requirements |
+| WorldGuard query | initially short server-thread query → DTO; check bypass separately |
+| CMI | general thread safety not documented; start server-thread-only |
+| OP verification | never trust model values; use the platform's actual operator registry/API as the authoritative source |
 
-플랫폼/NMS/Bukkit/WorldGuard/CMI 객체를 Brain이나 공통 Java 모듈로 넘기지 않는다. 비동기 경계 밖에는 JARVIS DTO만 보관한다.
+Do not pass platform/NMS/Bukkit/WorldGuard/CMI objects into the Brain or shared Java module. Retain only JARVIS DTOs across asynchronous boundaries.
 
-## 7. T01/T02에 넘기는 고정값
+## 7. Values Handed to T01/T02
 
-T01은 아래를 계약 전제로 사용할 수 있다.
+T01 may assume the following contract values:
 
-- 첫 protocol/runtime target: Minecraft 1.21.8, Java 21.
+- First protocol/runtime target: Minecraft 1.21.8, Java 21.
 - Brain: Node 24, OpenAI 7.22.0, gpt-6-luna + reasoning medium, @typesafe-ai/sdk 0.6.0, jev-1.13.0.
 - OP authority: Paper isOp(), Fabric PlayerManager.isOperator(GameProfile), NeoForge vanilla operator list.
-- 외부 모델/Brain이 보내는 isOp 값은 권한 근거가 아니다.
-- Provider가 없거나 version/API check가 실패하면 capability/tool 자체를 노출하지 않는다.
-- CMI capability는 활성 Provider와 runtime API probe가 성공할 때만 노출한다. 실제 server version 호환성은 별도 smoke evidence로 기록한다.
+- An `isOp` value sent by an external model/Brain is not authority evidence.
+- If a Provider is absent or its version/API check fails, do not expose the capability/Tool.
+- Expose CMI capability only when the active Provider and runtime API probe succeed. Record actual server-version compatibility as separate smoke evidence.
 
-T02는 다음 고정값으로 build skeleton을 시도한다.
+T02 attempts the build skeleton with these fixed values:
 
 - Gradle Wrapper 8.14.5
 - Paper API 1.21.8-R0.1-SNAPSHOT
@@ -264,28 +264,28 @@ T02는 다음 고정값으로 build skeleton을 시도한다.
 - NeoForge 21.8.52
 - ModDevGradle 2.0.147
 
-T02에서 실제 dependency resolution/compile이 실패하면 **가장 작은 버전 조정만** 수행하고, 이 문서와 ADR을 함께 갱신한다.
+If actual dependency resolution/compilation fails in T02, make **only the smallest version adjustment** and update this document and the ADR together.
 
-## 8. 미확인 항목 / 후속 검증 게이트
+## 8. Unverified Items / Follow-up Gates
 
-1. Paper/Fabric/NeoForge 1.21.8 dedicated server의 실제 기동과 동일 채팅 UX.
-2. Fabric ALLOW_CHAT_MESSAGE 취소 시 1.21.8 client에 서명 채팅 관련 잔여 표시가 없는지.
-3. NeoForge 21.8.52의 ServerChatEvent 및 operator 판정 정확한 compile signature.
-4. 세 플랫폼에서 deop/logout race가 실행 직전 재검사로 차단되는지.
-5. Gradle 8.14.5 + Loom 1.12.2 + ModDevGradle 2.0.147 멀티프로젝트 동시 build.
-6. CoreProtect 24.1 runtime에서 API v12 lookup paging/timeout과 실제 DB executor 동작.
-7. WorldGuard 사용자 예시 7.0.18 + 실제 WorldEdit/FAWE 조합에서 RegionQuery와 bypass 결과; 현재 compile target 7.0.14 / WorldEdit 7.3.16.
-8. CMI 9.8.9.6 + CMILib 1.5.9.9 + compileOnly CMI-API 9.8.6.4 조합의 실제 binary/runtime smoke. 사용자가 Zrips 허가를 확인한 사실은 T14 handoff 문서에 기록했다.
-9. 실제 OpenAI 계정에서 gpt-6-luna Responses Tool call/result.
-10. 실제 TypeSafe 계정에서 jev-1.13.0 모델 ID/분류 응답/request ID.
-11. 한국어 Jev A09 평가 200건 이상. confidence threshold는 그 전까지 정책 권한으로 사용하지 않음.
+1. Actual startup and equivalent chat UX on Paper/Fabric/NeoForge 1.21.8 dedicated servers.
+2. Whether cancelling Fabric `ALLOW_CHAT_MESSAGE` leaves any signed-chat residue in the 1.21.8 client.
+3. Exact compile signatures for NeoForge 21.8.52 `ServerChatEvent` and operator checks.
+4. Whether de-op/logout races are blocked by the immediate pre-execution re-check on all three platforms.
+5. Joint Gradle 8.14.5 + Loom 1.12.2 + ModDevGradle 2.0.147 multiproject build.
+6. API v12 lookup paging/timeout and real DB-executor behavior on CoreProtect 24.1 runtime.
+7. `RegionQuery` and bypass behavior on the example WorldGuard 7.0.18 server with its actual WorldEdit/FAWE combination; current compile target is WorldGuard 7.0.14 / WorldEdit 7.3.16.
+8. Real binary/runtime smoke for CMI 9.8.9.6 + CMILib 1.5.9.9 + compileOnly CMI-API 9.8.6.4. The user's confirmation of Zrips permission is recorded in the T14 handoff.
+9. `gpt-6-luna` Responses Tool call/result using a real OpenAI account.
+10. `jev-1.13.0` model ID/classification response/request ID using a real TypeSafe account.
+11. Korean Jev A09 evaluation with at least 200 cases. Do not use the confidence threshold as policy authority before that evaluation.
 
-## 9. T00 인계
+## 9. T00 Handoff
 
-- 선행 커밋: 878ce755438ad5313b58bbbb6ef088ef6bc38b0b
-- 작업 브랜치: codex/t00-compatibility
-- 변경 범위: docs/compatibility.md, docs/decisions/*
-- 구현 코드 변경: 없음
-- 유료 API 호출: 없음
-- Minecraft 서버 기동: 없음
-- 결론: **문서 계약 기준 T00 완료. T01 계약·스키마 작업을 시작할 수 있음.**
+- Prior commit: 878ce755438ad5313b58bbbb6ef088ef6bc38b0b
+- Working branch: codex/t00-compatibility
+- Changed scope: docs/compatibility.md, docs/decisions/*
+- Implementation code changes: none
+- Paid API calls: none
+- Minecraft server startup: none
+- Conclusion: **T00 is complete as a documentation-contract baseline. T01 contract/schema work may begin.**
