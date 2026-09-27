@@ -4,6 +4,8 @@ import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ScheduleActi
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
@@ -138,11 +140,12 @@ public final class ScheduledActionService
         return entry.cancel();
     }
 
-    public void cancelActor(UUID requesterUuid) {
+    public List<UUID> cancelActor(UUID requesterUuid) {
         Objects.requireNonNull(
             requesterUuid,
             "requesterUuid"
         );
+        List<UUID> cancelled = new ArrayList<>();
         entries.values().stream()
             .filter(
                 entry -> entry.requesterUuid.equals(
@@ -150,7 +153,16 @@ public final class ScheduledActionService
                 )
             )
             .toList()
-            .forEach(Entry::cancel);
+            .forEach(entry -> {
+                if (entry.cancel()) {
+                    cancelled.add(entry.scheduleId);
+                }
+            });
+        return List.copyOf(cancelled);
+    }
+
+    public List<UUID> pendingScheduleIds() {
+        return List.copyOf(entries.keySet());
     }
 
     @Override
@@ -165,7 +177,10 @@ public final class ScheduledActionService
 
     @FunctionalInterface
     public interface ActionRunner {
-        CompletionStage<Boolean> run(int runIndex);
+        CompletionStage<Boolean> run(
+            UUID scheduleId,
+            int runIndex
+        );
     }
 
     public record Snapshot(
@@ -220,7 +235,10 @@ public final class ScheduledActionService
             int currentRun = runIndex++;
             CompletionStage<Boolean> stage;
             try {
-                stage = runner.run(currentRun);
+                stage = runner.run(
+                    scheduleId,
+                    currentRun
+                );
             } catch (RuntimeException failure) {
                 finish();
                 return;
