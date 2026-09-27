@@ -13,6 +13,8 @@ public final class RuntimeConfigurationReloadService
     private final ExecutorService executor;
     private final AtomicBoolean closed =
         new AtomicBoolean();
+    private final AtomicBoolean reloading =
+        new AtomicBoolean();
 
     public RuntimeConfigurationReloadService(
         RuntimeConfigurationManager runtimeConfiguration
@@ -56,13 +58,23 @@ public final class RuntimeConfigurationReloadService
                 )
             );
         }
+        if (!reloading.compareAndSet(false, true)) {
+            return CompletableFuture.failedFuture(
+                new IllegalStateException(
+                    "Runtime configuration reload is already in progress."
+                )
+            );
+        }
 
         try {
             return CompletableFuture.supplyAsync(
                 runtimeConfiguration::reload,
                 executor
+            ).whenComplete(
+                (ignored, failure) -> reloading.set(false)
             );
         } catch (RuntimeException failure) {
+            reloading.set(false);
             return CompletableFuture.failedFuture(
                 failure
             );
