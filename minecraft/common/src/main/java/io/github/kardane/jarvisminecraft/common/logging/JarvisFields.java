@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.common.logging;
 
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -27,6 +28,6 @@ public final class JarvisFields {
             }
             fields.put(key, keyValues[index + 1]);
         }
-        return Map.copyOf(fields);
+        return Collections.unmodifiableMap(fields);
     }
 }
