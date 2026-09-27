@@ -19,6 +19,7 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaTurnInput;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
+import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.logging.NoOpJarvisLog;
@@ -38,6 +39,7 @@ import io.github.kardane.jarvisminecraft.common.runtime.ExecutionPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ScheduledActionService;
 import io.github.kardane.jarvisminecraft.common.runtime.SchedulingPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
+import io.github.kardane.jarvisminecraft.common.runtime.ToolReferenceWriter;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 
 import java.nio.charset.StandardCharsets;
@@ -75,6 +77,8 @@ public final class EmbeddedBrainVerificationMain {
         embeddedReadOnlyLoop();
         promptCompositionContract();
         requestPromptSnapshotContract();
+        styledChatContract();
+        toolReferenceContract();
         preAuditFailClosed();
         gatewayDeliveryAuthorityRecheck();
         gatewayCancellationOwnsSession();
@@ -375,6 +379,91 @@ public final class EmbeddedBrainVerificationMain {
         require(
             active.get() == second,
             "Prompt snapshot fixture did not change the live source between rounds."
+        );
+    }
+
+    private static void styledChatContract() {
+        StyledChatMessage message =
+            StyledChatMessage.fromConfiguredPrefix(
+                "<#FF00FF>[JARVIS]&r ",
+                "hello"
+            ).withHoverSuffix(
+                " 📊",
+                "Luna 토큰: 42"
+            );
+
+        require(
+            !message.prefix().isEmpty()
+                && Integer.valueOf(0xFF00FF).equals(
+                    message.prefix().getFirst().rgb()
+                ),
+            "Configured prefix hex color was not parsed."
+        );
+        require(
+            message.plainText().endsWith("hello 📊"),
+            "Hover suffix changed visible response text unexpectedly."
+        );
+        require(
+            "Luna 토큰: 42".equals(
+                message.suffix().getFirst().hoverText()
+            ),
+            "Hover suffix text was not retained."
+        );
+
+        LunaStep.Usage usage =
+            new LunaStep.Usage(
+                10,
+                4,
+                14,
+                true
+            ).plus(
+                new LunaStep.Usage(
+                    20,
+                    6,
+                    26,
+                    true
+                )
+            );
+        require(
+            usage.inputTokens() == 30
+                && usage.outputTokens() == 10
+                && usage.totalTokens() == 40
+                && usage.complete(),
+            "Luna token usage did not aggregate across rounds."
+        );
+    }
+
+    private static void toolReferenceContract()
+        throws Exception {
+        Path root = Files.createTempDirectory(
+            "jarvis-tool-reference-"
+        );
+        ToolReferenceWriter.writeAsync(
+            root,
+            Set.of(ToolName.GET_SERVER_STATUS)
+        ).toCompletableFuture().join();
+
+        String content = Files.readString(
+            root.resolve(ToolReferenceWriter.FILE_NAME),
+            StandardCharsets.UTF_8
+        );
+        require(
+            content.contains(
+                "get_server_status | registered"
+            ),
+            "Generated Tool reference did not mark registered Tools."
+        );
+        require(
+            content.contains(
+                "schedule_action | brain-control"
+            ),
+            "Generated Tool reference omitted Brain control Tools."
+        );
+        require(
+            content.contains(
+                "lookup_area_history | not-registered"
+            ),
+            "Generated Tool reference did not mark unavailable provider Tools."
         );
     }
 

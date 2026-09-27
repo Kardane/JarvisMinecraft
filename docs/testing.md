@@ -104,6 +104,11 @@ Core scenarios:
 - DIRECT wake-word request and FOLLOW_UP
 - `/jm status` output
 - `/jm reload` success and failure behavior
+- `response.prefix` legacy color and `<#RRGGBB>` hex color rendering
+- final/error reply metrics icon hover shows token usage/time only when enabled
+- disabling `response.metrics.enabled` removes the hover suffix
+- no public follow-up-session TTL announcement is emitted
+- generated `tools.md` reflects registered, unavailable-provider, and Brain-control Tools
 - edit `persona.md`, reload, and confirm only new requests use the new persona
 - add ordered `knowledge/*.md`, reload, and confirm server-specific context is available
 - malformed/oversized prompt content fails reload while the previous config/persona/knowledge stays active
@@ -195,6 +200,10 @@ Manual authority regression:
 5. Confirm current live Tool results override stale knowledge for live server state.
 
 Prompt content must never appear in operational logs.
+
+Chat presentation deterministic coverage also checks hex-prefix parsing, hover
+suffix preservation, Luna token-usage aggregation, and generated Tool-reference
+classification.
 
 ## 9. Audit and Operational Logging Verification
 

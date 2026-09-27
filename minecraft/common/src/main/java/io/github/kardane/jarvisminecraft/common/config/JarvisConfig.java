@@ -94,7 +94,20 @@ public record JarvisConfig(
                     List.of(
                         "잠시만요.",
                         "확인해볼게요.",
-                        "서버 상태를 살펴보고 있어요."
+                        "서버 상태를 살펴보고 있어요.",
+                        "조금만 기다려 주세요.",
+                        "요청을 확인하고 있어요.",
+                        "필요한 정보를 모으고 있어요.",
+                        "서버 데이터를 확인 중이에요.",
+                        "관련 상태를 조회하고 있어요.",
+                        "요청 내용을 정리하고 있어요.",
+                        "확인할 항목을 살펴보고 있어요.",
+                        "잠깐 확인해볼게요.",
+                        "처리할 내용을 점검하고 있어요.",
+                        "서버에서 확인 중이에요.",
+                        "필요한 상태를 불러오고 있어요.",
+                        "요청을 처리하고 있어요.",
+                        "곧 답변드릴게요."
                     )
                 ),
                 new Sound(
@@ -102,7 +115,8 @@ public record JarvisConfig(
                     "minecraft:block.note_block.pling",
                     1.0,
                     1.0
-                )
+                ),
+                ResponseMetrics.defaults()
             ),
             new Execution(
                 ExecutionMode.READ_TALK,
@@ -309,8 +323,22 @@ public record JarvisConfig(
     public record Response(
         String prefix,
         WaitingMessage waitingMessage,
-        Sound sound
+        Sound sound,
+        ResponseMetrics metrics
     ) {
+        public Response(
+            String prefix,
+            WaitingMessage waitingMessage,
+            Sound sound
+        ) {
+            this(
+                prefix,
+                waitingMessage,
+                sound,
+                ResponseMetrics.defaults()
+            );
+        }
+
         public Response {
             prefix = requireTextAllowEmpty(prefix, "response.prefix", 128);
             Objects.requireNonNull(
@@ -318,6 +346,7 @@ public record JarvisConfig(
                 "response.waitingMessage"
             );
             Objects.requireNonNull(sound, "response.sound");
+            Objects.requireNonNull(metrics, "response.metrics");
         }
     }
 
@@ -353,6 +382,23 @@ public record JarvisConfig(
             id = requireText(id, "response.sound.id", 128);
             requireFiniteRange(volume, 0.0, 4.0, "response.sound.volume");
             requireFiniteRange(pitch, 0.01, 2.0, "response.sound.pitch");
+        }
+    }
+
+    public record ResponseMetrics(
+        boolean enabled,
+        String icon
+    ) {
+        public ResponseMetrics {
+            icon = requireText(
+                icon,
+                "response.metrics.icon",
+                16
+            );
+        }
+
+        public static ResponseMetrics defaults() {
+            return new ResponseMetrics(true, "📊");
         }
     }
 

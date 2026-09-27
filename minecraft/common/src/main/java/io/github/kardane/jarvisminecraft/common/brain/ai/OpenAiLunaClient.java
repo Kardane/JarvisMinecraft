@@ -269,9 +269,11 @@ public final class OpenAiLunaClient implements LunaClient {
             );
         }
 
+        LunaStep.Usage usage = usage(response);
+
         if (!calls.isEmpty()) {
             state.pendingCalls = List.copyOf(pending);
-            return new LunaStep.Tools(calls);
+            return new LunaStep.Tools(calls, usage);
         }
 
         String text = extractOutputText(response).trim();
@@ -282,7 +284,22 @@ public final class OpenAiLunaClient implements LunaClient {
         }
 
         clear(input.requestId());
-        return new LunaStep.Final(text, LunaStep.SessionState.CONTINUE);
+        return new LunaStep.Final(
+            text,
+            LunaStep.SessionState.CONTINUE,
+            usage
+        );
+    }
+
+    private LunaStep.Usage usage(Response response) {
+        return response.usage()
+            .map(value -> new LunaStep.Usage(
+                value.inputTokens(),
+                value.outputTokens(),
+                value.totalTokens(),
+                true
+            ))
+            .orElseGet(LunaStep.Usage::unavailable);
     }
 
     private void appendFunctionOutputs(

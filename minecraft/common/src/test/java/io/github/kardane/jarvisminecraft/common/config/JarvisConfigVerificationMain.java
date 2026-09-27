@@ -16,6 +16,7 @@ public final class JarvisConfigVerificationMain {
         verifyPropertiesOverride();
         verifyInvalidConfigRejected();
         verifyPromptContentBoundsRejected();
+        verifyResponseUxDefaults();
         verifyReloadFailureKeepsPreviousSnapshot();
         verifyAtomicRuntimeReload();
         verifyAsyncReloadService();
@@ -192,6 +193,45 @@ public final class JarvisConfigVerificationMain {
         require(
             rejected,
             "Per-file knowledge limit must not exceed total knowledge limit."
+        );
+    }
+
+    private static void verifyResponseUxDefaults() {
+        JarvisConfig.Response response =
+            JarvisConfig.defaults().response();
+
+        require(
+            response.waitingMessage().messages().size() == 16,
+            "Default waiting-message variation count must be 16."
+        );
+        require(
+            response.metrics().enabled(),
+            "Response metrics hover must default to enabled."
+        );
+        require(
+            "📊".equals(response.metrics().icon()),
+            "Response metrics default icon changed unexpectedly."
+        );
+
+        Properties properties = new Properties();
+        properties.setProperty(
+            "jarvis.response.metrics.enabled",
+            "false"
+        );
+        properties.setProperty(
+            "jarvis.response.metrics.icon",
+            "ℹ️"
+        );
+
+        JarvisConfig overridden = JarvisConfigLoader.load(
+            PropertiesJarvisConfigSource.from(properties)
+        );
+        require(
+            !overridden.response().metrics().enabled()
+                && "ℹ️".equals(
+                    overridden.response().metrics().icon()
+                ),
+            "Response metrics configuration override failed."
         );
     }
 

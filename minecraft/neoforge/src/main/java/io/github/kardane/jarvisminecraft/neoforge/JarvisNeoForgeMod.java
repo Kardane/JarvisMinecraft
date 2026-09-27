@@ -16,6 +16,7 @@ import io.github.kardane.jarvisminecraft.common.config.PropertiesJarvisConfigSou
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
+import io.github.kardane.jarvisminecraft.common.runtime.ToolReferenceWriter;
 import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftTools;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
@@ -245,6 +246,15 @@ public final class JarvisNeoForgeMod {
 
         ToolRegistry registry = new ToolRegistry();
         new NeoForgeToolService(platform, clock).register(registry);
+        ToolReferenceWriter.writeAsync(
+            dataDirectory,
+            registry.tools()
+        ).exceptionally(failure -> {
+            LOGGER.warning(
+                "Could not write generated JARVIS Tool reference."
+            );
+            return null;
+        });
 
         CommonRuntime commonRuntime = new CommonRuntime(
             registry,

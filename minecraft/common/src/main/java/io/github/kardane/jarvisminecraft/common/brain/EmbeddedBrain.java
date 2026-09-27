@@ -634,14 +634,27 @@ public final class EmbeddedBrain {
 
     public record Reply(
         String text,
-        LunaStep.SessionState sessionState
+        LunaStep.SessionState sessionState,
+        LunaStep.Usage usage
     ) {
+        public Reply(
+            String text,
+            LunaStep.SessionState sessionState
+        ) {
+            this(
+                text,
+                sessionState,
+                LunaStep.Usage.unavailable()
+            );
+        }
+
         public Reply {
             Objects.requireNonNull(text, "text");
             Objects.requireNonNull(
                 sessionState,
                 "sessionState"
             );
+            Objects.requireNonNull(usage, "usage");
         }
     }
 

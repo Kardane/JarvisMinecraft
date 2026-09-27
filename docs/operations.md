@@ -60,16 +60,21 @@ Phase 3 applies `jarvis.model.reasoning.*`:
 
 The resolved effort remains fixed across all Luna rounds in that request.
 
-Phase 4 applies `jarvis.response.*`:
+Response configuration under `jarvis.response.*` includes:
 
-- `prefix`: AI/error/progress prefix. Legacy `&` formatting is parsed only
-  here, never from model output.
+- `prefix`: AI/error/progress prefix. Legacy `&` formatting and
+  `<#RRGGBB>` hex colors are parsed only here, never from model output.
 - `waiting-message.enabled/threshold-ms/messages`: show at most one delayed
-  public progress message while a request is still running.
+  public progress message while a request is still running. The built-in
+  default now provides 16 message variations.
 - `sound.enabled/id/volume/pitch`: after a final/error response, play the
   configured sound only to the requester.
+- `metrics.enabled/icon`: append only the configured icon to final/error
+  replies. Hovering the icon shows aggregate Luna input/output/total token
+  usage when available plus end-to-end request processing time.
 
-Session-start/end notices still use the legacy platform notice path.
+Starting a follow-up session no longer emits the old public "120 seconds"
+session-rules announcement. The configured follow-up TTL itself is unchanged.
 
 Phase 5 applies `jarvis.execution.*`:
 
@@ -229,6 +234,25 @@ subdirectories, and `knowledge/README.md` are ignored. Symlink/path escapes outs
 the platform JARVIS directory are rejected. Knowledge files are ordered
 deterministically by normalized filename.
 
+## Generated Tool reference
+
+Every platform asynchronously generates a current Tool catalog in its JARVIS
+configuration directory:
+
+```text
+tools.md
+```
+
+The file lists every known Tool wire name with its runtime source, capability,
+risk, and state-changing flag. Registered optional-provider Tools are reflected
+from the actual startup registry. Scheduling control Tools are marked
+`brain-control`. The file is generated operational reference material and may
+be overwritten on each server startup.
+
+A Tool appearing as registered does not grant authority. Actual exposure still
+depends on current OP authority, Jev route, execution policy, scheduling policy,
+and provider availability.
+
 ## Startup
 
 At platform startup JARVIS:
@@ -289,7 +313,7 @@ Post-execution audit failure never triggers a Tool retry.
 
 Operational console logging is separate from the JSONL Audit.
 
-Default categories cover request lifecycle, Jev/Luna, Tool lifecycle, scheduling, ACTIVE proactive decisions, and Audit health transitions. Raw player chat, raw prompts/responses, provider keys, Authorization headers, and complete environment/config dumps are not operational log fields.
+Default categories cover request lifecycle, Jev/Luna, Tool lifecycle, scheduling, ACTIVE proactive decisions, and Audit health transitions. Raw player chat, raw prompts/responses, provider keys, Authorization headers, and complete environment/config dumps are not operational log fields. Response hover metrics expose token counts and duration only; they do not expose prompts, reasoning, Tool arguments, or secrets.
 
 Common settings:
 

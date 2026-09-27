@@ -6,21 +6,32 @@ import java.util.Objects;
 
 public record StyledChatMessage(
     List<Segment> prefix,
-    String body
+    String body,
+    List<HoverSegment> suffix
 ) {
+    public StyledChatMessage(
+        List<Segment> prefix,
+        String body
+    ) {
+        this(prefix, body, List.of());
+    }
+
     public StyledChatMessage {
         prefix = List.copyOf(
             Objects.requireNonNull(prefix, "prefix")
         );
         body = Objects.requireNonNull(body, "body");
+        suffix = List.copyOf(
+            Objects.requireNonNull(suffix, "suffix")
+        );
     }
 
-    public static StyledChatMessage fromLegacyPrefix(
+    public static StyledChatMessage fromConfiguredPrefix(
         String configuredPrefix,
         String body
     ) {
         return new StyledChatMessage(
-            parseLegacyPrefix(
+            parseConfiguredPrefix(
                 Objects.requireNonNull(
                     configuredPrefix,
                     "configuredPrefix"
@@ -30,16 +41,51 @@ public record StyledChatMessage(
         );
     }
 
+    public static StyledChatMessage fromLegacyPrefix(
+        String configuredPrefix,
+        String body
+    ) {
+        return fromConfiguredPrefix(
+            configuredPrefix,
+            body
+        );
+    }
+
+    public StyledChatMessage withHoverSuffix(
+        String text,
+        String hoverText
+    ) {
+        List<HoverSegment> next =
+            new ArrayList<>(suffix);
+        next.add(
+            new HoverSegment(
+                Objects.requireNonNull(text, "text"),
+                Objects.requireNonNull(
+                    hoverText,
+                    "hoverText"
+                )
+            )
+        );
+        return new StyledChatMessage(
+            prefix,
+            body,
+            next
+        );
+    }
+
     public String plainText() {
         StringBuilder output = new StringBuilder();
         for (Segment segment : prefix) {
             output.append(segment.text());
         }
         output.append(body);
+        for (HoverSegment segment : suffix) {
+            output.append(segment.text());
+        }
         return output.toString();
     }
 
-    private static List<Segment> parseLegacyPrefix(
+    private static List<Segment> parseConfiguredPrefix(
         String value
     ) {
         List<Segment> segments = new ArrayList<>();
@@ -47,6 +93,17 @@ public record StyledChatMessage(
         StyleState style = new StyleState();
 
         for (int index = 0; index < value.length(); index += 1) {
+            if (isHexColorAt(value, index)) {
+                flush(segments, text, style);
+                int rgb = Integer.parseInt(
+                    value.substring(index + 2, index + 8),
+                    16
+                );
+                style = style.applyRgb(rgb);
+                index += 8;
+                continue;
+            }
+
             char current = value.charAt(index);
             if (
                 current != '&'
@@ -71,6 +128,26 @@ public record StyledChatMessage(
 
         flush(segments, text, style);
         return List.copyOf(segments);
+    }
+
+    private static boolean isHexColorAt(
+        String value,
+        int index
+    ) {
+        if (
+            index + 8 >= value.length()
+                || value.charAt(index) != '<'
+                || value.charAt(index + 1) != '#'
+                || value.charAt(index + 8) != '>'
+        ) {
+            return false;
+        }
+        for (int cursor = index + 2; cursor < index + 8; cursor += 1) {
+            if (Character.digit(value.charAt(cursor), 16) < 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void flush(
@@ -122,6 +199,29 @@ public record StyledChatMessage(
         }
     }
 
+    public record HoverSegment(
+        String text,
+        String hoverText
+    ) {
+        public HoverSegment {
+            Objects.requireNonNull(text, "text");
+            Objects.requireNonNull(
+                hoverText,
+                "hoverText"
+            );
+            if (text.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "Hover segment text must not be empty."
+                );
+            }
+            if (hoverText.isBlank()) {
+                throw new IllegalArgumentException(
+                    "Hover text must not be blank."
+                );
+            }
+        }
+    }
+
     private record StyleState(
         Integer rgb,
         boolean obfuscated,
@@ -141,17 +241,21 @@ public record StyledChatMessage(
             );
         }
 
+        StyleState applyRgb(int color) {
+            return new StyleState(
+                color,
+                false,
+                false,
+                false,
+                false,
+                false
+            );
+        }
+
         StyleState apply(char code) {
             Integer color = legacyColor(code);
             if (color != null) {
-                return new StyleState(
-                    color,
-                    false,
-                    false,
-                    false,
-                    false,
-                    false
-                );
+                return applyRgb(color);
             }
 
             return switch (code) {

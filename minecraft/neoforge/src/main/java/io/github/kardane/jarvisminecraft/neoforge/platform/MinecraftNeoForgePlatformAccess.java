@@ -5,6 +5,7 @@ import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WeatherType;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
 import net.minecraft.resources.ResourceLocation;
@@ -369,6 +370,20 @@ public final class MinecraftNeoForgePlatformAccess implements NeoForgePlatformAc
             );
         }
         output.append(Component.literal(message.body()));
+        for (StyledChatMessage.HoverSegment segment : message.suffix()) {
+            output.append(
+                Component.literal(segment.text())
+                    .setStyle(
+                        Style.EMPTY.withHoverEvent(
+                            new HoverEvent.ShowText(
+                                Component.literal(
+                                    segment.hoverText()
+                                )
+                            )
+                        )
+                    )
+            );
+        }
         return output;
     }
 
