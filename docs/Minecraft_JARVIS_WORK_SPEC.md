@@ -77,6 +77,8 @@ Jev 저신뢰·장애 시: Luna에 제한된 **조회 전용** 도구를 제공�
 | `get_nearby_players` | center, radius, limit | 같은 월드, 반경 상한 64블록, 최대 100명 |
 | `get_world_info` | worldId | 로드된 월드의 지원 가능한 정보만 |
 | `teleport_staff` | targetPlayerUuid, actionId | 이동 주체는 항상 requester; 온라인 대상 위치를 실행 직전 확인 |
+| `weather_set` | worldId, weather, durationSeconds, actionId | Phase 6: loaded world만, CLEAR/RAIN/THUNDER, 1~3600초 |
+| `time_set` | worldId, timeOfDay, actionId | Phase 6: loaded world만, 0~23999, 현재 day count 유지 |
 
 `teleport_staff`는 사용자가 실제 이동을 요청한 턴에서만 제안한다. 단순 위치 질문에는 실행하지 않는다. 모호한 대상은 먼저 질문하고, 임의 좌표·다른 플레이어 강제 이동·오프라인 이동은 초기 미지원이다. 이동 대상 월드·경계·플랫폼 취소 결과를 확인하고 실제 성공 후에만 완료 응답을 보낸다. 장애 fallback에서는 실행하지 않는다.
 
@@ -114,13 +116,14 @@ History/Region 조회는 v0.1.1 Tool catalog에 추가한다. 이력 기본 범�
 - 감사 필드: timestamp, serverId, requesterUuid, requestId, toolCallId/actionId, tool, risk, 검증된 인자 요약, outcome, source, latency, 모델 ID, fallback 사유. 비밀·전체 프롬프트는 저장하지 않는다.
 - v0.1 감사는 비동기 회전 JSONL, 기본 7일/총 100MiB. 변경 실행은 pre-execution 감사 기록을 안전하게 큐/저장할 수 없으면 거부한다. 큐 포화·디스크 오류를 무시하지 않고 health에 표시한다.
 
-### 3.6 후속 runtime policy Phase 1-5
+### 3.6 후속 runtime policy Phase 1-6
 
 Phase 1은 비밀이 아닌 runtime-policy의 immutable snapshot, strict validation,
 fail-safe reload 기반을 추가했다. Phase 2는 interaction policy를 실제
 chat admission/session 경로에 연결했고, Phase 3는 Jev decision과 Luna
 reasoning policy를 연결했다. Phase 4는 response UX policy를 연결했고,
-Phase 5는 execution Tool exposure policy를 연결한다.
+Phase 5는 execution Tool exposure policy를 연결했고, Phase 6는 검증된
+LOW-risk structured action Tool을 확장한다.
 
 - 기본 audience는 계속 `OP`다. 운영자가 명시적으로 설정하면
   `WHITELIST / ALL / BLACKLIST`가 새 JARVIS 대화 진입과 기존 session 유지
@@ -164,6 +167,15 @@ Phase 5는 execution Tool exposure policy를 연결한다.
   pre-audit 성공 후에도 실행 직전에 다시 확인한다.
 - `EXECUTE_LITE/EXECUTE`는 현재 등록된 structured Tool catalog만 대상으로
   하며 범용 명령 실행 경로를 새로 추가하지 않는다.
+- Phase 6 structured action은 `weather_set`, `time_set` 두 개다. 둘 다
+  `Risk.LOW`이고 loaded world 한 곳만 대상으로 하며 raw console command를
+  사용하지 않는다.
+- `weather_set`은 weather를 `CLEAR / RAIN / THUNDER`, duration을 1~3600초로
+  제한한다. `time_set`은 time-of-day 0~23999만 허용하고 현재 day count를
+  유지한다.
+- 두 Tool은 state-changing contract이므로 actionId, pre-execution audit,
+  execution policy, current online OP, active Tool registry를 모두 통과해야 한다.
+  기본 `READ_TALK`에서는 노출되지 않는다.
 - scheduling 설정은 기본 비활성이고 실제 예약 실행 경로를 만들지 않는다.
 - `docs/later-todo.md`의 `ADMIN` 아이디어는 현재 승인된 runtime contract가
   아니다. 서버 파일 생성·수정·삭제는 별도 Work Spec/Tool 계약과 안전성

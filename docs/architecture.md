@@ -121,6 +121,12 @@ An in-flight request cannot gain newly permitted mutation Tools after it starts.
 Policy tightening is re-applied before every model round and again immediately
 before Tool execution, including after pre-execution audit.
 
+Phase 6 adds two LOW-risk structured actions to the registered catalog:
+`weather_set` and `time_set`. They are available only when the selected
+execution mode explicitly allowlists them. Both are rechecked by
+`ExecutionPolicy`, pre-execution audit, `CommonRuntime`, current online OP
+authority, and the platform loaded-world lookup before mutation.
+
 Scheduling and admin reload commands are still not wired.
 
 Provider credentials and logical server identity remain in
@@ -138,7 +144,9 @@ successful parse, otherwise the previous valid snapshot remains active.
 
 ## Tool 경계
 
-정적 Tool metadata는 `Protocol.ToolName`, 현재 활성 Tool set은 `ToolRegistry`가 소유한다. v0.1의 상태 변경 Tool은 요청자 본인을 온라인 대상 플레이어 위치로 이동하는 `teleport_staff`뿐이다.
+정적 Tool metadata는 `Protocol.ToolName`, 현재 활성 Tool set은 `ToolRegistry`가 소유한다. 기존 v0.1 상태 변경 Tool은 요청자 본인을 온라인 대상 플레이어 위치로 이동하는 `teleport_staff`였고, Phase 6에서 구조화된 `weather_set`과 `time_set`을 추가했다.
+
+Phase 6 action Tool은 모두 `Risk.LOW`이며 raw command를 만들지 않는다. `weather_set`은 loaded world 한 곳의 `CLEAR / RAIN / THUNDER`를 1~3600초 범위로 설정하고, `time_set`은 loaded world 한 곳의 day count를 유지하면서 time-of-day 0~23999만 변경한다. 기본 `READ_TALK`에서는 세 state-changing Tool 모두 Luna에 노출되지 않는다.
 
 CoreProtect, WorldGuard, CMI 기능은 Paper에서 optional Provider로 로딩하며 초기화 실패/의존성 부재 시 관련 Tool을 등록하지 않는다.
 

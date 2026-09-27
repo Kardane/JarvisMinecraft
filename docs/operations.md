@@ -66,9 +66,31 @@ Phase 5 applies `jarvis.execution.*`:
 - `deny-tools` takes precedence and may hide read-only Tools too.
 - execution actor remains `OP`; broader chat audience does not grant Tool authority.
 
-Tool names are exact wire names such as `teleport_staff`. Unknown names,
-read-only entries in allow lists, and non-LOW entries in the LITE allow list
-fail configuration validation.
+Tool names are exact wire names. Current LOW-risk mutation names are:
+
+- `teleport_staff`
+- `weather_set`
+- `time_set`
+
+Unknown names, read-only entries in allow lists, and non-LOW entries in the
+LITE allow list fail configuration validation.
+
+Example:
+
+```yaml
+jarvis:
+  execution:
+    mode: EXECUTE_LITE
+    actors: OP
+    lite:
+      allow-tools:
+        - weather_set
+        - time_set
+      deny-tools: []
+```
+
+The default remains `READ_TALK`, so merely upgrading to Phase 6 does not
+activate mutations.
 
 Scheduling and `/jm reload` remain pending later phases.
 
@@ -238,6 +260,16 @@ record succeeds, before handoff to `CommonRuntime`.
 ### Audit failure
 
 Read-only work may continue according to policy. State-changing work must fail closed until audit health recovers.
+
+### Phase 6 structured actions
+
+`weather_set` and `time_set` target only already loaded worlds. They use
+Paper/Fabric/NeoForge world APIs directly and never dispatch a console command.
+
+`weather_set` accepts `CLEAR / RAIN / THUNDER` and 1~3600 seconds.
+`time_set` accepts time-of-day 0~23999 and preserves the current day count.
+Both require a non-null actionId, successful pre-execution audit, current
+execution-policy allowance, and current online OP authority.
 
 ### Tool timeout
 
