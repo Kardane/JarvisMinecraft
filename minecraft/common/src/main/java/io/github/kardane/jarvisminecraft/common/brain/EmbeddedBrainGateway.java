@@ -2,43 +2,30 @@ package io.github.kardane.jarvisminecraft.common.brain;
 
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
-import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
-import io.github.kardane.jarvisminecraft.common.logging.JarvisEvents;
-import io.github.kardane.jarvisminecraft.common.logging.JarvisFields;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.NoOpJarvisLog;
 import io.github.kardane.jarvisminecraft.common.platform.AdapterPlatformAccess;
-import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 
 import java.nio.file.Path;
 import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
-import static io.github.kardane.jarvisminecraft.common.brain.BrainAsync.unwrap;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.CancelReason;
-import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ErrorCode;
 
 public final class EmbeddedBrainGateway implements BrainGateway {
     private final EmbeddedBrain brain;
     private final ChatSessionManager sessions;
-    private final InteractionCoordinator interactions;
     private final ConfigManager configManager;
-    private final AdapterPlatformAccess platform;
-    private final Clock clock;
     private final EmbeddedBrainBootstrap.LiveRuntime ownedRuntime;
-    private final JarvisLog log;
-    private final GatewayReplyPresenter presenter;
+    private final GatewayRequestCoordinator requests;
     private final ProactiveInteractionController proactive;
     private final GatewayAuditHealthMonitor auditHealth;
 
@@ -101,16 +88,13 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     ) {
         this.brain = Objects.requireNonNull(brain, "brain");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
-        this.interactions = Objects.requireNonNull(
-            interactions,
-            "interactions"
-        );
+        Objects.requireNonNull(interactions, "interactions");
         this.configManager = Objects.requireNonNull(
             configManager,
             "configManager"
         );
         if (
-            this.interactions.configManager()
+            interactions.configManager()
                 != this.configManager
         ) {
             throw new IllegalArgumentException(
@@ -122,28 +106,34 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             progressNotifier,
             "progressNotifier"
         );
-        this.platform = Objects.requireNonNull(
-            platform,
-            "platform"
-        );
+        Objects.requireNonNull(platform, "platform");
         Objects.requireNonNull(
             serverScheduler,
             "serverScheduler"
         );
-        this.clock = Objects.requireNonNull(
-            clock,
-            "clock"
-        );
+        Objects.requireNonNull(clock, "clock");
+        Objects.requireNonNull(log, "log");
         this.ownedRuntime = ownedRuntime;
-        this.log = Objects.requireNonNull(log, "log");
 
-        this.presenter = new GatewayReplyPresenter(
+        GatewayReplyPresenter presenter =
+            new GatewayReplyPresenter(
+                brain,
+                sessions,
+                interactions,
+                progressNotifier,
+                platform,
+                serverScheduler,
+                this::isRunning
+            );
+        this.requests = new GatewayRequestCoordinator(
             brain,
             sessions,
             interactions,
-            progressNotifier,
+            configManager,
             platform,
-            serverScheduler,
+            clock,
+            log,
+            presenter,
             this::isRunning
         );
         this.proactive =
@@ -157,7 +147,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 clock,
                 log,
                 this::isRunning,
-                this::submitChat
+                requests::submit
             );
         this.auditHealth =
             new GatewayAuditHealthMonitor(
@@ -410,141 +400,13 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         String mode,
         String text
     ) {
-        if (!isRunning()) {
-            return CompletableFuture.completedFuture(
-                false
-            );
-        }
-
-        if (!platform.isServerThread()) {
-            return CompletableFuture.failedFuture(
-                new IllegalStateException(
-                    "Embedded Brain submitChat must be called from the server thread."
-                )
-            );
-        }
-
-        PlayerIdentity currentPlayer = platform
-            .interactionPlayer(requesterUuid)
-            .orElse(null);
-        if (
-            currentPlayer == null
-                || !interactions.isAuthorized(
-                    currentPlayer
-                )
-        ) {
-            return CompletableFuture.completedFuture(
-                false
-            );
-        }
-        if (
-            !sessions.isActive(
-                requesterUuid,
-                sessionId
-            )
-        ) {
-            return CompletableFuture.completedFuture(
-                false
-            );
-        }
-
-        Instant now = clock.instant();
-        EmbeddedBrain.ChatRequest request =
-            new EmbeddedBrain.ChatRequest(
-                UUID.randomUUID(),
-                requesterUuid,
-                requesterName,
-                sessionId,
-                mode,
-                text,
-                now,
-                now.plusMillis(
-                    RequestBudget.MAX_REQUEST_MILLIS
-                ),
-                currentPlayer.operator()
-            );
-
-        log.debug(
-            JarvisEvents.REQUEST_ACCEPTED,
-            JarvisFields.of(
-                "requestId", request.requestId(),
-                "sessionId", sessionId,
-                "requesterUuid", requesterUuid,
-                "origin", mode
-            )
+        return requests.submit(
+            requesterUuid,
+            requesterName,
+            sessionId,
+            mode,
+            text
         );
-
-        JarvisConfig.Response responseConfig =
-            configManager.current().response();
-
-        final CompletionStage<EmbeddedBrain.Reply>
-            processing;
-        try {
-            processing = brain.submit(request);
-        } catch (RuntimeException failure) {
-            logRequestFailure(
-                request,
-                failure
-            );
-            return CompletableFuture.completedFuture(
-                false
-            );
-        }
-
-        ProgressNotifier.ProgressHandle progress =
-            presenter.beginProgress(
-                requesterUuid,
-                sessionId,
-                request.requestId(),
-                mode,
-                responseConfig
-            );
-
-        processing.whenComplete((reply, failure) -> {
-            progress.complete();
-            if (failure == null) {
-                log.info(
-                    JarvisEvents.REQUEST_COMPLETED,
-                    JarvisFields.of(
-                        "requestId",
-                        request.requestId(),
-                        "sessionId",
-                        request.sessionId(),
-                        "requesterUuid",
-                        request.requesterUuid(),
-                        "origin",
-                        request.mode(),
-                        "latencyMs",
-                        Math.max(
-                            0L,
-                            Duration.between(
-                                request.receivedAt(),
-                                clock.instant()
-                            ).toMillis()
-                        )
-                    )
-                );
-                presenter.deliverReply(
-                    requesterUuid,
-                    sessionId,
-                    reply,
-                    responseConfig
-                );
-            } else {
-                logRequestFailure(
-                    request,
-                    failure
-                );
-                presenter.deliverFailure(
-                    requesterUuid,
-                    sessionId,
-                    failure,
-                    responseConfig
-                );
-            }
-        });
-
-        return CompletableFuture.completedFuture(true);
     }
 
     @Override
@@ -604,38 +466,5 @@ public final class EmbeddedBrainGateway implements BrainGateway {
 
     private synchronized boolean isRunning() {
         return started && !stopped;
-    }
-
-    private void logRequestFailure(
-        EmbeddedBrain.ChatRequest request,
-        Throwable failure
-    ) {
-        Throwable cause = unwrap(failure);
-        ErrorCode code =
-            cause instanceof ProtocolException protocol
-                ? protocol.code()
-                : ErrorCode.INTERNAL;
-
-        log.warn(
-            JarvisEvents.REQUEST_FAILED,
-            JarvisFields.of(
-                "requestId", request.requestId(),
-                "sessionId", request.sessionId(),
-                "requesterUuid",
-                request.requesterUuid(),
-                "origin", request.mode(),
-                "errorCode", code,
-                "errorClass",
-                cause.getClass().getSimpleName(),
-                "latencyMs",
-                Math.max(
-                    0L,
-                    Duration.between(
-                        request.receivedAt(),
-                        clock.instant()
-                    ).toMillis()
-                )
-            )
-        );
     }
 }
