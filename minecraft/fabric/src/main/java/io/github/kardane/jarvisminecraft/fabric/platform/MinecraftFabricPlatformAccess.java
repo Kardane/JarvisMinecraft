@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.fabric.platform;
 
+import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.PlayerManager;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -35,6 +36,24 @@ public final class MinecraftFabricPlatformAccess implements FabricPlatformAccess
         PlayerManager manager = server.getPlayerManager();
         ServerPlayerEntity player = manager.getPlayer(playerUuid);
         return player != null && manager.isOperator(player.getGameProfile());
+    }
+
+    @Override
+    public Optional<PlayerIdentity> interactionPlayer(UUID playerUuid) {
+        requireServerThread();
+        PlayerManager manager = server.getPlayerManager();
+        ServerPlayerEntity player = manager.getPlayer(playerUuid);
+        if (player == null) {
+            return Optional.empty();
+        }
+        return Optional.of(
+            new PlayerIdentity(
+                playerUuid,
+                player.getGameProfile().getName(),
+                true,
+                manager.isOperator(player.getGameProfile())
+            )
+        );
     }
 
     @Override

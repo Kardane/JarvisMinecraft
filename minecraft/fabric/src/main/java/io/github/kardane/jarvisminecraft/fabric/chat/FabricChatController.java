@@ -1,9 +1,14 @@
 package io.github.kardane.jarvisminecraft.fabric.chat;
 
+import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
+import io.github.kardane.jarvisminecraft.common.chat.InteractionDecision;
+import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
+import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
+import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.fabric.platform.FabricPlatformAccess;
-import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 
@@ -14,12 +19,9 @@ import java.util.logging.Logger;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.CancelReason;
 
 public final class FabricChatController {
-    private static final String SESSION_RULES =
-        "대화를 시작합니다. 120초 동안 후속 대화가 이어집니다. "
-            + "'대화 끝'으로 종료하고, '!내용'은 이번 메시지만 일반 채팅으로 보냅니다.";
-
     private final MinecraftServer server;
     private final ChatSessionManager sessions;
+    private final InteractionCoordinator interactions;
     private final BrainGateway brain;
     private final FabricPlatformAccess platform;
     private final ServerScheduler scheduler;
@@ -34,8 +36,32 @@ public final class FabricChatController {
         ServerScheduler scheduler,
         Logger logger
     ) {
+        this(
+            server,
+            sessions,
+            new InteractionCoordinator(
+                sessions,
+                new ConfigManager(JarvisConfig::defaults)
+            ),
+            brain,
+            platform,
+            scheduler,
+            logger
+        );
+    }
+
+    public FabricChatController(
+        MinecraftServer server,
+        ChatSessionManager sessions,
+        InteractionCoordinator interactions,
+        BrainGateway brain,
+        FabricPlatformAccess platform,
+        ServerScheduler scheduler,
+        Logger logger
+    ) {
         this.server = server;
         this.sessions = sessions;
+        this.interactions = interactions;
         this.brain = brain;
         this.platform = platform;
         this.scheduler = scheduler;
@@ -55,12 +81,23 @@ public final class FabricChatController {
         }
 
         UUID requesterUuid = sender.getUuid();
-        boolean currentOperator = platform.isOnlineOperator(requesterUuid);
-        ChatSessionManager.Decision decision =
-            sessions.accept(requesterUuid, currentOperator, text);
+        boolean currentOperator =
+            platform.isOnlineOperator(requesterUuid);
+        PlayerIdentity identity = new PlayerIdentity(
+            requesterUuid,
+            sender.getGameProfile().getName(),
+            true,
+            currentOperator
+        );
 
-        if (!currentOperator) {
-            brain.cancelActor(requesterUuid, CancelReason.OP_REVOKED);
+        InteractionDecision decision =
+            interactions.accept(identity, text);
+
+        if (decision.accessRevoked()) {
+            brain.cancelActor(
+                requesterUuid,
+                CancelReason.OP_REVOKED
+            );
         }
 
         return switch (decision.kind()) {
@@ -77,7 +114,9 @@ public final class FabricChatController {
             }
             case FORWARD -> {
                 if (decision.started()) {
-                    platform.sendPublicPlain(SESSION_RULES);
+                    platform.sendPublicPlain(
+                        sessionRules(decision.followUpSeconds())
+                    );
                 }
 
                 brain.submitChat(
@@ -87,11 +126,14 @@ public final class FabricChatController {
                     decision.mode(),
                     decision.text()
                 ).whenComplete((sent, failure) -> {
-                    if (failure == null && Boolean.TRUE.equals(sent)) {
+                    if (
+                        failure == null
+                            && Boolean.TRUE.equals(sent)
+                    ) {
                         return;
                     }
                     scheduler.submit(() -> {
-                        if (platform.isOnlineOperator(requesterUuid)) {
+                        if (isCurrentlyAuthorized(requesterUuid)) {
                             platform.sendPublicPlain(
                                 "자비스 요청을 현재 처리하지 못했습니다."
                             );
@@ -107,15 +149,23 @@ public final class FabricChatController {
     public void onDisconnect(ServerPlayerEntity player) {
         UUID requesterUuid = player.getUuid();
         sessions.invalidate(requesterUuid);
-        brain.cancelActor(requesterUuid, CancelReason.CLIENT_DISCONNECTED);
+        brain.cancelActor(
+            requesterUuid,
+            CancelReason.CLIENT_DISCONNECTED
+        );
     }
 
     public void sweepSessions() {
         if (!server.isOnThread()) {
-            throw new IllegalStateException("Fabric session sweep must run on the server thread.");
+            throw new IllegalStateException(
+                "Fabric session sweep must run on the server thread."
+            );
         }
 
-        for (ChatSessionManager.SessionHandle expired : sessions.pruneExpired()) {
+        for (
+            ChatSessionManager.SessionHandle expired
+                : sessions.pruneExpired()
+        ) {
             brain.cancelSession(
                 expired.requesterUuid(),
                 expired.sessionId(),
@@ -123,8 +173,29 @@ public final class FabricChatController {
             );
         }
 
-        for (UUID revoked : sessions.pruneInvalid(platform::isOnlineOperator)) {
-            brain.cancelActor(revoked, CancelReason.OP_REVOKED);
+        for (
+            UUID revoked
+                : interactions.pruneInvalid(
+                    platform::interactionPlayer
+                )
+        ) {
+            brain.cancelActor(
+                revoked,
+                CancelReason.OP_REVOKED
+            );
         }
+    }
+
+    private boolean isCurrentlyAuthorized(UUID requesterUuid) {
+        return platform.interactionPlayer(requesterUuid)
+            .map(interactions::isAuthorized)
+            .orElse(false);
+    }
+
+    private String sessionRules(int followUpSeconds) {
+        return "대화를 시작합니다. "
+            + followUpSeconds
+            + "초 동안 후속 대화가 이어집니다. "
+            + "'대화 끝'으로 종료하고, '!내용'은 이번 메시지만 일반 채팅으로 보냅니다.";
     }
 }

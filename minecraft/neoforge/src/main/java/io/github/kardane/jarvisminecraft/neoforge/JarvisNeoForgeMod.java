@@ -13,6 +13,7 @@ import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftTools;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
 import io.github.kardane.jarvisminecraft.neoforge.chat.NeoForgeChatController;
 import io.github.kardane.jarvisminecraft.neoforge.platform.MinecraftNeoForgePlatformAccess;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAccess;
@@ -142,6 +143,8 @@ public final class JarvisNeoForgeMod {
         );
 
         ChatSessionManager sessions = new ChatSessionManager(clock);
+        InteractionCoordinator interactions =
+            new InteractionCoordinator(sessions, configManager);
 
         BrainGateway brain = EmbeddedBrainGateway.live(
             embeddedSettings.serverId(),
@@ -153,6 +156,7 @@ public final class JarvisNeoForgeMod {
             embeddedSettings.typesafeApiKey(),
             embeddedSettings.auditDirectory(),
             sessions,
+            interactions,
             registry,
             commonRuntime,
             serverScheduler,
@@ -163,6 +167,7 @@ public final class JarvisNeoForgeMod {
         NeoForgeChatController chat = new NeoForgeChatController(
             server,
             sessions,
+            interactions,
             brain,
             platform,
             serverScheduler,
@@ -185,8 +190,8 @@ public final class JarvisNeoForgeMod {
 
         brain.start();
         LOGGER.info(
-            "JARVIS Phase 1 runtime policy config validated "
-                + "(not yet applied to chat/tool policy): "
+            "JARVIS runtime policy config validated "
+                + "(interaction policy active; model/execution policy pending): "
                 + JarvisConfigSummary.from(configManager.current()).toLogLine()
         );
         LOGGER.info(

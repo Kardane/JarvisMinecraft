@@ -1,9 +1,14 @@
 package io.github.kardane.jarvisminecraft.paper.chat;
 
+import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
+import io.github.kardane.jarvisminecraft.common.chat.InteractionDecision;
+import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
+import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
+import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperPlatformAccess;
-import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.papermc.paper.event.player.ChatEvent;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer;
@@ -20,11 +25,8 @@ import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.CancelR
 
 @SuppressWarnings("deprecation")
 public final class PaperChatListener implements Listener {
-    private static final String SESSION_RULES =
-        "대화를 시작합니다. 120초 동안 후속 대화가 이어집니다. "
-            + "'대화 끝'으로 종료하고, '!내용'은 이번 메시지만 일반 채팅으로 보냅니다.";
-
     private final ChatSessionManager sessions;
+    private final InteractionCoordinator interactions;
     private final BrainGateway brain;
     private final PaperPlatformAccess platform;
     private final ServerScheduler scheduler;
@@ -37,7 +39,27 @@ public final class PaperChatListener implements Listener {
         PaperPlatformAccess platform,
         ServerScheduler scheduler
     ) {
+        this(
+            sessions,
+            new InteractionCoordinator(
+                sessions,
+                new ConfigManager(JarvisConfig::defaults)
+            ),
+            brain,
+            platform,
+            scheduler
+        );
+    }
+
+    public PaperChatListener(
+        ChatSessionManager sessions,
+        InteractionCoordinator interactions,
+        BrainGateway brain,
+        PaperPlatformAccess platform,
+        ServerScheduler scheduler
+    ) {
         this.sessions = sessions;
+        this.interactions = interactions;
         this.brain = brain;
         this.platform = platform;
         this.scheduler = scheduler;
@@ -47,13 +69,18 @@ public final class PaperChatListener implements Listener {
     public void onChat(ChatEvent event) {
         Player player = event.getPlayer();
         UUID requesterUuid = player.getUniqueId();
-        boolean currentOperator = player.isOnline() && player.isOp();
         String text = plain.serialize(event.message());
 
-        ChatSessionManager.Decision decision =
-            sessions.accept(requesterUuid, currentOperator, text);
+        PlayerIdentity identity = new PlayerIdentity(
+            requesterUuid,
+            player.getName(),
+            player.isOnline(),
+            player.isOnline() && player.isOp()
+        );
+        InteractionDecision decision =
+            interactions.accept(identity, text);
 
-        if (!currentOperator) {
+        if (decision.accessRevoked()) {
             brain.cancelActor(requesterUuid, CancelReason.OP_REVOKED);
         }
 
@@ -61,7 +88,8 @@ public final class PaperChatListener implements Listener {
             case PUBLIC_CHAT -> {
                 // Leave Paper's normal chat path unchanged.
             }
-            case PUBLIC_ESCAPE -> event.message(Component.text(decision.text()));
+            case PUBLIC_ESCAPE ->
+                event.message(Component.text(decision.text()));
             case END -> {
                 brain.cancelSession(
                     requesterUuid,
@@ -72,7 +100,9 @@ public final class PaperChatListener implements Listener {
             }
             case FORWARD -> {
                 if (decision.started()) {
-                    platform.sendPublicPlain(SESSION_RULES);
+                    platform.sendPublicPlain(
+                        sessionRules(decision.followUpSeconds())
+                    );
                 }
 
                 brain.submitChat(
@@ -82,11 +112,14 @@ public final class PaperChatListener implements Listener {
                     decision.mode(),
                     decision.text()
                 ).whenComplete((sent, failure) -> {
-                    if (failure == null && Boolean.TRUE.equals(sent)) {
+                    if (
+                        failure == null
+                            && Boolean.TRUE.equals(sent)
+                    ) {
                         return;
                     }
                     scheduler.submit(() -> {
-                        if (platform.isOnlineOperator(requesterUuid)) {
+                        if (isCurrentlyAuthorized(requesterUuid)) {
                             platform.sendPublicPlain(
                                 "자비스 요청을 현재 처리하지 못했습니다."
                             );
@@ -102,6 +135,22 @@ public final class PaperChatListener implements Listener {
     public void onQuit(PlayerQuitEvent event) {
         UUID requesterUuid = event.getPlayer().getUniqueId();
         sessions.invalidate(requesterUuid);
-        brain.cancelActor(requesterUuid, CancelReason.CLIENT_DISCONNECTED);
+        brain.cancelActor(
+            requesterUuid,
+            CancelReason.CLIENT_DISCONNECTED
+        );
+    }
+
+    private boolean isCurrentlyAuthorized(UUID requesterUuid) {
+        return platform.interactionPlayer(requesterUuid)
+            .map(interactions::isAuthorized)
+            .orElse(false);
+    }
+
+    private String sessionRules(int followUpSeconds) {
+        return "대화를 시작합니다. "
+            + followUpSeconds
+            + "초 동안 후속 대화가 이어집니다. "
+            + "'대화 끝'으로 종료하고, '!내용'은 이번 메시지만 일반 채팅으로 보냅니다.";
     }
 }

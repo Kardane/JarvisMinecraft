@@ -12,6 +12,7 @@ import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
 import io.github.kardane.jarvisminecraft.paper.chat.PaperChatListener;
 import io.github.kardane.jarvisminecraft.paper.config.PaperJarvisConfigSource;
 import io.github.kardane.jarvisminecraft.paper.platform.BukkitPaperPlatformAccess;
@@ -34,6 +35,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
     private BrainGateway brain;
     private ConfigManager configManager;
     private ChatSessionManager sessions;
+    private InteractionCoordinator interactions;
     private PaperPlatformAccess platform;
     private IntegrationRegistry integrations;
 
@@ -107,6 +109,10 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         );
 
         sessions = new ChatSessionManager(clock);
+        interactions = new InteractionCoordinator(
+            sessions,
+            configManager
+        );
         brain = EmbeddedBrainGateway.live(
             embeddedSettings.serverId(),
             integrations.capabilities(Bukkit.getMinecraftVersion()),
@@ -114,6 +120,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             embeddedSettings.typesafeApiKey(),
             embeddedSettings.auditDirectory(),
             sessions,
+            interactions,
             registry,
             commonRuntime,
             serverScheduler,
@@ -122,7 +129,13 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         );
 
         getServer().getPluginManager().registerEvents(
-            new PaperChatListener(sessions, brain, platform, serverScheduler),
+            new PaperChatListener(
+                sessions,
+                interactions,
+                brain,
+                platform,
+                serverScheduler
+            ),
             this
         );
 
@@ -135,8 +148,8 @@ public final class JarvisPaperPlugin extends JavaPlugin {
 
         brain.start();
         getLogger().info(
-            "JARVIS Phase 1 runtime policy config validated "
-                + "(not yet applied to chat/tool policy): "
+            "JARVIS runtime policy config validated "
+                + "(interaction policy active; model/execution policy pending): "
                 + JarvisConfigSummary.from(configManager.current()).toLogLine()
         );
         getLogger().info(
@@ -156,6 +169,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             integrations.close();
             integrations = null;
         }
+        interactions = null;
         configManager = null;
     }
 
@@ -195,7 +209,10 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             );
         }
 
-        for (UUID revoked : sessions.pruneInvalid(platform::isOnlineOperator)) {
+        for (
+            UUID revoked
+                : interactions.pruneInvalid(platform::interactionPlayer)
+        ) {
             brain.cancelActor(revoked, CancelReason.OP_REVOKED);
         }
     }

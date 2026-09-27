@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.paper.platform;
 
+import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
 import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -35,6 +36,23 @@ public final class BukkitPaperPlatformAccess implements PaperPlatformAccess {
         requireServerThread();
         Player player = server.getPlayer(playerUuid);
         return player != null && player.isOnline() && player.isOp();
+    }
+
+    @Override
+    public Optional<PlayerIdentity> interactionPlayer(UUID playerUuid) {
+        requireServerThread();
+        Player player = server.getPlayer(playerUuid);
+        if (player == null || !player.isOnline()) {
+            return Optional.empty();
+        }
+        return Optional.of(
+            new PlayerIdentity(
+                playerUuid,
+                player.getName(),
+                true,
+                player.isOp()
+            )
+        );
     }
 
     @Override

@@ -1,9 +1,14 @@
 package io.github.kardane.jarvisminecraft.neoforge.chat;
 
+import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
+import io.github.kardane.jarvisminecraft.common.chat.InteractionDecision;
+import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
+import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
+import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAccess;
-import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
@@ -16,12 +21,9 @@ import java.util.logging.Logger;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.CancelReason;
 
 public final class NeoForgeChatController {
-    private static final String SESSION_RULES =
-        "대화를 시작합니다. 120초 동안 후속 대화가 이어집니다. "
-            + "'대화 끝'으로 종료하고, '!내용'은 이번 메시지만 일반 채팅으로 보냅니다.";
-
     private final MinecraftServer server;
     private final ChatSessionManager sessions;
+    private final InteractionCoordinator interactions;
     private final BrainGateway brain;
     private final NeoForgePlatformAccess platform;
     private final ServerScheduler scheduler;
@@ -37,8 +39,32 @@ public final class NeoForgeChatController {
         ServerScheduler scheduler,
         Logger logger
     ) {
+        this(
+            server,
+            sessions,
+            new InteractionCoordinator(
+                sessions,
+                new ConfigManager(JarvisConfig::defaults)
+            ),
+            brain,
+            platform,
+            scheduler,
+            logger
+        );
+    }
+
+    public NeoForgeChatController(
+        MinecraftServer server,
+        ChatSessionManager sessions,
+        InteractionCoordinator interactions,
+        BrainGateway brain,
+        NeoForgePlatformAccess platform,
+        ServerScheduler scheduler,
+        Logger logger
+    ) {
         this.server = server;
         this.sessions = sessions;
+        this.interactions = interactions;
         this.brain = brain;
         this.platform = platform;
         this.scheduler = scheduler;
@@ -63,20 +89,31 @@ public final class NeoForgeChatController {
 
         ServerPlayer sender = event.getPlayer();
         UUID requesterUuid = sender.getUUID();
-        boolean currentOperator = platform.isOnlineOperator(requesterUuid);
+        boolean currentOperator =
+            platform.isOnlineOperator(requesterUuid);
+        PlayerIdentity identity = new PlayerIdentity(
+            requesterUuid,
+            sender.getGameProfile().getName(),
+            true,
+            currentOperator
+        );
 
-        ChatSessionManager.Decision decision =
-            sessions.accept(requesterUuid, currentOperator, event.getRawText());
+        InteractionDecision decision =
+            interactions.accept(identity, event.getRawText());
 
-        if (!currentOperator) {
-            brain.cancelActor(requesterUuid, CancelReason.OP_REVOKED);
+        if (decision.accessRevoked()) {
+            brain.cancelActor(
+                requesterUuid,
+                CancelReason.OP_REVOKED
+            );
         }
 
         switch (decision.kind()) {
             case PUBLIC_CHAT -> {
                 // Preserve normal NeoForge chat handling.
             }
-            case PUBLIC_ESCAPE -> event.setMessage(Component.literal(decision.text()));
+            case PUBLIC_ESCAPE ->
+                event.setMessage(Component.literal(decision.text()));
             case END -> {
                 brain.cancelSession(
                     requesterUuid,
@@ -87,7 +124,9 @@ public final class NeoForgeChatController {
             }
             case FORWARD -> {
                 if (decision.started()) {
-                    platform.sendPublicPlain(SESSION_RULES);
+                    platform.sendPublicPlain(
+                        sessionRules(decision.followUpSeconds())
+                    );
                 }
 
                 brain.submitChat(
@@ -97,11 +136,14 @@ public final class NeoForgeChatController {
                     decision.mode(),
                     decision.text()
                 ).whenComplete((sent, failure) -> {
-                    if (failure == null && Boolean.TRUE.equals(sent)) {
+                    if (
+                        failure == null
+                            && Boolean.TRUE.equals(sent)
+                    ) {
                         return;
                     }
                     scheduler.submit(() -> {
-                        if (platform.isOnlineOperator(requesterUuid)) {
+                        if (isCurrentlyAuthorized(requesterUuid)) {
                             platform.sendPublicPlain(
                                 "자비스 요청을 현재 처리하지 못했습니다."
                             );
@@ -116,12 +158,17 @@ public final class NeoForgeChatController {
     public void onDisconnect(ServerPlayer player) {
         UUID requesterUuid = player.getUUID();
         sessions.invalidate(requesterUuid);
-        brain.cancelActor(requesterUuid, CancelReason.CLIENT_DISCONNECTED);
+        brain.cancelActor(
+            requesterUuid,
+            CancelReason.CLIENT_DISCONNECTED
+        );
     }
 
     public void onServerTick() {
         if (!server.isSameThread()) {
-            throw new IllegalStateException("NeoForge session sweep must run on the server thread.");
+            throw new IllegalStateException(
+                "NeoForge session sweep must run on the server thread."
+            );
         }
 
         tickCounter += 1;
@@ -130,7 +177,10 @@ public final class NeoForgeChatController {
         }
         tickCounter = 0;
 
-        for (ChatSessionManager.SessionHandle expired : sessions.pruneExpired()) {
+        for (
+            ChatSessionManager.SessionHandle expired
+                : sessions.pruneExpired()
+        ) {
             brain.cancelSession(
                 expired.requesterUuid(),
                 expired.sessionId(),
@@ -138,8 +188,29 @@ public final class NeoForgeChatController {
             );
         }
 
-        for (UUID revoked : sessions.pruneInvalid(platform::isOnlineOperator)) {
-            brain.cancelActor(revoked, CancelReason.OP_REVOKED);
+        for (
+            UUID revoked
+                : interactions.pruneInvalid(
+                    platform::interactionPlayer
+                )
+        ) {
+            brain.cancelActor(
+                revoked,
+                CancelReason.OP_REVOKED
+            );
         }
+    }
+
+    private boolean isCurrentlyAuthorized(UUID requesterUuid) {
+        return platform.interactionPlayer(requesterUuid)
+            .map(interactions::isAuthorized)
+            .orElse(false);
+    }
+
+    private String sessionRules(int followUpSeconds) {
+        return "대화를 시작합니다. "
+            + followUpSeconds
+            + "초 동안 후속 대화가 이어집니다. "
+            + "'대화 끝'으로 종료하고, '!내용'은 이번 메시지만 일반 채팅으로 보냅니다.";
     }
 }

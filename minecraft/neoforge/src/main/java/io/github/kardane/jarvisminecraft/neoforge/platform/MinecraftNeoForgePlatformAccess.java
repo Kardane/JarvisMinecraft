@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.neoforge.platform;
 
+import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -40,6 +41,24 @@ public final class MinecraftNeoForgePlatformAccess implements NeoForgePlatformAc
         PlayerList manager = server.getPlayerList();
         ServerPlayer player = manager.getPlayer(playerUuid);
         return player != null && manager.isOp(player.getGameProfile());
+    }
+
+    @Override
+    public Optional<PlayerIdentity> interactionPlayer(UUID playerUuid) {
+        requireServerThread();
+        PlayerList manager = server.getPlayerList();
+        ServerPlayer player = manager.getPlayer(playerUuid);
+        if (player == null) {
+            return Optional.empty();
+        }
+        return Optional.of(
+            new PlayerIdentity(
+                playerUuid,
+                player.getGameProfile().getName(),
+                true,
+                manager.isOp(player.getGameProfile())
+            )
+        );
     }
 
     @Override
