@@ -7,6 +7,8 @@ import io.github.kardane.jarvisminecraft.common.brain.PackagingSmoke;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
+import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.config.PropertiesJarvisConfigSource;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
@@ -15,6 +17,7 @@ import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftTools;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
 import io.github.kardane.jarvisminecraft.fabric.chat.FabricChatController;
+import io.github.kardane.jarvisminecraft.fabric.logging.FabricJarvisLog;
 import io.github.kardane.jarvisminecraft.fabric.platform.FabricPlatformAccess;
 import io.github.kardane.jarvisminecraft.fabric.platform.FabricServerScheduler;
 import io.github.kardane.jarvisminecraft.fabric.platform.MinecraftFabricPlatformAccess;
@@ -125,6 +128,10 @@ public final class JarvisFabricMod implements ModInitializer {
             return;
         }
 
+        JarvisLog operationalLog = new ConfiguredJarvisLog(
+            configManager,
+            new FabricJarvisLog(LOGGER)
+        );
         Clock clock = Clock.systemUTC();
         FabricPlatformAccess platform =
             new MinecraftFabricPlatformAccess(server);
@@ -160,7 +167,8 @@ public final class JarvisFabricMod implements ModInitializer {
             commonRuntime,
             serverScheduler,
             platform,
-            clock
+            clock,
+            operationalLog
         );
 
         FabricChatController chat = new FabricChatController(
