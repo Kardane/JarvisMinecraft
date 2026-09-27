@@ -184,6 +184,53 @@ public final class LunaToolSchemas {
                     )
                 )
             );
+            case SCHEDULE_ACTION -> List.of(
+                scheduleDefinition(
+                    "schedule_teleport_staff",
+                    tool,
+                    ToolName.TELEPORT_STAFF,
+                    objectSchema(
+                        properties("targetPlayerUuid", uuidSchema()),
+                        List.of("targetPlayerUuid")
+                    )
+                ),
+                scheduleDefinition(
+                    "schedule_weather_set",
+                    tool,
+                    ToolName.WEATHER_SET,
+                    objectSchema(
+                        properties(
+                            "worldId", stringSchema(1, 128),
+                            "weather", enumStringSchema("CLEAR", "RAIN", "THUNDER"),
+                            "durationSeconds", integerSchema(1, 3_600)
+                        ),
+                        List.of("worldId", "weather", "durationSeconds")
+                    )
+                ),
+                scheduleDefinition(
+                    "schedule_time_set",
+                    tool,
+                    ToolName.TIME_SET,
+                    objectSchema(
+                        properties(
+                            "worldId", stringSchema(1, 128),
+                            "timeOfDay", integerSchema(0, 23_999)
+                        ),
+                        List.of("worldId", "timeOfDay")
+                    )
+                )
+            );
+            case CANCEL_SCHEDULED_ACTION -> List.of(
+                define(
+                    tool.wireName(),
+                    tool,
+                    "Cancel one pending scheduled action owned by the requesting player.",
+                    objectSchema(
+                        properties("scheduleId", uuidSchema()),
+                        List.of("scheduleId")
+                    )
+                )
+            );
             case LOOKUP_AREA_HISTORY -> List.of(
                 define(
                     tool.wireName(),
@@ -257,6 +304,36 @@ public final class LunaToolSchemas {
                 )
             );
         };
+    }
+
+    private Definition scheduleDefinition(
+        String name,
+        ToolName controlTool,
+        ToolName nestedTool,
+        JsonObject nestedArguments
+    ) {
+        return define(
+            name,
+            controlTool,
+            "Schedule the explicit structured action " + nestedTool.wireName()
+                + ". delaySeconds is 1..60. For one-shot execution set intervalSeconds and durationSeconds to null. For repetition set both to 1..60 and durationSeconds >= intervalSeconds.",
+            objectSchema(
+                properties(
+                    "tool", constStringSchema(nestedTool.wireName()),
+                    "arguments", nestedArguments,
+                    "delaySeconds", integerSchema(1, 60),
+                    "intervalSeconds", nullableIntegerSchema(1, 60),
+                    "durationSeconds", nullableIntegerSchema(1, 60)
+                ),
+                List.of(
+                    "tool",
+                    "arguments",
+                    "delaySeconds",
+                    "intervalSeconds",
+                    "durationSeconds"
+                )
+            )
+        );
     }
 
     private Definition uuidTool(ToolName tool, String description) {
@@ -342,6 +419,13 @@ public final class LunaToolSchemas {
         return schema;
     }
 
+    private JsonObject constStringSchema(String value) {
+        JsonObject schema = new JsonObject();
+        schema.addProperty("type", "string");
+        schema.addProperty("const", value);
+        return schema;
+    }
+
     private JsonObject enumStringSchema(String... values) {
         JsonObject schema = new JsonObject();
         schema.addProperty("type", "string");
@@ -350,6 +434,17 @@ public final class LunaToolSchemas {
             choices.add(value);
         }
         schema.add("enum", choices);
+        return schema;
+    }
+
+    private JsonObject nullableIntegerSchema(int min, int max) {
+        JsonObject schema = new JsonObject();
+        JsonArray types = new JsonArray();
+        types.add("integer");
+        types.add("null");
+        schema.add("type", types);
+        schema.addProperty("minimum", min);
+        schema.addProperty("maximum", max);
         return schema;
     }
 
