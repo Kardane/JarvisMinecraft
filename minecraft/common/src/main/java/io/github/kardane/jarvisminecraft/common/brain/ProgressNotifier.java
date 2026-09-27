@@ -5,11 +5,12 @@ import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 public final class ProgressNotifier {
     public ProgressHandle schedule(
         Duration threshold,
-        Runnable notification
+        Consumer<ProgressHandle> notification
     ) {
         Objects.requireNonNull(threshold, "threshold");
         Objects.requireNonNull(notification, "notification");
@@ -25,9 +26,15 @@ public final class ProgressNotifier {
             TimeUnit.MILLISECONDS
         ).execute(() -> {
             if (!handle.completed()) {
-                notification.run();
+                notification.accept(handle);
             }
         });
+        return handle;
+    }
+
+    public ProgressHandle completedHandle() {
+        Handle handle = new Handle();
+        handle.complete();
         return handle;
     }
 

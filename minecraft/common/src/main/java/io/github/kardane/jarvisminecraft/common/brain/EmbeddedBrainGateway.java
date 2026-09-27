@@ -10,6 +10,7 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
 import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
+import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.platform.AdapterPlatformAccess;
@@ -23,6 +24,7 @@ import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 import java.net.http.HttpClient;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Objects;
@@ -40,6 +42,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     private final EmbeddedBrain brain;
     private final ChatSessionManager sessions;
     private final InteractionCoordinator interactions;
+    private final ConfigManager configManager;
+    private final ProgressNotifier progressNotifier;
     private final AdapterPlatformAccess platform;
     private final ServerScheduler serverScheduler;
     private final Clock clock;
@@ -64,6 +68,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 sessions,
                 new ConfigManager(JarvisConfig::defaults)
             ),
+            new ConfigManager(JarvisConfig::defaults),
+            new ProgressNotifier(),
             platform,
             serverScheduler,
             clock,
@@ -77,6 +83,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         EmbeddedBrain brain,
         ChatSessionManager sessions,
         InteractionCoordinator interactions,
+        ConfigManager configManager,
+        ProgressNotifier progressNotifier,
         AdapterPlatformAccess platform,
         ServerScheduler serverScheduler,
         Clock clock
@@ -85,6 +93,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             brain,
             sessions,
             interactions,
+            new ConfigManager(JarvisConfig::defaults),
+            new ProgressNotifier(),
             platform,
             serverScheduler,
             clock,
@@ -110,6 +120,14 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         this.interactions = Objects.requireNonNull(
             interactions,
             "interactions"
+        );
+        this.configManager = Objects.requireNonNull(
+            configManager,
+            "configManager"
+        );
+        this.progressNotifier = Objects.requireNonNull(
+            progressNotifier,
+            "progressNotifier"
         );
         this.platform = Objects.requireNonNull(platform, "platform");
         this.serverScheduler = Objects.requireNonNull(
@@ -253,6 +271,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             brain,
             sessions,
             interactions,
+            configManager,
+            new ProgressNotifier(),
             platform,
             serverScheduler,
             clock,
@@ -339,6 +359,9 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             currentPlayer.operator()
         );
 
+        JarvisConfig.Response responseConfig =
+            configManager.current().response();
+
         final CompletionStage<EmbeddedBrain.Reply> processing;
         try {
             processing = brain.submit(request);
@@ -346,11 +369,30 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             return CompletableFuture.completedFuture(false);
         }
 
+        ProgressNotifier.ProgressHandle progress =
+            scheduleProgress(
+                requesterUuid,
+                sessionId,
+                request.requestId(),
+                responseConfig
+            );
+
         processing.whenComplete((reply, failure) -> {
+            progress.complete();
             if (failure == null) {
-                deliverReply(requesterUuid, sessionId, reply);
+                deliverReply(
+                    requesterUuid,
+                    sessionId,
+                    reply,
+                    responseConfig
+                );
             } else {
-                deliverFailure(requesterUuid, sessionId, failure);
+                deliverFailure(
+                    requesterUuid,
+                    sessionId,
+                    failure,
+                    responseConfig
+                );
             }
         });
 
@@ -381,7 +423,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     private void deliverReply(
         UUID requesterUuid,
         UUID sessionId,
-        EmbeddedBrain.Reply reply
+        EmbeddedBrain.Reply reply,
+        JarvisConfig.Response responseConfig
     ) {
         scheduleDelivery(() -> {
             if (
@@ -391,7 +434,13 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 return;
             }
 
-            platform.sendPublicPlain(reply.text());
+            platform.sendPublicStyled(
+                styled(responseConfig, reply.text())
+            );
+            playResponseSound(
+                requesterUuid,
+                responseConfig
+            );
 
             if (reply.sessionState() == LunaStep.SessionState.END) {
                 sessions.end(requesterUuid, sessionId);
@@ -403,7 +452,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     private void deliverFailure(
         UUID requesterUuid,
         UUID sessionId,
-        Throwable failure
+        Throwable failure,
+        JarvisConfig.Response responseConfig
     ) {
         Throwable cause = unwrap(failure);
         ErrorCode code = cause instanceof ProtocolException protocol
@@ -420,9 +470,83 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 isInteractionAuthorized(requesterUuid)
                     && sessions.isActive(requesterUuid, sessionId)
             ) {
-                platform.sendPublicPlain(text);
+                platform.sendPublicStyled(
+                    styled(responseConfig, text)
+                );
+                playResponseSound(
+                    requesterUuid,
+                    responseConfig
+                );
             }
         });
+    }
+
+    private ProgressNotifier.ProgressHandle scheduleProgress(
+        UUID requesterUuid,
+        UUID sessionId,
+        UUID requestId,
+        JarvisConfig.Response responseConfig
+    ) {
+        JarvisConfig.WaitingMessage waiting =
+            responseConfig.waitingMessage();
+        if (!waiting.enabled()) {
+            return progressNotifier.completedHandle();
+        }
+
+        int index = Math.floorMod(
+            requestId.hashCode(),
+            waiting.messages().size()
+        );
+        String progressText = waiting.messages().get(index);
+
+        return progressNotifier.schedule(
+            Duration.ofMillis(waiting.thresholdMillis()),
+            handle -> scheduleDelivery(() -> {
+                if (
+                    handle.completed()
+                        || !isInteractionAuthorized(requesterUuid)
+                        || !sessions.isActive(
+                            requesterUuid,
+                            sessionId
+                        )
+                ) {
+                    return;
+                }
+                platform.sendPublicStyled(
+                    styled(responseConfig, progressText)
+                );
+            })
+        );
+    }
+
+    private StyledChatMessage styled(
+        JarvisConfig.Response responseConfig,
+        String body
+    ) {
+        return StyledChatMessage.fromLegacyPrefix(
+            responseConfig.prefix(),
+            body
+        );
+    }
+
+    private void playResponseSound(
+        UUID requesterUuid,
+        JarvisConfig.Response responseConfig
+    ) {
+        JarvisConfig.Sound sound = responseConfig.sound();
+        if (!sound.enabled()) {
+            return;
+        }
+        try {
+            platform.playResponseSound(
+                requesterUuid,
+                sound.id(),
+                (float) sound.volume(),
+                (float) sound.pitch()
+            );
+        } catch (RuntimeException ignored) {
+            // Feedback failure must not turn a completed response into failure.
+        }
     }
 
     private boolean isInteractionAuthorized(UUID requesterUuid) {
