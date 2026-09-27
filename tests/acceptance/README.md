@@ -1,8 +1,8 @@
-# Historical T10 acceptance evidence
+# Historical T10 Acceptance Evidence
 
-E14 이후 이 디렉터리는 실행 가능한 Node acceptance harness가 아니라 **과거 T10 evidence archive** 역할을 한다.
+After E14, this directory is no longer an executable Node acceptance harness. It serves as a **historical T10 evidence archive**.
 
-보존 항목:
+Retained artifacts:
 
 - `out/paper.json`
 - `out/fabric.json`
@@ -10,19 +10,19 @@ E14 이후 이 디렉터리는 실행 가능한 Node acceptance harness가 아�
 - `out/a09-jev-report.json`
 - `out/a10-live-models-report.json`
 
-기존 core/live Node runner와 WebSocket acceptance gateway는 production Remote Brain과 함께 제거했다. 이 결과 파일을 현재 Embedded runtime의 신규 E2E 통과 증거로 재해석하지 않는다.
+The former core/live Node runners and WebSocket acceptance gateway were removed with the production Remote Brain. Do not reinterpret these result files as evidence that the current Embedded runtime has passed a new E2E run.
 
-현재 deterministic 검증은:
+Current deterministic verification:
 
 ```bash
 ./gradlew build
 ```
 
-현재 live Jev/Luna smoke는:
+Current live Jev/Luna smoke test:
 
 ```bash
 OPENAI_API_KEY=... TYPESAFE_API_KEY=... \
   ./gradlew :minecraft:common:embeddedBrainLiveVerification
 ```
 
-새 platform live acceptance harness가 필요하면 Embedded Brain을 직접 부팅하는 형태로 별도 추가해야 한다.
+If a new platform live-acceptance harness is needed, add one that boots the Embedded Brain directly.
