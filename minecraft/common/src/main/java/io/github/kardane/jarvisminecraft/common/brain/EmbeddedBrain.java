@@ -479,6 +479,21 @@ public final class EmbeddedBrain {
             assertRunning();
             assertSession(request.requesterUuid(), request.sessionId());
 
+            if (
+                !executionPolicy.allows(
+                    call.tool(),
+                    request.toolsAllowed(),
+                    request.mode()
+                )
+            ) {
+                return CompletableFuture.failedFuture(
+                    new ProtocolException(
+                        ErrorCode.UNSUPPORTED,
+                        "Tool was denied by the current execution policy before execution."
+                    )
+                );
+            }
+
             CommonRuntime.ToolInvocation invocation =
                 new CommonRuntime.ToolInvocation(
                     sentAt,
