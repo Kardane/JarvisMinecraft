@@ -212,6 +212,12 @@ public final class PromptContentLoader {
     private boolean isMarkdownEntry(Path path) {
         String filename = path.getFileName().toString();
         if (
+            PromptContentTemplates.KNOWLEDGE_README
+                .equalsIgnoreCase(filename)
+        ) {
+            return false;
+        }
+        if (
             !filename.toLowerCase(Locale.ROOT)
                 .endsWith(".md")
         ) {
