@@ -43,9 +43,9 @@ Runtime validation:
 The Paper Adapter listens to Paper `ChatEvent` and makes the OP/session decision on the server thread. Accepted JARVIS messages remain on the normal public chat path; replies and session notices are broadcast as plain text.
 
 Supported direct aliases:
-- 자비스
+- `자비스` — Korean wake-word literal (`Jarvis`);
 - jarvis (case-insensitive)
-- 재비스
+- `재비스` — alternate Korean wake-word literal;
 
 Rules:
 - non-OP chat is left on the normal Paper chat path and is never submitted to Brain.
