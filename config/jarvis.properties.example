@@ -45,6 +45,7 @@ jarvis.execution.lite.deny-tools=
 jarvis.execution.full.allow-tools=
 jarvis.execution.full.deny-tools=
 
+# Enables schedule_action. Pending schedules are memory-only.
 jarvis.scheduling.enabled=false
 jarvis.scheduling.max-delay-seconds=60
 jarvis.scheduling.max-duration-seconds=60

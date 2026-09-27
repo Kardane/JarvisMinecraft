@@ -92,7 +92,24 @@ jarvis:
 The default remains `READ_TALK`, so merely upgrading to Phase 6 does not
 activate mutations.
 
-Scheduling and `/jm reload` remain pending later phases.
+Phase 7 applies `jarvis.scheduling.*`:
+
+- `enabled=false` keeps `schedule_action` hidden.
+- `max-delay-seconds` is validated in the range 1..60.
+- `max-duration-seconds` is validated in the range 1..60.
+- schedulable mutations are limited to `teleport_staff`, `weather_set`,
+  and `time_set`.
+- one-shot schedules use a delay only; repeating schedules use delay +
+  interval + duration.
+- each execution rechecks current scheduling/execution policy, active Tool
+  registration, audit health, and current online OP authority.
+- schedules are not persisted across server restart.
+
+`cancel_scheduled_action` can cancel only a pending schedule owned by the
+requesting player. Actor invalidation/logout and Brain shutdown also cancel
+that actor's pending schedules.
+
+`/jm reload` remains pending a later phase.
 
 A failed initial runtime-policy parse stops JARVIS startup. `ConfigManager`
 already provides fail-safe snapshot replacement semantics for the later reload
@@ -179,6 +196,7 @@ InteractionCoordinator
   -> ReasoningPolicy
   -> Luna
   -> ProgressNotifier / StyledChatMessage
+  -> SchedulingPolicy / ScheduledActionService
   -> AuditSink
   -> CommonRuntime.ExecutionRuntime
   -> Platform Tool

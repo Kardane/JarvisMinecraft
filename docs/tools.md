@@ -483,3 +483,32 @@ T05:
 - Luna function schema는 이 catalog에서 생성.
 - 모델이 schema 밖 인자를 만들면 재질문 또는 INVALID_ARGUMENT 처리.
 - Jev category는 Tool 후보를 좁힐 뿐 실행 권한을 주지 않는다.
+
+
+## Phase 7 scheduling controls
+
+### schedule_action
+
+예약 가능한 nested Tool:
+
+- `teleport_staff`
+- `weather_set`
+- `time_set`
+
+입력은 nested `tool`, strict `arguments`, `delaySeconds`,
+`intervalSeconds`, `durationSeconds`를 포함한다.
+
+- delay: 1~60초
+- one-shot: interval/duration 모두 null
+- repeat: interval/duration 모두 정수이며 duration >= interval
+- duration: 최대 60초
+- scheduling.enabled=false이면 Tool 자체를 노출하지 않는다.
+- proactive origin에서는 등록하지 않는다.
+
+등록 결과는 `scheduleId`, 첫 실행 시각, 선택적 만료 시각을 반환한다.
+실제 실행은 등록 요청의 deadline을 재사용하지 않는다.
+
+### cancel_scheduled_action
+
+`scheduleId` 하나를 받아 현재 requester가 소유한 pending schedule만 취소한다.
+다른 플레이어의 ID, 이미 종료된 ID, 존재하지 않는 ID는 NOT_FOUND로 처리한다.

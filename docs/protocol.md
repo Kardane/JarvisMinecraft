@@ -414,3 +414,19 @@ T06~T08 Adapter:
 
 - platform event를 이 protocol DTO로 변환.
 - Tool 실행과 결과 전달 양쪽에서 현재 OP와 actor binding 재검사.
+
+
+## Phase 7 scheduling control Tools
+
+Embedded runtime은 분석/회귀용 protocol schema에도 다음 control Tool을 유지한다.
+
+- `schedule_action`
+- `cancel_scheduled_action`
+
+둘 다 state-changing control Tool이므로 wire fixture에서는 non-null
+`actionId`를 요구한다. `schedule_action`의 nested tool은
+`teleport_staff / weather_set / time_set` 중 하나로 제한한다.
+
+`schedule_action`은 원 Tool request를 60초 동안 열어 두는 계약이 아니다.
+등록 성공 시 schedule ID를 즉시 결과로 반환하고, 실제 delayed/repeating
+실행은 Embedded runtime 내부에서 새 toolCallId/actionId/deadline으로 수행한다.

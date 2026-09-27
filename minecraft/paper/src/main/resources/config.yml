@@ -67,6 +67,8 @@ jarvis:
       deny-tools: []
 
   scheduling:
+    # Enables schedule_action for structured LOW-risk mutation Tools.
+    # Pending schedules are memory-only and do not survive server restart.
     enabled: false
     max-delay-seconds: 60
     max-duration-seconds: 60

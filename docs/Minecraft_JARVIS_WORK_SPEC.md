@@ -116,14 +116,15 @@ History/Region 조회는 v0.1.1 Tool catalog에 추가한다. 이력 기본 범�
 - 감사 필드: timestamp, serverId, requesterUuid, requestId, toolCallId/actionId, tool, risk, 검증된 인자 요약, outcome, source, latency, 모델 ID, fallback 사유. 비밀·전체 프롬프트는 저장하지 않는다.
 - v0.1 감사는 비동기 회전 JSONL, 기본 7일/총 100MiB. 변경 실행은 pre-execution 감사 기록을 안전하게 큐/저장할 수 없으면 거부한다. 큐 포화·디스크 오류를 무시하지 않고 health에 표시한다.
 
-### 3.6 후속 runtime policy Phase 1-6
+### 3.6 후속 runtime policy Phase 1-7
 
 Phase 1은 비밀이 아닌 runtime-policy의 immutable snapshot, strict validation,
 fail-safe reload 기반을 추가했다. Phase 2는 interaction policy를 실제
 chat admission/session 경로에 연결했고, Phase 3는 Jev decision과 Luna
 reasoning policy를 연결했다. Phase 4는 response UX policy를 연결했고,
 Phase 5는 execution Tool exposure policy를 연결했고, Phase 6는 검증된
-LOW-risk structured action Tool을 확장한다.
+LOW-risk structured action Tool을 확장했으며, Phase 7은 최대 60초의
+지연/반복 structured action scheduling을 연결한다.
 
 - 기본 audience는 계속 `OP`다. 운영자가 명시적으로 설정하면
   `WHITELIST / ALL / BLACKLIST`가 새 JARVIS 대화 진입과 기존 session 유지
@@ -176,6 +177,16 @@ LOW-risk structured action Tool을 확장한다.
 - 두 Tool은 state-changing contract이므로 actionId, pre-execution audit,
   execution policy, current online OP, active Tool registry를 모두 통과해야 한다.
   기본 `READ_TALK`에서는 노출되지 않는다.
+- Phase 7의 `schedule_action`은 `teleport_staff / weather_set / time_set`만
+  대상으로 하며 delay 1~60초를 허용한다. 반복은 interval과 duration을 함께
+  지정하고 duration은 최대 60초다.
+- 예약 등록은 원 Brain request 안에서 즉시 scheduleId를 반환한다. 실제 실행은
+  새 actionId와 짧은 Tool deadline을 발급해 원 30초 request deadline과 분리한다.
+- 각 예약 실행은 scheduling policy, execution policy, active Tool, pre-audit,
+  current online OP를 다시 확인한다. 실패/거부/timeout/OUTCOME_UNKNOWN이면
+  남은 반복을 중단하며 자동 retry하지 않는다.
+- pending schedule은 메모리 내 상태이며 actor invalidation 또는 서버/Brain
+  종료 시 취소한다. 서버 재시작 후 자동 복구하지 않는다.
 - scheduling 설정은 기본 비활성이고 실제 예약 실행 경로를 만들지 않는다.
 - `docs/later-todo.md`의 `ADMIN` 아이디어는 현재 승인된 runtime contract가
   아니다. 서버 파일 생성·수정·삭제는 별도 Work Spec/Tool 계약과 안전성

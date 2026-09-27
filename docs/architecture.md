@@ -27,7 +27,7 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 
 | 구성 요소 | 책임 |
 |---|---|
-| `minecraft/common` | `BrainGateway`, `EmbeddedBrain`, Jev/Luna client, route policy, conversation history, request budget/scheduler, audit, runtime-policy config snapshot/validation, Tool argument validation, `CommonRuntime`, Tool registry, authority/deadline/deduplication |
+| `minecraft/common` | `BrainGateway`, `EmbeddedBrain`, Jev/Luna client, route policy, conversation history, request budget/scheduler, delayed/repeating action scheduler, audit, runtime-policy config snapshot/validation, Tool argument validation, `CommonRuntime`, Tool registry, authority/deadline/deduplication |
 | `minecraft/paper` | Paper entrypoint, chat/session integration, scheduler/platform access, standard Tool, CoreProtect/WorldGuard/CMI optional Provider |
 | `minecraft/fabric` | Fabric dedicated-server entrypoint, chat controller, scheduler/platform access, standard Tool |
 | `minecraft/neoforge` | NeoForge dedicated-server entrypoint, chat controller, scheduler/platform access, tick sampler, standard Tool |
@@ -127,7 +127,21 @@ execution mode explicitly allowlists them. Both are rechecked by
 `ExecutionPolicy`, pre-execution audit, `CommonRuntime`, current online OP
 authority, and the platform loaded-world lookup before mutation.
 
-Scheduling and admin reload commands are still not wired.
+Phase 7 wires `jarvis.scheduling.*` through Brain-level scheduling controls.
+`schedule_action` can defer or repeat only `teleport_staff`,
+`weather_set`, and `time_set`. Delay is bounded by the configured maximum
+and never exceeds 60 seconds. Repeating schedules require both interval and
+duration; duration never exceeds 60 seconds.
+
+Registration returns a schedule ID immediately instead of keeping the original
+30-second Brain request open. Every scheduled run receives a new action ID and
+short Tool deadline, then rechecks scheduling policy, execution policy, active
+Tool registration, pre-execution audit, and current online OP authority through
+`CommonRuntime`. Runs are serialized; a failed, denied, cancelled, timed-out,
+or outcome-unknown run stops the remaining repetition. Pending schedules are
+memory-only and are cancelled on actor invalidation or Brain shutdown.
+
+Admin reload commands are still not wired.
 
 Provider credentials and logical server identity remain in
 `EmbeddedBrainSettings`; they are not copied into `JarvisConfig`.
