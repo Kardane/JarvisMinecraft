@@ -13,6 +13,10 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningLevel;
 import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
 import io.github.kardane.jarvisminecraft.common.chat.AmbientChatMessage;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisEvents;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisFields;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.NoOpJarvisLog;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.CancelScheduledActionArguments;
@@ -68,6 +72,7 @@ public final class EmbeddedBrain {
     private final AuditSink audit;
     private final CommonRuntime.ExecutionRuntime toolRuntime;
     private final Clock clock;
+    private final JarvisLog log;
     private final Map<SessionKey, Set<UUID>> activeRequestIds = new HashMap<>();
     private volatile boolean stopped;
 
@@ -152,6 +157,44 @@ public final class EmbeddedBrain {
         CommonRuntime.ExecutionRuntime toolRuntime,
         Clock clock
     ) {
+        this(
+            serverId,
+            capabilities,
+            sessions,
+            history,
+            scheduler,
+            jev,
+            routePolicy,
+            luna,
+            reasoningPolicy,
+            executionPolicy,
+            schedulingPolicy,
+            scheduledActions,
+            audit,
+            toolRuntime,
+            clock,
+            NoOpJarvisLog.INSTANCE
+        );
+    }
+
+    public EmbeddedBrain(
+        String serverId,
+        List<Capability> capabilities,
+        ChatSessionManager sessions,
+        ConversationHistoryStore history,
+        AiRequestScheduler scheduler,
+        JevClassifier jev,
+        DeterministicRoutePolicy routePolicy,
+        LunaClient luna,
+        ReasoningPolicy reasoningPolicy,
+        ExecutionPolicy executionPolicy,
+        SchedulingPolicy schedulingPolicy,
+        ScheduledActionService scheduledActions,
+        AuditSink audit,
+        CommonRuntime.ExecutionRuntime toolRuntime,
+        Clock clock,
+        JarvisLog log
+    ) {
         if (serverId == null || serverId.isBlank()) {
             throw new IllegalArgumentException("serverId must not be blank.");
         }
@@ -184,6 +227,7 @@ public final class EmbeddedBrain {
         this.audit = Objects.requireNonNull(audit, "audit");
         this.toolRuntime = Objects.requireNonNull(toolRuntime, "toolRuntime");
         this.clock = Objects.requireNonNull(clock, "clock");
+        this.log = Objects.requireNonNull(log, "log");
     }
 
     public CompletionStage<JevClassification> classifyProactive(
@@ -314,9 +358,10 @@ public final class EmbeddedBrain {
                 request.mode()
             );
 
+            Instant jevStarted = clock.instant();
             Instant jevDeadline = earlier(
                 budget.deadlineAt(),
-                clock.instant().plus(JdkJevClassifier.MAX_TIMEOUT)
+                jevStarted.plus(JdkJevClassifier.MAX_TIMEOUT)
             );
             return withDeadline(
                 jev.classify(input, jevDeadline),
@@ -324,6 +369,7 @@ public final class EmbeddedBrain {
                 ErrorCode.TIMEOUT,
                 "Jev classification timed out."
             ).handle((classification, failure) -> {
+                    long latency = elapsedMillis(jevStarted);
                     if (
                         failure != null
                             || classification == null
@@ -331,21 +377,82 @@ public final class EmbeddedBrain {
                                 classification.model()
                             )
                     ) {
+                        String errorCode = failureCode(
+                            failure,
+                            "JEV_FAILED",
+                            "JEV_TIMEOUT"
+                        );
+                        if (
+                            classification != null
+                                && !JdkJevClassifier.MODEL.equals(
+                                    classification.model()
+                                )
+                        ) {
+                            errorCode = "JEV_INVALID_OUTPUT";
+                        }
+                        log.warn(
+                            JarvisEvents.JEV_FAILED,
+                            JarvisFields.of(
+                                "requestId", request.requestId(),
+                                "errorCode", errorCode,
+                                "latencyMs", latency
+                            )
+                        );
+                        DeterministicRoutePolicy.RoutingDecision fallback =
+                            routePolicy.errorFallback(activeTools);
+                        ReasoningLevel reasoning =
+                            reasoningPolicy.fallback();
+                        log.warn(
+                            JarvisEvents.JEV_FALLBACK,
+                            JarvisFields.of(
+                                "requestId", request.requestId(),
+                                "reason", fallback.fallbackReason(),
+                                "fallbackRoute", fallback.category(),
+                                "fallbackReasoning", reasoning,
+                                "latencyMs", latency
+                            )
+                        );
+                        logPlanning(request, fallback, reasoning);
                         return new PlanningDecision(
-                            routePolicy.errorFallback(
-                                activeTools
-                            ),
-                            reasoningPolicy.fallback()
+                            fallback,
+                            reasoning
                         );
                     }
-                    return new PlanningDecision(
+
+                    log.debug(
+                        JarvisEvents.JEV_COMPLETED,
+                        JarvisFields.of(
+                            "requestId", request.requestId(),
+                            "route", classification.category(),
+                            "reasoning", classification.reasoning(),
+                            "engagement", classification.engagement(),
+                            "confidence", classification.confidence(),
+                            "latencyMs", latency
+                        )
+                    );
+                    DeterministicRoutePolicy.RoutingDecision routing =
                         routePolicy.route(
                             classification,
                             activeTools
-                        ),
-                        reasoningPolicy.resolve(
-                            classification
-                        )
+                        );
+                    ReasoningLevel reasoning =
+                        reasoningPolicy.resolve(classification);
+                    if (routing.fallbackActive()) {
+                        log.warn(
+                            JarvisEvents.JEV_FALLBACK,
+                            JarvisFields.of(
+                                "requestId", request.requestId(),
+                                "reason", routing.fallbackReason(),
+                                "fallbackRoute", routing.category(),
+                                "fallbackReasoning", reasoning,
+                                "latencyMs", latency
+                            )
+                        );
+                    }
+                    logPlanning(request, routing, reasoning);
+                    return new PlanningDecision(
+                        routing,
+                        reasoning
                     );
                 })
                 .thenCompose(
@@ -371,6 +478,9 @@ public final class EmbeddedBrain {
             assertRunning();
             assertSession(request.requesterUuid(), request.sessionId());
             budget.consumeModelRound(clock.instant());
+            int round = RequestBudget.MAX_MODEL_ROUNDS
+                - budget.remainingModelRounds()
+                - 1;
 
             DeterministicRoutePolicy.RoutingDecision effectiveRouting =
                 currentRouting(request, routing);
@@ -387,6 +497,7 @@ public final class EmbeddedBrain {
                 budget.deadlineAt()
             );
 
+            Instant lunaStarted = clock.instant();
             CompletionStage<LunaStep> model = withDeadline(
                 luna.next(input, effectiveRouting),
                 budget.deadlineAt(),
@@ -403,6 +514,19 @@ public final class EmbeddedBrain {
                     );
 
                     if (outcome.failure() != null) {
+                        log.warn(
+                            JarvisEvents.LUNA_FAILED,
+                            JarvisFields.of(
+                                "requestId", request.requestId(),
+                                "round", round,
+                                "errorCode", failureCode(
+                                    outcome.failure(),
+                                    "LUNA_FAILED",
+                                    "LUNA_TIMEOUT"
+                                ),
+                                "latencyMs", elapsedMillis(lunaStarted)
+                            )
+                        );
                         luna.clear(request.requestId());
                         history.append(
                             request.requesterUuid(),
@@ -423,6 +547,16 @@ public final class EmbeddedBrain {
 
                     LunaStep step = outcome.step();
                     if (step instanceof LunaStep.Final finalStep) {
+                        log.debug(
+                            JarvisEvents.LUNA_ROUND_COMPLETED,
+                            JarvisFields.of(
+                                "requestId", request.requestId(),
+                                "round", round,
+                                "kind", "FINAL",
+                                "toolCallCount", 0,
+                                "latencyMs", elapsedMillis(lunaStarted)
+                            )
+                        );
                         validateFinal(finalStep);
                         history.append(
                             request.requesterUuid(),
@@ -442,6 +576,16 @@ public final class EmbeddedBrain {
                     }
 
                     LunaStep.Tools tools = (LunaStep.Tools) step;
+                    log.debug(
+                        JarvisEvents.LUNA_ROUND_COMPLETED,
+                        JarvisFields.of(
+                            "requestId", request.requestId(),
+                            "round", round,
+                            "kind", "TOOL_CALLS",
+                            "toolCallCount", tools.calls().size(),
+                            "latencyMs", elapsedMillis(lunaStarted)
+                        )
+                    );
                     budget.consumeToolCalls(
                         tools.calls().size(),
                         clock.instant()
@@ -1153,6 +1297,54 @@ public final class EmbeddedBrain {
                 ? null
                 : routing.fallbackReason().name()
         );
+    }
+
+    private void logPlanning(
+        ChatRequest request,
+        DeterministicRoutePolicy.RoutingDecision routing,
+        ReasoningLevel reasoning
+    ) {
+        log.debug(
+            JarvisEvents.ROUTING_RESOLVED,
+            JarvisFields.of(
+                "requestId", request.requestId(),
+                "route", routing.category(),
+                "fallback", routing.fallbackActive(),
+                "availableTools", routing.availableTools().size()
+            )
+        );
+        log.debug(
+            JarvisEvents.REASONING_RESOLVED,
+            JarvisFields.of(
+                "requestId", request.requestId(),
+                "reasoning", reasoning
+            )
+        );
+    }
+
+    private long elapsedMillis(Instant startedAt) {
+        return Math.max(
+            0L,
+            Duration.between(startedAt, clock.instant()).toMillis()
+        );
+    }
+
+    private String failureCode(
+        Throwable failure,
+        String fallback,
+        String timeout
+    ) {
+        if (failure == null) {
+            return fallback;
+        }
+        Throwable cause = unwrap(failure);
+        if (
+            cause instanceof ProtocolException protocol
+                && protocol.code() == ErrorCode.TIMEOUT
+        ) {
+            return timeout;
+        }
+        return fallback;
     }
 
     private void validateFinal(LunaStep.Final step) {
