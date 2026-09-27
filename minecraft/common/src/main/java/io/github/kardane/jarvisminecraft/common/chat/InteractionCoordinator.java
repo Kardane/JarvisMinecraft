@@ -112,6 +112,14 @@ public final class InteractionCoordinator {
         );
     }
 
+    /**
+     * Returns the runtime-scoped configuration manager backing interaction policy.
+     * Composition roots must share this same instance with the Brain policies.
+     */
+    public ConfigManager configManager() {
+        return configManager;
+    }
+
     public boolean isAuthorized(PlayerIdentity player) {
         Objects.requireNonNull(player, "player");
         return audiencePolicy.allows(
