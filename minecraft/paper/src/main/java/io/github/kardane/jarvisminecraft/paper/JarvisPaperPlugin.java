@@ -9,6 +9,7 @@ import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
 import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationManager;
+import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationReloadService;
 import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
@@ -25,6 +26,7 @@ import io.github.kardane.jarvisminecraft.paper.platform.PaperServerScheduler;
 import io.github.kardane.jarvisminecraft.paper.integrations.IntegrationRegistry;
 import io.github.kardane.jarvisminecraft.paper.logging.PaperJarvisLog;
 import org.bukkit.Bukkit;
+import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.time.Clock;
@@ -39,6 +41,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
 
     private BrainGateway brain;
     private RuntimeConfigurationManager runtimeConfiguration;
+    private RuntimeConfigurationReloadService reloadService;
     private ConfigManager configManager;
     private ChatSessionManager sessions;
     private InteractionCoordinator interactions;
@@ -106,6 +109,10 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         }
 
         runtimeConfiguration = loadedRuntimeConfiguration;
+        reloadService =
+            new RuntimeConfigurationReloadService(
+                runtimeConfiguration
+            );
         configManager = loadedConfigManager;
         JarvisLog operationalLog = new ConfiguredJarvisLog(
             configManager,
@@ -171,21 +178,20 @@ public final class JarvisPaperPlugin extends JavaPlugin {
                         );
                         return true;
                     }
-                    RuntimeConfigurationManager.ReloadResult result =
-                        runtimeConfiguration.reload();
-                    if (result.success()) {
-                        sender.sendMessage(
-                            "[JARVIS] Configuration reloaded."
-                        );
-                        logReloadSuccess(result);
-                    } else {
-                        sender.sendMessage(
-                            "[JARVIS] Reload failed; previous configuration remains active."
-                        );
-                        getLogger().warning(
-                            "JARVIS configuration reload failed; previous configuration remains active."
-                        );
-                    }
+                    reloadService.reloadAsync()
+                        .whenComplete((result, failure) -> {
+                            if (!isEnabled()) {
+                                return;
+                            }
+                            getServer().getScheduler().runTask(
+                                this,
+                                () -> finishReload(
+                                    sender,
+                                    result,
+                                    failure
+                                )
+                            );
+                        });
                     return true;
                 }
                 sender.sendMessage("/jm <status|reload>");
@@ -235,8 +241,37 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             integrations = null;
         }
         interactions = null;
+        if (reloadService != null) {
+            reloadService.close();
+            reloadService = null;
+        }
         configManager = null;
         runtimeConfiguration = null;
+    }
+
+    private void finishReload(
+        CommandSender sender,
+        RuntimeConfigurationManager.ReloadResult result,
+        Throwable failure
+    ) {
+        if (
+            failure == null
+                && result != null
+                && result.success()
+        ) {
+            sender.sendMessage(
+                "[JARVIS] Configuration reloaded."
+            );
+            logReloadSuccess(result);
+            return;
+        }
+
+        sender.sendMessage(
+            "[JARVIS] Reload failed; previous configuration remains active."
+        );
+        getLogger().warning(
+            "JARVIS configuration reload failed; previous configuration remains active."
+        );
     }
 
     private void logReloadSuccess(
