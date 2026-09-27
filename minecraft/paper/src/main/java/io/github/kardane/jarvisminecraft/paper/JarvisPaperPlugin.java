@@ -4,11 +4,16 @@ import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainSettings;
 import io.github.kardane.jarvisminecraft.common.brain.PackagingSmoke;
+import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
+import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
+import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
+import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.paper.chat.PaperChatListener;
+import io.github.kardane.jarvisminecraft.paper.config.PaperJarvisConfigSource;
 import io.github.kardane.jarvisminecraft.paper.platform.BukkitPaperPlatformAccess;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperPlatformAccess;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperServerScheduler;
@@ -27,6 +32,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
     private static final String ADAPTER_VERSION = "0.1.0-dev";
 
     private BrainGateway brain;
+    private ConfigManager configManager;
     private ChatSessionManager sessions;
     private PaperPlatformAccess platform;
     private IntegrationRegistry integrations;
@@ -52,8 +58,10 @@ public final class JarvisPaperPlugin extends JavaPlugin {
 
         saveDefaultConfig();
 
+        final ConfigManager loadedConfigManager;
         final EmbeddedBrainSettings embeddedSettings;
         try {
+            loadedConfigManager = new ConfigManager(this::loadRuntimeConfig);
             embeddedSettings = EmbeddedBrainSettings.resolve(
                 setting(
                     "jarvis.serverId",
@@ -81,6 +89,8 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             getServer().getPluginManager().disablePlugin(this);
             return;
         }
+
+        configManager = loadedConfigManager;
 
         Clock clock = Clock.systemUTC();
         platform = new BukkitPaperPlatformAccess(getServer());
@@ -125,6 +135,11 @@ public final class JarvisPaperPlugin extends JavaPlugin {
 
         brain.start();
         getLogger().info(
+            "JARVIS Phase 1 runtime policy config validated "
+                + "(not yet applied to chat/tool policy): "
+                + JarvisConfigSummary.from(configManager.current()).toLogLine()
+        );
+        getLogger().info(
             "JARVIS Paper enabled for serverId="
                 + embeddedSettings.serverId()
                 + " with Embedded Brain."
@@ -141,6 +156,14 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             integrations.close();
             integrations = null;
         }
+        configManager = null;
+    }
+
+    private JarvisConfig loadRuntimeConfig() {
+        reloadConfig();
+        return JarvisConfigLoader.load(
+            new PaperJarvisConfigSource(getConfig())
+        );
     }
 
     private String setting(

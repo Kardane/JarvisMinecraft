@@ -50,7 +50,7 @@ public final class PropertiesJarvisConfigSource implements JarvisConfigSource {
 
     @Override
     public Optional<String> string(String path) {
-        return raw(path).map(String::trim);
+        return raw(path);
     }
 
     @Override

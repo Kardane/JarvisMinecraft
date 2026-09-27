@@ -4,6 +4,10 @@ import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainSettings;
 import io.github.kardane.jarvisminecraft.common.brain.PackagingSmoke;
+import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
+import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
+import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
+import io.github.kardane.jarvisminecraft.common.config.PropertiesJarvisConfigSource;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
@@ -82,8 +86,17 @@ public final class JarvisFabricMod implements ModInitializer {
             return;
         }
 
+        Path dataDirectory = Path.of("config", "jarvisminecraft");
+        Path runtimeConfigPath = dataDirectory.resolve("jarvis.properties");
+
+        final ConfigManager configManager;
         final EmbeddedBrainSettings embeddedSettings;
         try {
+            configManager = new ConfigManager(
+                () -> JarvisConfigLoader.load(
+                    PropertiesJarvisConfigSource.load(runtimeConfigPath)
+                )
+            );
             embeddedSettings = EmbeddedBrainSettings.resolve(
                 setting(
                     "jarvis.serverId",
@@ -100,10 +113,7 @@ public final class JarvisFabricMod implements ModInitializer {
                     "TYPESAFE_API_KEY",
                     ""
                 ),
-                Path.of(
-                    "config",
-                    "jarvisminecraft"
-                )
+                dataDirectory
             );
         } catch (RuntimeException failure) {
             LOGGER.log(
@@ -166,11 +176,17 @@ public final class JarvisFabricMod implements ModInitializer {
         RuntimeState next = new RuntimeState(
             server,
             brain,
-            chat
+            chat,
+            configManager
         );
         runtime = next;
         brain.start();
 
+        LOGGER.info(
+            "JARVIS Phase 1 runtime policy config validated "
+                + "(not yet applied to chat/tool policy): "
+                + JarvisConfigSummary.from(configManager.current()).toLogLine()
+        );
         LOGGER.info(
             "JARVIS Fabric enabled for serverId="
                 + embeddedSettings.serverId()
@@ -206,7 +222,8 @@ public final class JarvisFabricMod implements ModInitializer {
     private record RuntimeState(
         MinecraftServer server,
         BrainGateway brain,
-        FabricChatController chat
+        FabricChatController chat,
+        ConfigManager configManager
     ) {
         void close() {
             brain.stop();

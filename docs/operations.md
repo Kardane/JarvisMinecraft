@@ -28,14 +28,37 @@ Do not log provider keys, raw process environments, or complete configuration ob
 
 ## Platform configuration
 
+Phase 1 adds a validated, immutable runtime-policy snapshot. It is deliberately
+separate from provider credentials. The snapshot is loaded at platform startup,
+but its interaction/reasoning/execution/scheduling values are **not yet wired
+into the current v0.1 chat or Tool policy**. This preserves existing behavior
+until the corresponding later phases are implemented.
+
+A failed initial runtime-policy parse stops JARVIS startup. Future reloads use
+`ConfigManager` fail-safe replacement semantics: an invalid replacement does
+not overwrite the previous valid snapshot. The `/jm reload` command is not
+registered in Phase 1.
+
 ### Paper
 
-Paper's generated `config.yml` contains only:
+Paper's generated `config.yml` contains the existing provider-key
+fallbacks plus the non-secret `jarvis.*` runtime-policy tree.
+
+Provider-key fallback fields:
 
 - `openai-api-key`
 - `typesafe-api-key`
 
-The server ID is generated automatically unless the optional system-property/environment override is supplied.
+Runtime-policy groups:
+
+- `jarvis.interaction.*`
+- `jarvis.model.*`
+- `jarvis.response.*`
+- `jarvis.execution.*`
+- `jarvis.scheduling.*`
+
+The server ID is generated automatically unless the optional
+system-property/environment override is supplied.
 
 System properties/environment take precedence over plugin-config credentials:
 
@@ -48,11 +71,19 @@ Audit directory:
 
 ### Fabric / NeoForge
 
-Use system properties or environment:
+Use system properties or environment for identity/provider credentials:
 
 - `jarvis.serverId` / `JARVIS_SERVER_ID`
 - `jarvis.openaiApiKey` / `OPENAI_API_KEY`
 - `jarvis.typesafeApiKey` / `TYPESAFE_API_KEY`
+
+Optional runtime-policy file:
+
+`config/jarvisminecraft/jarvis.properties`
+
+If the file does not exist, the validated built-in defaults are used. A
+reference file is committed as `config/jarvis.properties.example`. List
+values in the properties format use `|` as the separator.
 
 Audit directory:
 
@@ -62,14 +93,15 @@ Audit directory:
 
 At platform startup JARVIS:
 
-1. validates server ID and provider credentials;
-2. builds the platform Tool registry;
-3. activates optional Paper Providers only when their dependencies/API discovery succeed;
-4. constructs `CommonRuntime`;
-5. constructs `ChatSessionManager`;
-6. constructs `EmbeddedBrainGateway` and `EmbeddedBrain`;
-7. constructs the Jev HTTP classifier, Luna client, AI scheduler and JSONL audit sink;
-8. starts accepting OP chat requests.
+1. loads and validates the Phase 1 runtime-policy snapshot;
+2. validates server ID and provider credentials;
+3. builds the platform Tool registry;
+4. activates optional Paper Providers only when their dependencies/API discovery succeed;
+5. constructs `CommonRuntime`;
+6. constructs `ChatSessionManager`;
+7. constructs `EmbeddedBrainGateway` and `EmbeddedBrain`;
+8. constructs the Jev HTTP classifier, Luna client, AI scheduler and JSONL audit sink;
+9. starts accepting OP chat requests.
 
 Configuration failure disables/stops JARVIS startup rather than falling back to a weaker policy.
 
@@ -167,7 +199,10 @@ Deterministic verification:
 ./gradlew build
 ```
 
-This includes the E12 Embedded policy parity/safety verification, T06/T07/T08 platform contract tests, existing Provider tests, and E16 deployable-artifact content verification.
+This includes the Phase 1 `JarvisConfig` validation/fail-safe reload
+verification, E12 Embedded policy parity/safety verification, T06/T07/T08
+platform contract tests, existing Provider tests, and E16 deployable-artifact
+content verification.
 
 CI also boots a clean Paper, Fabric, and NeoForge server with each packaged artifact and an E16 smoke flag. The smoke exits before provider credentials are required; normal production startup still requires both provider keys.
 

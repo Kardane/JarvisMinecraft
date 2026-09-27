@@ -1,2 +1,64 @@
+# Provider credentials. Environment/system-property values take precedence.
 openai-api-key: ""
 typesafe-api-key: ""
+
+# Phase 1 runtime policy configuration.
+# These values are loaded and validated now, but chat/tool policy wiring is
+# intentionally deferred to later phases so current v0.1 behavior is unchanged.
+jarvis:
+  interaction:
+    mode: PASSIVE
+    wake-words:
+      - "자비스"
+      - "jarvis"
+      - "재비스"
+    follow-up-seconds: 120
+
+    audience:
+      mode: OP
+      whitelist: []
+      blacklist: []
+
+    proactive:
+      context-messages: 12
+      cooldown-seconds: 15
+      confidence-threshold: 0.75
+
+  model:
+    name: "gpt-6-luna"
+    reasoning:
+      mode: AUTO
+      fallback: MEDIUM
+
+  response:
+    prefix: "[JARVIS] "
+    waiting-message:
+      enabled: true
+      threshold-ms: 1800
+      messages:
+        - "잠시만요."
+        - "확인해볼게요."
+        - "서버 상태를 살펴보고 있어요."
+
+    sound:
+      enabled: false
+      id: "minecraft:block.note_block.pling"
+      volume: 1.0
+      pitch: 1.0
+
+  execution:
+    mode: READ_TALK
+    actors: OP
+
+    lite:
+      allow-tools: []
+      deny-tools: []
+
+    full:
+      allow-tools: []
+      deny-tools: []
+
+  scheduling:
+    enabled: false
+    max-delay-seconds: 60
+    max-duration-seconds: 60

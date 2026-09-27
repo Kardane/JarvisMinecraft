@@ -27,7 +27,7 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 
 | 구성 요소 | 책임 |
 |---|---|
-| `minecraft/common` | `BrainGateway`, `EmbeddedBrain`, Jev/Luna client, route policy, conversation history, request budget/scheduler, audit, Tool argument validation, `CommonRuntime`, Tool registry, authority/deadline/deduplication |
+| `minecraft/common` | `BrainGateway`, `EmbeddedBrain`, Jev/Luna client, route policy, conversation history, request budget/scheduler, audit, runtime-policy config snapshot/validation, Tool argument validation, `CommonRuntime`, Tool registry, authority/deadline/deduplication |
 | `minecraft/paper` | Paper entrypoint, chat/session integration, scheduler/platform access, standard Tool, CoreProtect/WorldGuard/CMI optional Provider |
 | `minecraft/fabric` | Fabric dedicated-server entrypoint, chat controller, scheduler/platform access, standard Tool |
 | `minecraft/neoforge` | NeoForge dedicated-server entrypoint, chat controller, scheduler/platform access, tick sampler, standard Tool |
@@ -60,6 +60,26 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 - 상태 변경 결과가 deadline 안에 확정되지 않으면 `OUTCOME_UNKNOWN`이며 자동 retry하지 않는다.
 - deop/logout/session end 후 stale Tool 실행과 stale reply를 차단한다.
 - optional Provider가 성공적으로 활성화되지 않으면 그 Provider Tool은 Luna에 노출하지 않는다.
+
+## Runtime policy configuration
+
+Phase 1 introduces `JarvisConfig`, `JarvisConfigLoader`, and
+`ConfigManager` as a non-secret immutable runtime-policy snapshot. Paper
+adapts Bukkit YAML values through `PaperJarvisConfigSource`; Fabric and
+NeoForge read the optional
+`config/jarvisminecraft/jarvis.properties` file through the common
+properties source. Missing Fabric/NeoForge policy files use built-in defaults.
+
+The snapshot currently validates proposed interaction, reasoning, response,
+execution, and scheduling settings but does not yet alter v0.1 chat/session or
+Tool behavior. This separation is intentional: later phases can consume one
+validated configuration contract without weakening the current OP authority
+boundary during Phase 1.
+
+Provider credentials and logical server identity remain in
+`EmbeddedBrainSettings`; they are not copied into `JarvisConfig`.
+`ConfigManager.reload()` replaces the snapshot only after a complete
+successful parse, otherwise the previous valid snapshot remains active.
 
 ## Session과 conversation state
 
