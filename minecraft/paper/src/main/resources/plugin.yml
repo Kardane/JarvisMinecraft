@@ -5,3 +5,14 @@ api-version: '1.21'
 description: OP-gated AI operations assistant with public chat replies for Minecraft servers.
 authors: [Kardane]
 softdepend: [CMILib, CMI, CoreProtect, WorldEdit, WorldGuard]
+
+commands:
+  jm:
+    description: Shows JARVIS runtime status.
+    usage: /jm status
+    permission: jarvisminecraft.status
+
+permissions:
+  jarvisminecraft.status:
+    description: Allows viewing JARVIS runtime health and status.
+    default: op
