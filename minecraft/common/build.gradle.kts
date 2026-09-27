@@ -1,4 +1,6 @@
 import org.gradle.api.file.DuplicatesStrategy
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
+import org.gradle.jvm.tasks.Jar
 
 plugins {
     `java-library`
@@ -37,7 +39,9 @@ tasks.withType<JavaCompile>().configureEach {
     options.encoding = "UTF-8"
 }
 
-tasks.shadowJar {
+val relocatedShadowJar = tasks.named<ShadowJar>("shadowJar")
+
+relocatedShadowJar.configure {
     archiveClassifier.set("embedded")
     configurations = listOf(embeddedRuntime)
 
@@ -51,13 +55,25 @@ tasks.shadowJar {
 
     exclude("META-INF/*.SF", "META-INF/*.RSA", "META-INF/*.DSA")
 
+    // Kotlin reflection depends on canonical Kotlin packages and built-ins metadata.
+    // Keep Kotlin in its original package; relocate the remaining SDK dependencies.
+    relocate("kotlin", "kotlin") {
+        skipStringConstants = true
+    }
+    // OpenAI models rely on Kotlin metadata (@kotlin.Metadata) for Jackson reflection.
+    // Relocating com.openai breaks Kotlin reflection due to unresolved class names.
+    // Keep com.openai in its original package; isolate the third-party dependencies (Jackson, OkHttp, Okio).
+    relocate("com.openai", "com.openai") {
+        skipStringConstants = true
+    }
+
+
     enableAutoRelocation = true
-    relocationPrefix =
-        "io.github.kardane.jarvisminecraft.internal.shaded"
+    relocationPrefix = "io.github.kardane.jarvisminecraft.internal.shaded"
 }
 
 tasks.named("assemble") {
-    dependsOn(tasks.shadowJar)
+    dependsOn(relocatedShadowJar)
 }
 
 val embeddedBrainVerification by tasks.registering(JavaExec::class) {

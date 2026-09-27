@@ -130,13 +130,6 @@ public final class CommonRuntime {
                     );
                 }
 
-                if (!authority.isOnlineOperator(invocation.requesterUuid())) {
-                    throw new ProtocolException(
-                        ErrorCode.UNAUTHORIZED,
-                        "Requester is not a current online operator."
-                    );
-                }
-
                 ToolCallStart toolStart = toolCalls.begin(invocation.toolCallId());
                 if (toolStart.kind() == ToolCallStart.Kind.IN_FLIGHT) {
                     return completed(
@@ -193,11 +186,22 @@ public final class CommonRuntime {
                 CompletionStage<ToolResult> scheduled;
                 try {
                     scheduled = scheduler.submit(
-                        () -> registry.execute(
-                            tool,
-                            context,
-                            invocation.arguments()
-                        )
+                        () -> {
+                            if (!authority.isOnlineOperator(invocation.requesterUuid())) {
+                                return CompletableFuture.completedFuture(
+                                    error(
+                                        ErrorCode.UNAUTHORIZED,
+                                        "Requester is not a current online operator.",
+                                        false
+                                    )
+                                );
+                            }
+                            return registry.execute(
+                                tool,
+                                context,
+                                invocation.arguments()
+                            );
+                        }
                     );
                 } catch (RuntimeException failure) {
                     ToolResult result = error(

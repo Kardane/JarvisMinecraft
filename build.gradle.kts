@@ -45,12 +45,39 @@ fun verifyE16Artifact(
 
         val shadedPrefix =
             "io/github/kardane/jarvisminecraft/internal/shaded/"
+        val requiredKotlinBuiltins = listOf(
+            "kotlin/annotation/annotation.kotlin_builtins",
+            "kotlin/collections/collections.kotlin_builtins",
+            "kotlin/coroutines/coroutines.kotlin_builtins",
+            "kotlin/internal/internal.kotlin_builtins",
+            "kotlin/kotlin.kotlin_builtins",
+            "kotlin/ranges/ranges.kotlin_builtins",
+            "kotlin/reflect/reflect.kotlin_builtins"
+        )
+        check(requiredKotlinBuiltins.all(names::contains)) {
+            "E16 $platform artifact is missing Kotlin reflection built-ins resources."
+        }
+        check(listOf(
+            "kotlin/Metadata.class",
+            "kotlin/jvm/internal/Intrinsics.class",
+            "kotlin/reflect/jvm/internal/KClassImpl.class"
+        ).all(names::contains)) {
+            "E16 $platform artifact is missing the canonical Kotlin runtime classes."
+        }
+
         check(
             names.any {
+                it.startsWith("com/openai/")
+            }
+        ) {
+            "E16 $platform artifact does not contain canonical OpenAI SDK classes."
+        }
+        check(
+            names.none {
                 it.startsWith(shadedPrefix + "com/openai/")
             }
         ) {
-            "E16 $platform artifact does not contain relocated OpenAI SDK classes."
+            "E16 $platform artifact unexpectedly relocated OpenAI SDK classes."
         }
         check(
             names.any {
@@ -68,19 +95,35 @@ fun verifyE16Artifact(
         }
 
         val forbiddenPrefixes = listOf(
-            "com/openai/",
             "com/fasterxml/jackson/",
             "okhttp3/",
             "okio/",
-            "kotlin/",
             "com/google/gson/"
         )
-        check(
-            names.none { name ->
-                forbiddenPrefixes.any(name::startsWith)
-            }
-        ) {
+        val unrelocatedSdkEntries = names
+            .map { it.replace(Regex("^META-INF/versions/[^/]+/"), "") }
+        check(unrelocatedSdkEntries.none { name ->
+            forbiddenPrefixes.any(name::startsWith)
+        }) {
             "E16 $platform artifact contains unrelocated SDK/Gson classes."
+        }
+
+        val builtinsProtocolName =
+            "kotlin/reflect/jvm/internal/impl/serialization/deserialization/builtins/BuiltInSerializerProtocol.class"
+        val builtinsProtocol = zip.getEntry(builtinsProtocolName)
+        check(builtinsProtocol != null) {
+            "E16 $platform artifact is missing the relocated Kotlin built-ins loader."
+        }
+        val builtinsProtocolBytes = zip.getInputStream(builtinsProtocol).use {
+            String(it.readBytes(), Charsets.ISO_8859_1)
+        }
+        check(".kotlin_builtins" in builtinsProtocolBytes) {
+            "E16 $platform artifact's Kotlin built-ins resource suffix is unexpected."
+        }
+        check(names.none { name ->
+            name.startsWith(shadedPrefix + "kotlin/") && name.endsWith(".class")
+        }) {
+            "E16 $platform artifact unexpectedly relocated Kotlin runtime classes."
         }
 
         check(

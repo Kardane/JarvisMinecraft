@@ -22,6 +22,7 @@ import java.util.concurrent.CompletionStage;
 
 import static io.github.kardane.jarvisminecraft.common.brain.BrainAsync.elapsedMillis;
 import static io.github.kardane.jarvisminecraft.common.brain.BrainAsync.failureCode;
+import static io.github.kardane.jarvisminecraft.common.brain.BrainAsync.unwrap;
 import static io.github.kardane.jarvisminecraft.common.brain.BrainAsync.withDeadline;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ErrorCode;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
@@ -144,6 +145,8 @@ final class ModelConversationLoop {
         );
 
         if (outcome.failure() != null) {
+            Throwable cause = unwrap(outcome.failure());
+            String errorMessage = cause.getMessage() != null ? cause.getMessage() : cause.toString();
             log.warn(
                 JarvisEvents.LUNA_FAILED,
                 JarvisFields.of(
@@ -154,6 +157,8 @@ final class ModelConversationLoop {
                         "LUNA_FAILED",
                         "LUNA_TIMEOUT"
                     ),
+                    "errorClass", cause.getClass().getSimpleName(),
+                    "errorDetail", errorMessage,
                     "latencyMs", elapsedMillis(
                         lunaStarted,
                         clock
