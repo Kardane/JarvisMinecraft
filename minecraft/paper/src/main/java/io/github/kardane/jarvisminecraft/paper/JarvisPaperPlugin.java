@@ -8,6 +8,7 @@ import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
+import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationManager;
 import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
@@ -37,6 +38,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
     private static final String ADAPTER_VERSION = "0.1.0-dev";
 
     private BrainGateway brain;
+    private RuntimeConfigurationManager runtimeConfiguration;
     private ConfigManager configManager;
     private ChatSessionManager sessions;
     private InteractionCoordinator interactions;
@@ -64,10 +66,17 @@ public final class JarvisPaperPlugin extends JavaPlugin {
 
         saveDefaultConfig();
 
+        final RuntimeConfigurationManager loadedRuntimeConfiguration;
         final ConfigManager loadedConfigManager;
         final EmbeddedBrainSettings embeddedSettings;
         try {
-            loadedConfigManager = new ConfigManager(this::loadRuntimeConfig);
+            loadedRuntimeConfiguration =
+                new RuntimeConfigurationManager(
+                    getDataFolder().toPath(),
+                    this::loadRuntimeConfig
+                );
+            loadedConfigManager =
+                loadedRuntimeConfiguration.configManager();
             embeddedSettings = EmbeddedBrainSettings.resolve(
                 setting(
                     "jarvis.serverId",
@@ -96,6 +105,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             return;
         }
 
+        runtimeConfiguration = loadedRuntimeConfiguration;
         configManager = loadedConfigManager;
         JarvisLog operationalLog = new ConfiguredJarvisLog(
             configManager,
@@ -129,7 +139,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             embeddedSettings.auditDirectory(),
             sessions,
             interactions,
-            configManager,
+            runtimeConfiguration,
             registry,
             commonRuntime,
             serverScheduler,
@@ -194,6 +204,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         }
         interactions = null;
         configManager = null;
+        runtimeConfiguration = null;
     }
 
     private JarvisConfig loadRuntimeConfig() {
