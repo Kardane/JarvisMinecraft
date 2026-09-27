@@ -179,19 +179,20 @@ public final class JarvisPaperPlugin extends JavaPlugin {
                         return true;
                     }
                     reloadService.reloadAsync()
-                        .whenComplete((result, failure) -> {
-                            if (!isEnabled()) {
-                                return;
-                            }
-                            getServer().getScheduler().runTask(
-                                this,
-                                () -> finishReload(
-                                    sender,
-                                    result,
-                                    failure
-                                )
-                            );
-                        });
+                        .whenComplete((result, failure) ->
+                            serverScheduler.submit(() -> {
+                                if (isEnabled()) {
+                                    finishReload(
+                                        sender,
+                                        result,
+                                        failure
+                                    );
+                                }
+                                return java.util.concurrent.CompletableFuture.completedFuture(
+                                    null
+                                );
+                            })
+                        );
                     return true;
                 }
                 sender.sendMessage("/jm <status|reload>");
