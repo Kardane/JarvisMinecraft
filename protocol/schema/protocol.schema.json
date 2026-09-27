@@ -1179,6 +1179,38 @@
           ],
           "properties": {
             "tool": {
+              "const": "schedule_action"
+            },
+            "arguments": {
+              "$ref": "#/$defs/scheduleActionArguments"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tool",
+            "arguments"
+          ],
+          "properties": {
+            "tool": {
+              "const": "cancel_scheduled_action"
+            },
+            "arguments": {
+              "$ref": "#/$defs/cancelScheduledActionArguments"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tool",
+            "arguments"
+          ],
+          "properties": {
+            "tool": {
               "const": "lookup_area_history"
             },
             "arguments": {
@@ -2269,6 +2301,226 @@
           ],
           "properties": {
             "tool": {
+              "const": "schedule_action"
+            },
+            "result": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "data",
+                "error",
+                "observedAt",
+                "source",
+                "truncated"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "OK",
+                    "EMPTY",
+                    "ERROR",
+                    "UNSUPPORTED"
+                  ]
+                },
+                "data": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/scheduledActionData"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "error": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/errorObject"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "observedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "truncated": {
+                  "type": "boolean"
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "ERROR",
+                          "UNSUPPORTED"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "data": {
+                        "type": "null"
+                      },
+                      "error": {
+                        "$ref": "#/$defs/errorObject"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "OK",
+                          "EMPTY"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "error": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tool",
+            "result"
+          ],
+          "properties": {
+            "tool": {
+              "const": "cancel_scheduled_action"
+            },
+            "result": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "data",
+                "error",
+                "observedAt",
+                "source",
+                "truncated"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "OK",
+                    "EMPTY",
+                    "ERROR",
+                    "UNSUPPORTED"
+                  ]
+                },
+                "data": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/cancelScheduledActionData"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "error": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/errorObject"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "observedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "truncated": {
+                  "type": "boolean"
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "ERROR",
+                          "UNSUPPORTED"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "data": {
+                        "type": "null"
+                      },
+                      "error": {
+                        "$ref": "#/$defs/errorObject"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "OK",
+                          "EMPTY"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "error": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tool",
+            "result"
+          ],
+          "properties": {
+            "tool": {
               "const": "lookup_area_history"
             },
             "result": {
@@ -3078,6 +3330,8 @@
                       "teleport_staff",
                       "weather_set",
                       "time_set",
+                      "cancel_scheduled_action",
+                      "schedule_action",
                       "lookup_area_history",
                       "lookup_player_history",
                       "get_regions_at_location",
@@ -3332,7 +3586,9 @@
                     "enum": [
                       "teleport_staff",
                       "weather_set",
-                      "time_set"
+                      "time_set",
+                      "schedule_action",
+                      "cancel_scheduled_action"
                     ]
                   }
                 }
@@ -3424,7 +3680,9 @@
                     "enum": [
                       "teleport_staff",
                       "weather_set",
-                      "time_set"
+                      "time_set",
+                      "schedule_action",
+                      "cancel_scheduled_action"
                     ]
                   }
                 }
@@ -3740,6 +3998,224 @@
           "maximum": 23999
         },
         "completed": {
+          "const": true
+        }
+      }
+    },
+    "scheduleActionArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tool",
+        "arguments",
+        "delaySeconds",
+        "intervalSeconds",
+        "durationSeconds"
+      ],
+      "properties": {
+        "tool": {
+          "enum": [
+            "teleport_staff",
+            "weather_set",
+            "time_set"
+          ]
+        },
+        "arguments": {
+          "type": "object"
+        },
+        "delaySeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        },
+        "intervalSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 60
+        },
+        "durationSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 60
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "tool": {
+                "const": "teleport_staff"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/teleportArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tool": {
+                "const": "weather_set"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/weatherSetArguments"
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "tool": {
+                "const": "time_set"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "arguments": {
+                "$ref": "#/$defs/timeSetArguments"
+              }
+            }
+          }
+        },
+        {
+          "oneOf": [
+            {
+              "properties": {
+                "intervalSeconds": {
+                  "type": "null"
+                },
+                "durationSeconds": {
+                  "type": "null"
+                }
+              }
+            },
+            {
+              "properties": {
+                "intervalSeconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 60
+                },
+                "durationSeconds": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 60
+                }
+              }
+            }
+          ]
+        }
+      ]
+    },
+    "cancelScheduledActionArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scheduleId"
+      ],
+      "properties": {
+        "scheduleId": {
+          "type": "string",
+          "format": "uuid"
+        }
+      }
+    },
+    "scheduledActionData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scheduleId",
+        "tool",
+        "delaySeconds",
+        "intervalSeconds",
+        "durationSeconds",
+        "firstRunAt",
+        "expiresAt",
+        "accepted"
+      ],
+      "properties": {
+        "scheduleId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "tool": {
+          "enum": [
+            "teleport_staff",
+            "weather_set",
+            "time_set"
+          ]
+        },
+        "delaySeconds": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 60
+        },
+        "intervalSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 60
+        },
+        "durationSeconds": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 1,
+          "maximum": 60
+        },
+        "firstRunAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "expiresAt": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "accepted": {
+          "const": true
+        }
+      }
+    },
+    "cancelScheduledActionData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "scheduleId",
+        "cancelled"
+      ],
+      "properties": {
+        "scheduleId": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "cancelled": {
           "const": true
         }
       }

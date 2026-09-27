@@ -39,7 +39,11 @@
     "tool-request-weather-set.json",
     "tool-request-time-set.json",
     "tool-result-weather-set.json",
-    "tool-result-time-set.json"
+    "tool-result-time-set.json",
+    "tool-request-schedule-weather.json",
+    "tool-result-schedule-weather.json",
+    "tool-request-cancel-schedule.json",
+    "tool-result-cancel-schedule.json"
   ],
   "invalid": [
     {
@@ -89,6 +93,14 @@
     {
       "file": "time-set-out-of-range.json",
       "reason": "time_set timeOfDay is limited to 0 through 23999."
+    },
+    {
+      "file": "schedule-missing-action-id.json",
+      "reason": "State-changing schedule_action requires actionId."
+    },
+    {
+      "file": "schedule-duration-too-large.json",
+      "reason": "Repeating schedule duration is capped at 60 seconds."
     }
   ]
 }
