@@ -1,34 +1,34 @@
-# T05 model evaluation assets
+# T05 Model Evaluation Assets
 
-E14에서 TypeScript/Node production Brain이 제거되면서 Node 기반 T05 runner도 제거했다. 평가 데이터와 기존 evidence는 보존한다.
+When the TypeScript/Node production Brain was removed in E14, the Node-based T05 runner was removed as well. The evaluation datasets and existing evidence are retained.
 
-## Jev Korean routing set
+## Jev Korean Routing Set
 
-`jev-korean-cases.jsonl`에는 기존 200-case Korean Jev routing dataset이 남아 있다. 다음을 포함한다.
+`jev-korean-cases.jsonl` retains the existing 200-case Korean Jev routing dataset. It includes:
 
-- 8 routing label
+- 8 routing labels
 - development / holdout split
-- 존댓말/반말
-- typo
+- honorific / casual speech
+- typos
 - negation
-- pronoun
-- compound request
+- pronouns
+- compound requests
 - general conversation
-- hostile/prompt-injection strings
+- hostile / prompt-injection strings
 
-이 데이터는 향후 Java Jev evaluation runner를 추가할 때 그대로 재사용한다.
+Reuse this dataset unchanged if a Java Jev evaluation runner is added in the future.
 
-## 현재 live model 검증
+## Current Live-Model Verification
 
-Embedded Java 경로의 live provider smoke는 다음 Gradle task가 담당한다.
+The Embedded Java path uses this Gradle task for live Provider smoke testing:
 
 ```bash
 OPENAI_API_KEY=... TYPESAFE_API_KEY=... \
   ./gradlew :minecraft:common:embeddedBrainLiveVerification
 ```
 
-E11 verification은 실제 Jev와 Luna provider 호출을 검증한다. Minecraft platform E2E와 model live smoke는 서로 다른 evidence 층위다.
+E11 verification exercises real Jev and Luna Provider calls. Minecraft platform E2E and live-model smoke tests are separate evidence layers.
 
-## E12 parity
+## E12 Parity
 
-`evals/embedded-policy-parity.json`은 E12에서 확정한 shared policy fixture다. Node reference 삭제 후에도 Java parity regression input으로 계속 유지한다.
+`evals/embedded-policy-parity.json` is the shared policy fixture finalized in E12. It remains the Java parity-regression input after removal of the Node reference implementation.
