@@ -7,6 +7,7 @@ import io.github.kardane.jarvisminecraft.common.brain.PackagingSmoke;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
+import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationManager;
 import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
@@ -125,14 +126,21 @@ public final class JarvisFabricMod implements ModInitializer {
         Path dataDirectory = Path.of("config", "jarvisminecraft");
         Path runtimeConfigPath = dataDirectory.resolve("jarvis.properties");
 
+        final RuntimeConfigurationManager runtimeConfiguration;
         final ConfigManager configManager;
         final EmbeddedBrainSettings embeddedSettings;
         try {
-            configManager = new ConfigManager(
-                () -> JarvisConfigLoader.load(
-                    PropertiesJarvisConfigSource.load(runtimeConfigPath)
-                )
-            );
+            runtimeConfiguration =
+                new RuntimeConfigurationManager(
+                    dataDirectory,
+                    () -> JarvisConfigLoader.load(
+                        PropertiesJarvisConfigSource.load(
+                            runtimeConfigPath
+                        )
+                    )
+                );
+            configManager =
+                runtimeConfiguration.configManager();
             embeddedSettings = EmbeddedBrainSettings.resolve(
                 setting(
                     "jarvis.serverId",
@@ -194,7 +202,7 @@ public final class JarvisFabricMod implements ModInitializer {
             embeddedSettings.auditDirectory(),
             sessions,
             interactions,
-            configManager,
+            runtimeConfiguration,
             registry,
             commonRuntime,
             serverScheduler,
@@ -222,6 +230,7 @@ public final class JarvisFabricMod implements ModInitializer {
             server,
             brain,
             chat,
+            runtimeConfiguration,
             configManager
         );
         runtime = next;
@@ -268,6 +277,7 @@ public final class JarvisFabricMod implements ModInitializer {
         MinecraftServer server,
         BrainGateway brain,
         FabricChatController chat,
+        RuntimeConfigurationManager runtimeConfiguration,
         ConfigManager configManager
     ) {
         void close() {
