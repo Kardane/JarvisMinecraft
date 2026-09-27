@@ -92,15 +92,9 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 sessions,
                 new ConfigManager(JarvisConfig::defaults)
             ),
-            new ConfigManager(JarvisConfig::defaults),
-            new ProgressNotifier(),
             platform,
             serverScheduler,
-            clock,
-            null,
-            null,
-            null,
-            NoOpJarvisLog.INSTANCE
+            clock
         );
     }
 
@@ -116,7 +110,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             brain,
             sessions,
             interactions,
-            new ConfigManager(JarvisConfig::defaults),
+            interactions.configManager(),
             new ProgressNotifier(),
             platform,
             serverScheduler,
@@ -152,6 +146,11 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             configManager,
             "configManager"
         );
+        if (this.interactions.configManager() != this.configManager) {
+            throw new IllegalArgumentException(
+                "InteractionCoordinator and EmbeddedBrainGateway must share the same ConfigManager instance."
+            );
+        }
         this.progressNotifier = Objects.requireNonNull(
             progressNotifier,
             "progressNotifier"
@@ -222,7 +221,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             auditDirectory,
             sessions,
             interactions,
-            new ConfigManager(JarvisConfig::defaults),
+            interactions.configManager(),
             registry,
             commonRuntime,
             serverScheduler,
@@ -280,7 +279,13 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         Clock clock,
         JarvisLog log
     ) {
+        Objects.requireNonNull(interactions, "interactions");
         Objects.requireNonNull(configManager, "configManager");
+        if (interactions.configManager() != configManager) {
+            throw new IllegalArgumentException(
+                "InteractionCoordinator and Embedded Brain policies must share the same ConfigManager instance."
+            );
+        }
         Objects.requireNonNull(log, "log");
         Objects.requireNonNull(registry, "registry");
         Objects.requireNonNull(commonRuntime, "commonRuntime");
