@@ -5,11 +5,11 @@
 
 ## 현재 구조
 
-JARVIS는 별도 Node/Brain daemon 없이 Minecraft 서버 JVM 안에서 동작한다. 접속 중인 OP의 채팅 입력은 플랫폼 Adapter가 권한을 확인한 뒤 `EmbeddedBrainGateway`로 전달한다. Embedded Brain은 Jev 분류, deterministic Tool narrowing, GPT-6 Luna Tool loop, 감사, 예산과 queue를 JVM 내부에서 수행한다.
+JARVIS는 별도 Node/Brain daemon 없이 Minecraft 서버 JVM 안에서 동작한다. 플랫폼 Adapter는 현재 온라인 플레이어 identity를 구성하고 `InteractionCoordinator`의 audience/호출어/session 정책을 통과한 입력만 `EmbeddedBrainGateway`로 전달한다. Embedded Brain은 Jev 분류, deterministic Tool narrowing, GPT-6 Luna Tool loop, 감사, 예산과 queue를 JVM 내부에서 수행한다. Minecraft Tool 권한은 interaction audience와 분리되어 있으며 현재는 online OP에게만 노출된다.
 
 ```mermaid
 flowchart LR
-  OP["접속 중인 OP"] --> AD["Minecraft Adapter"]
+  P["설정상 허용된 온라인 플레이어"] --> AD["Minecraft Adapter / InteractionCoordinator"]
   AD --> EB["EmbeddedBrainGateway / EmbeddedBrain"]
   EB --> JV["TypeSafe Jev HTTPS"]
   EB --> GPT["OpenAI GPT-6 Luna"]
@@ -18,7 +18,7 @@ flowchart LR
   API --> CR
   CR --> EB
   EB --> AD
-  AD --> OP
+  AD --> P
 ```
 
 WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong, reconnect generation, 별도 Brain process registry는 E13/E14에서 제거되었다.
@@ -37,8 +37,8 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 
 ## 요청 흐름
 
-1. 플랫폼 Adapter가 현재 플레이어가 online OP인지 확인하고 `ChatSessionManager`에서 직접 호출/후속 대화/session 종료를 판정한다.
-2. `EmbeddedBrainGateway`가 request를 생성해 bounded `AiRequestScheduler`로 넘긴다.
+1. 플랫폼 Adapter가 현재 온라인 플레이어 identity를 만들고 `InteractionCoordinator`가 `OP / WHITELIST / ALL / BLACKLIST` audience, configurable wake word, active session, 종료/escape를 판정한다.
+2. `EmbeddedBrainGateway`가 현재 identity와 interaction authorization을 다시 확인하고 request를 생성해 bounded `AiRequestScheduler`로 넘긴다. requester가 현재 OP가 아니면 request의 Tool set은 빈 집합으로 고정된다.
 3. Jev가 latest message, short topic, capability 이름만 받아 category를 분류한다.
 4. `DeterministicRoutePolicy`가 active Tool set을 category에 맞게 좁힌다. Jev 오류, `UNCERTAIN`, 저신뢰 fallback에서는 read-only Tool만 노출한다.
 5. Luna는 허용된 Tool schema만 보고 Tool call을 제안한다.
@@ -46,11 +46,11 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 7. 상태 변경 Tool은 pre-execution audit 성공 후에만 `CommonRuntime.ExecutionRuntime`으로 전달된다.
 8. `CommonRuntime`이 current OP, active Tool, deadline, deduplication/action semantics를 재검사하고 플랫폼 scheduler에서 실제 Minecraft/Provider API를 호출한다.
 9. Tool result를 Luna가 해석해 최종 답을 만든다.
-10. `EmbeddedBrainGateway`는 server thread로 돌아가 current online OP와 active session을 다시 확인한 뒤 요청자에게만 응답한다.
+10. `EmbeddedBrainGateway`는 server thread로 돌아가 현재 interaction authorization과 active session을 다시 확인한 뒤 응답을 public chat으로 broadcast한다.
 
 ## 권한과 안전 불변조건
 
-- 권한의 source of truth는 Minecraft 서버의 현재 online + OP 상태다.
+- interaction admission의 source of truth는 현재 online identity + `AudiencePolicy`다. Minecraft Tool authority의 source of truth는 계속 현재 online + OP 상태다.
 - Jev/Luna 출력, requester UUID 문자열, capability 이름은 권한 증거가 아니다.
 - Tool은 현재 `ToolRegistry`에 실제 등록된 경우에만 활성화된다.
 - unknown/missing Tool argument field, 잘못된 UUID/range/selector는 거부한다.
@@ -58,23 +58,26 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 - request당 Tool 최대 8회, 모델 왕복 최대 4회, 전체 deadline 30초를 유지한다.
 - 상태 변경 Tool은 audit fail-closed다.
 - 상태 변경 결과가 deadline 안에 확정되지 않으면 `OUTCOME_UNKNOWN`이며 자동 retry하지 않는다.
-- deop/logout/session end 후 stale Tool 실행과 stale reply를 차단한다.
+- audience 탈락/deop/logout/session end 후 stale reply를 차단한다. Tool 실행은 별도로 current OP를 재확인한다.
 - optional Provider가 성공적으로 활성화되지 않으면 그 Provider Tool은 Luna에 노출하지 않는다.
 
 ## Runtime policy configuration
 
-Phase 1 introduces `JarvisConfig`, `JarvisConfigLoader`, and
+Phase 1 introduced `JarvisConfig`, `JarvisConfigLoader`, and
 `ConfigManager` as a non-secret immutable runtime-policy snapshot. Paper
 adapts Bukkit YAML values through `PaperJarvisConfigSource`; Fabric and
 NeoForge read the optional
 `config/jarvisminecraft/jarvis.properties` file through the common
 properties source. Missing Fabric/NeoForge policy files use built-in defaults.
 
-The snapshot currently validates proposed interaction, reasoning, response,
-execution, and scheduling settings but does not yet alter v0.1 chat/session or
-Tool behavior. This separation is intentional: later phases can consume one
-validated configuration contract without weakening the current OP authority
-boundary during Phase 1.
+Phase 2 now consumes the interaction portion of that snapshot through
+`InteractionCoordinator`, `AudiencePolicy`, and `InvocationMatcher`.
+Wake words, follow-up TTL, and `OP / WHITELIST / ALL / BLACKLIST` admission
+are live. `ACTIVE` currently retains the same direct-invocation/follow-up
+path as `PASSIVE`; proactive ambient-chat initiation remains a later phase.
+
+Reasoning, response styling/sound, execution-mode Tool filtering, scheduling,
+and admin reload commands are still not wired.
 
 Provider credentials and logical server identity remain in
 `EmbeddedBrainSettings`; they are not copied into `JarvisConfig`.
@@ -85,7 +88,9 @@ successful parse, otherwise the previous valid snapshot remains active.
 
 `ChatSessionManager`가 session ID, TTL, active 여부, 종료와 invalidation을 단독 소유한다. Embedded Brain은 별도의 session TTL store를 만들지 않고 `ConversationHistoryStore`에 모델 대화 이력만 보관한다.
 
-기본 session TTL은 120초다. 직접 호출어는 `자비스`, `jarvis`, `재비스`이며, `대화 끝`과 `!내용`은 Adapter에서 로컬 처리한다.
+기본 session TTL은 120초지만 `jarvis.interaction.follow-up-seconds`로 변경할 수 있다. 직접 호출어 기본값은 `자비스`, `jarvis`, `재비스`이며 `jarvis.interaction.wake-words`로 교체할 수 있다. 호출어는 메시지 시작의 독립 토큰으로만 인정한다. `대화 끝`과 `!내용`은 모델 호출 전에 로컬 처리한다.
+
+`WHITELIST`와 `BLACKLIST`는 현재 접속 플레이어의 정확한 profile name을 대소문자 무시 비교한다. audience에서 허용된 비OP는 일반 Luna 대화는 가능하지만 request 단위 `toolsAllowed=false`가 적용되어 Minecraft Tool schema를 받지 않는다.
 
 ## Tool 경계
 

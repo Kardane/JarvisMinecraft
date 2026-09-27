@@ -114,22 +114,31 @@ History/Region 조회는 v0.1.1 Tool catalog에 추가한다. 이력 기본 범�
 - 감사 필드: timestamp, serverId, requesterUuid, requestId, toolCallId/actionId, tool, risk, 검증된 인자 요약, outcome, source, latency, 모델 ID, fallback 사유. 비밀·전체 프롬프트는 저장하지 않는다.
 - v0.1 감사는 비동기 회전 JSONL, 기본 7일/총 100MiB. 변경 실행은 pre-execution 감사 기록을 안전하게 큐/저장할 수 없으면 거부한다. 큐 포화·디스크 오류를 무시하지 않고 health에 표시한다.
 
-### 3.6 후속 runtime policy foundation
+### 3.6 후속 runtime policy Phase 1-2
 
-후속 interaction/execution 확장을 위한 Phase 1에서는 비밀이 아닌 runtime-policy
-설정의 immutable snapshot, strict validation, fail-safe reload 기반만 먼저 추가할
-수 있다. 이 기반 자체는 v0.1 권한·채팅·Tool 동작을 변경하지 않는다.
+Phase 1은 비밀이 아닌 runtime-policy의 immutable snapshot, strict validation,
+fail-safe reload 기반을 추가했다. Phase 2는 그중 interaction policy를 실제
+chat admission/session 경로에 연결한다.
 
-- `PASSIVE/ACTIVE`, `OP/WHITELIST/ALL/BLACKLIST` 값은 후속 interaction
-  단계의 설정 vocabulary로만 적재한다. Phase 2 계약·검증이 완료되기 전에는
-  admission에 적용하지 않으며 현재 online OP-only 경계를 유지한다.
+- 기본 audience는 계속 `OP`다. 운영자가 명시적으로 설정하면
+  `WHITELIST / ALL / BLACKLIST`가 새 JARVIS 대화 진입과 기존 session 유지
+  여부에 적용된다.
+- whitelist/blacklist 항목은 현재 접속 플레이어의 profile name과 정확히
+  비교하며 영문 대소문자는 무시한다.
+- 호출어와 follow-up TTL은 config에서 읽는다. 직접 호출은 새 session을
+  시작하고, 활성 session의 follow-up은 호출어 없이 수락한다.
+- `ACTIVE`는 Phase 2에서 direct/follow-up admission만 공유한다. 공개 채팅
+  흐름을 Jev로 관찰해 스스로 발화하는 proactive 동작은 별도 단계 전까지
+  수행하지 않는다.
+- interaction audience와 Minecraft Tool authority는 분리한다. audience에 의해
+  허용된 비OP request는 Luna 대화는 가능하지만 Tool set을 빈 집합으로
+  고정한다. `CommonRuntime`의 current online OP 검사는 그대로 유지한다.
 - reasoning 설정은 후속 Jev/reasoning 단계가 연결되기 전에는 현재 Luna 호출
   정책을 변경하지 않는다. 모델 이름은 계속 `gpt-6-luna`로 고정한다.
 - `READ_TALK/EXECUTE_LITE/EXECUTE` 값은 후속 ExecutionPolicy 단계가
-  연결되기 전에는 현재 Tool 노출을 변경하지 않는다. raw console command,
-  SQL, code execution을 허용하는 의미로 해석하지 않는다.
-- scheduling 설정은 foundation에서 기본 비활성이고 실제 예약 실행 경로를
-  만들지 않는다. 별도 scheduler/authority 재검증 계약 이후에만 활성화한다.
+  연결되기 전에는 Tool 범위를 넓히지 않는다. raw console command, SQL,
+  code execution을 허용하는 의미로 해석하지 않는다.
+- scheduling 설정은 기본 비활성이고 실제 예약 실행 경로를 만들지 않는다.
 - `docs/later-todo.md`의 `ADMIN` 아이디어는 현재 승인된 runtime contract가
   아니다. 서버 파일 생성·수정·삭제는 별도 Work Spec/Tool 계약과 안전성
   검토가 선행되기 전까지 구현하거나 config enum으로 활성화하지 않는다.

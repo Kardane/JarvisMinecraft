@@ -88,9 +88,9 @@ public record JarvisConfig(
     }
 
     /**
-     * Phase 1 keeps the current v0.1 authority boundary: only online OPs may
-     * execute state-changing work. Additional actor modes require a later
-     * contract change and are intentionally not accepted yet.
+     * Interaction audience expansion does not change Tool authority: only
+     * online OPs may receive Minecraft Tools in the current runtime. Additional
+     * execution actor modes require a later contract change.
      */
     public enum ExecutionActors {
         OP

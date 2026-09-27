@@ -197,7 +197,12 @@ public final class JarvisPaperPlugin extends JavaPlugin {
     }
 
     private void sweepSessions() {
-        if (sessions == null || brain == null || platform == null) {
+        if (
+            sessions == null
+                || interactions == null
+                || brain == null
+                || platform == null
+        ) {
             return;
         }
 

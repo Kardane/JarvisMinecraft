@@ -4,7 +4,7 @@
 
 JARVIS now runs the Brain inside the Minecraft server JVM. There is no Node.js Brain daemon, WebSocket listener, shared-secret handshake, or reconnect process to operate.
 
-JARVIS access remains OP-only, while accepted invocations, follow-up messages, session notices, and replies are visible to all online players in server chat. Only the requesting OP's JARVIS messages are sent to the Brain.
+JARVIS interaction access is configurable through `OP / WHITELIST / ALL / BLACKLIST`; the default remains `OP`. Accepted invocations, follow-up messages, session notices, and replies remain visible to all online players in server chat. Minecraft Tool access remains OP-only even when a broader interaction audience is configured.
 
 ## Required secrets
 
@@ -28,16 +28,23 @@ Do not log provider keys, raw process environments, or complete configuration ob
 
 ## Platform configuration
 
-Phase 1 adds a validated, immutable runtime-policy snapshot. It is deliberately
-separate from provider credentials. The snapshot is loaded at platform startup,
-but its interaction/reasoning/execution/scheduling values are **not yet wired
-into the current v0.1 chat or Tool policy**. This preserves existing behavior
-until the corresponding later phases are implemented.
+The runtime-policy snapshot is deliberately separate from provider
+credentials. Phase 2 applies the interaction subset at runtime:
 
-A failed initial runtime-policy parse stops JARVIS startup. Future reloads use
-`ConfigManager` fail-safe replacement semantics: an invalid replacement does
-not overwrite the previous valid snapshot. The `/jm reload` command is not
-registered in Phase 1.
+- `jarvis.interaction.wake-words`
+- `jarvis.interaction.follow-up-seconds`
+- `jarvis.interaction.audience.*`
+
+`PASSIVE` is the default. `ACTIVE` currently behaves like PASSIVE for direct
+invocations and active-session follow-ups; proactive ambient-chat initiation is
+not implemented yet.
+
+Reasoning selection, response styling/sound, execution-mode Tool filtering,
+scheduling, and `/jm reload` remain pending later phases.
+
+A failed initial runtime-policy parse stops JARVIS startup. `ConfigManager`
+already provides fail-safe snapshot replacement semantics for the later reload
+command: an invalid replacement does not overwrite the previous valid snapshot.
 
 ### Paper
 
@@ -101,7 +108,7 @@ At platform startup JARVIS:
 6. constructs `ChatSessionManager`;
 7. constructs `EmbeddedBrainGateway` and `EmbeddedBrain`;
 8. constructs the Jev HTTP classifier, Luna client, AI scheduler and JSONL audit sink;
-9. starts accepting OP chat requests.
+9. starts accepting chat requests from players allowed by the configured audience.
 
 Configuration failure disables/stops JARVIS startup rather than falling back to a weaker policy.
 
@@ -110,7 +117,8 @@ There is no separate Brain startup order.
 ## Request execution
 
 ```text
-ChatSessionManager
+InteractionCoordinator
+  -> ChatSessionManager
   -> EmbeddedBrainGateway
   -> AiRequestScheduler
   -> Jev
@@ -121,7 +129,9 @@ ChatSessionManager
   -> Platform Tool
 ```
 
-The Minecraft server remains the authority for OP status and server state.
+The Minecraft server remains the authority for online identity, OP status, and
+server state. `AudiencePolicy` decides who may converse; current OP status
+still decides whether a request receives Minecraft Tool schemas.
 
 ## Audit log
 
@@ -175,9 +185,15 @@ Read-only Tool timeout is reported as timeout/error according to the runtime con
 
 For state-changing Tools, a deadline expiry after execution may have started is `OUTCOME_UNKNOWN`. Do not automatically replay the action.
 
-### deop/logout/session end
+### audience revoke / deop / logout / session end
 
-Invalidate the actor/session and cancel queued work. Before Tool execution and before reply delivery, current online OP/session state is checked again.
+Invalidate the actor/session and cancel queued work. Before reply delivery,
+current online identity, audience authorization, and session state are checked
+again. Tool execution independently rechecks current OP authority.
+
+The existing internal `OP_REVOKED` cancel reason is reused when an active
+session loses audience authorization; the protocol enum is not expanded in
+Phase 2.
 
 ## Shutdown
 
