@@ -7,6 +7,8 @@ import io.github.kardane.jarvisminecraft.common.brain.PackagingSmoke;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
+import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.config.PropertiesJarvisConfigSource;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
@@ -15,6 +17,7 @@ import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftTools;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
 import io.github.kardane.jarvisminecraft.neoforge.chat.NeoForgeChatController;
+import io.github.kardane.jarvisminecraft.neoforge.logging.NeoForgeJarvisLog;
 import io.github.kardane.jarvisminecraft.neoforge.platform.MinecraftNeoForgePlatformAccess;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAccess;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgeServerScheduler;
@@ -126,6 +129,10 @@ public final class JarvisNeoForgeMod {
             return;
         }
 
+        JarvisLog operationalLog = new ConfiguredJarvisLog(
+            configManager,
+            new NeoForgeJarvisLog(LOGGER)
+        );
         Clock clock = Clock.systemUTC();
         NeoForgeTickSampler tickSampler = new NeoForgeTickSampler();
         NeoForgePlatformAccess platform =
@@ -162,7 +169,8 @@ public final class JarvisNeoForgeMod {
             commonRuntime,
             serverScheduler,
             platform,
-            clock
+            clock,
+            operationalLog
         );
 
         NeoForgeChatController chat = new NeoForgeChatController(
