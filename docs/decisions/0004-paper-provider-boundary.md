@@ -1,65 +1,65 @@
-# ADR-0004: Paper 외부 Provider 재사용 경계
+# ADR-0004: Paper External Provider Reuse Boundary
 
-- 상태: Accepted
-- 일자: 2026-09-24
-- 관련 작업: T00
+- Status: Accepted
+- Date: 2026-09-24
+- Related work: T00
 
-## 맥락
+## Context
 
-사용 대상 Paper 서버에는 CoreProtect, WorldGuard, CMI가 존재할 수 있다. JARVIS가 이 기능을 자체 재구현하거나 플러그인의 내부 DB/커맨드 출력/비공개 internals에 의존하면 유지보수성과 안전성이 악화된다.
+Target Paper servers may run CoreProtect, WorldGuard, and CMI. Reimplementing those capabilities inside JARVIS, or depending on plugin-internal databases, command output, or non-public internals, would reduce maintainability and safety.
 
-## 결정
+## Decision
 
-외부 Provider는 **공개 API만** 사용하며 optional capability로 취급한다. 플러그인 존재만으로 capability를 활성화하지 않는다.
+Use **public APIs only** for external Providers and treat them as optional capabilities. Plugin presence alone must not enable a capability.
 
 ### CoreProtect
 
-- 초기 compile target: CoreProtect 24.0 / API v12
-- runtime 첫 대상: 24.1
-- v0.1.1: 조회 기능만
-- capability 조건: plugin 타입 확인 + API enabled + APIVersion >= 12
-- 내부 DB 직접 조회 금지
-- rollback은 v0.2 승인/저널 계약 전 미지원
+- Initial compile target: CoreProtect 24.0 / API v12
+- First runtime target: 24.1
+- v0.1.1: query features only
+- Capability requirements: verified plugin type + API enabled + APIVersion >= 12
+- No direct access to the internal database
+- Rollback remains unsupported until the v0.2 approval/journal contract
 
 ### WorldGuard
 
-- runtime 첫 대상: 7.0.18
-- v0.1.1: region/flag/protection query만
-- 보호 판정은 `RegionQuery.testState` 등 공개 query API를 사용
-- bypass는 RegionQuery가 자동 반영한다고 가정하지 않고 SessionManager의 bypass 판정을 별도로 사용
-- WorldEdit companion 의존성을 함께 점검
+- First runtime target: 7.0.18
+- v0.1.1: region/flag/protection queries only
+- Use public query APIs such as `RegionQuery.testState` for protection checks
+- Do not assume RegionQuery automatically incorporates bypass; use SessionManager bypass evaluation separately
+- Verify the WorldEdit companion dependency as part of compatibility checks
 
 ### CMI
 
-- v0.1/v0.1.1 Tool catalog에 넣지 않음
-- v0.2 T14에서 공개 API와 라이선스/재배포 조건을 별도 검증
-- CMI runtime 9.8.9.6과 공개 문서의 CMI-API 9.8.6.4 조합은 실서버 smoke test 전까지 호환으로 단정하지 않음
-- CMI/CMI-API binary를 JARVIS artifact에 번들하지 않음
+- Not part of the v0.1/v0.1.1 Tool catalog
+- Public API and license/redistribution conditions are verified separately in v0.2 T14
+- Do not claim compatibility between CMI runtime 9.8.9.6 and the publicly documented CMI-API 9.8.6.4 combination until a real-server smoke test
+- Do not bundle CMI/CMI-API binaries in JARVIS artifacts
 
-### 공통
+### Shared Rules
 
-- Provider가 없거나 버전/API 상태 검증이 실패하면 관련 Tool을 AI에게 노출하지 않는다.
-- 타사 plugin binary는 기본적으로 JARVIS 배포물에 shade하지 않는다.
-- Bukkit/plugin 객체는 Brain이나 공통 Java 모듈로 전달하지 않는다.
+- If a Provider is absent or its version/API-state verification fails, do not expose the related Tools to the AI.
+- Do not shade third-party plugin binaries into JARVIS distributions by default.
+- Do not pass Bukkit/plugin objects into the Brain or shared Java module.
 
-## 결과
+## Consequences
 
-장점:
+Benefits:
 
-- 플러그인 미설치 서버에서도 공통 JARVIS 기능을 유지할 수 있다.
-- plugin 버전 문제를 capability 수준에서 격리할 수 있다.
-- 내부 구현/DB schema 변경에 대한 결합도를 낮춘다.
+- Core JARVIS features remain available on servers without these plugins.
+- Plugin-version problems are isolated at the capability boundary.
+- Reduces coupling to internal implementations and database schemas.
 
-비용:
+Costs:
 
-- 공개 API가 제공하지 않는 기능은 지원하지 않거나 후속 범위로 남겨야 한다.
-- CMI는 라이선스/호환 검증 전까지 기능을 활성화할 수 없다.
+- Features not exposed by public APIs must remain unsupported or be deferred.
+- CMI features cannot be enabled before license/compatibility verification.
 
-## 검증 상태
+## Verification Status
 
-CoreProtect/WorldGuard/CMI 실제 조합의 runtime smoke test는 아직 하지 않았다. CoreProtect와 WorldGuard의 실제 통합은 T11/T12/T13, CMI는 T14에서 검증한다.
+The exact CoreProtect/WorldGuard/CMI runtime combination had not yet been smoke-tested when this decision was recorded. CoreProtect and WorldGuard integration is verified in T11/T12/T13; CMI is verified in T14.
 
-## 공식 근거
+## Official References
 
 - CoreProtect API: https://docs.coreprotect.net/api/
 - WorldGuard dependency: https://worldguard.enginehub.org/en/latest/developer/dependency/
