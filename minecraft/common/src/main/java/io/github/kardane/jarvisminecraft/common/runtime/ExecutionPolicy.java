@@ -83,6 +83,13 @@ public final class ExecutionPolicy {
             return false;
         }
 
+        if (
+            isProactive(interactionOrigin)
+                && tool.stateChanging()
+        ) {
+            return false;
+        }
+
         if (tool == ToolName.SCHEDULE_ACTION) {
             return current.scheduling().enabled()
                 && config.mode()

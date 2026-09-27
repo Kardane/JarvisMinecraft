@@ -3,10 +3,13 @@ package io.github.kardane.jarvisminecraft.common.brain;
 import io.github.kardane.jarvisminecraft.common.audit.AsyncJsonlAuditSink;
 import io.github.kardane.jarvisminecraft.common.brain.ai.DeterministicRoutePolicy;
 import io.github.kardane.jarvisminecraft.common.brain.ai.JdkJevClassifier;
+import io.github.kardane.jarvisminecraft.common.brain.ai.JevEngagement;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaClient;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.OpenAiLunaClient;
 import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
+import io.github.kardane.jarvisminecraft.common.chat.AmbientChatMessage;
+import io.github.kardane.jarvisminecraft.common.chat.AmbientConversationTracker;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
 import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
@@ -37,11 +40,14 @@ import java.util.concurrent.CompletionException;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.CancelReason;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ErrorCode;
 
 public final class EmbeddedBrainGateway implements BrainGateway {
+    private static final Duration PROACTIVE_CLASSIFICATION_INTERVAL =
+        Duration.ofSeconds(1);
     private final EmbeddedBrain brain;
     private final ChatSessionManager sessions;
     private final InteractionCoordinator interactions;
@@ -53,9 +59,15 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     private final LunaClient ownedLuna;
     private final AsyncJsonlAuditSink ownedAudit;
     private final ExecutorService ownedAiExecutor;
+    private final AmbientConversationTracker ambientTracker =
+        new AmbientConversationTracker();
+    private final AtomicBoolean proactiveInFlight =
+        new AtomicBoolean();
 
     private boolean started;
     private boolean stopped;
+    private Instant proactiveCooldownUntil = Instant.EPOCH;
+    private Instant proactiveClassificationAfter = Instant.EPOCH;
 
     public EmbeddedBrainGateway(
         EmbeddedBrain brain,
@@ -376,12 +388,14 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         }
 
         ProgressNotifier.ProgressHandle progress =
-            scheduleProgress(
-                requesterUuid,
-                sessionId,
-                request.requestId(),
-                responseConfig
-            );
+            "PROACTIVE".equalsIgnoreCase(mode)
+                ? progressNotifier.completedHandle()
+                : scheduleProgress(
+                    requesterUuid,
+                    sessionId,
+                    request.requestId(),
+                    responseConfig
+                );
 
         processing.whenComplete((reply, failure) -> {
             progress.complete();
@@ -406,10 +420,231 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     }
 
     @Override
+    public CompletionStage<Boolean> considerProactive(
+        UUID requesterUuid,
+        String requesterName,
+        String text
+    ) {
+        Objects.requireNonNull(requesterUuid, "requesterUuid");
+        Objects.requireNonNull(requesterName, "requesterName");
+        Objects.requireNonNull(text, "text");
+
+        synchronized (this) {
+            if (!started || stopped) {
+                return CompletableFuture.completedFuture(false);
+            }
+        }
+        if (!platform.isServerThread()) {
+            return CompletableFuture.completedFuture(false);
+        }
+
+        JarvisConfig.Interaction interaction =
+            configManager.current().interaction();
+        if (
+            interaction.mode()
+                != JarvisConfig.InteractionMode.ACTIVE
+        ) {
+            return CompletableFuture.completedFuture(false);
+        }
+
+        PlayerIdentity current = platform
+            .interactionPlayer(requesterUuid)
+            .orElse(null);
+        if (
+            current == null
+                || !interactions.isAuthorized(current)
+                || sessions.activeSession(requesterUuid).isPresent()
+        ) {
+            return CompletableFuture.completedFuture(false);
+        }
+
+        Instant now = clock.instant();
+        ambientTracker.record(
+            requesterUuid,
+            requesterName,
+            text,
+            now
+        );
+
+        synchronized (this) {
+            if (
+                now.isBefore(proactiveCooldownUntil)
+                    || now.isBefore(
+                        proactiveClassificationAfter
+                    )
+            ) {
+                return CompletableFuture.completedFuture(false);
+            }
+            proactiveClassificationAfter =
+                now.plus(PROACTIVE_CLASSIFICATION_INTERVAL);
+        }
+
+        if (!proactiveInFlight.compareAndSet(false, true)) {
+            return CompletableFuture.completedFuture(false);
+        }
+
+        List<AmbientChatMessage> context =
+            ambientTracker.snapshot(
+                interaction.proactive().contextMessages()
+            );
+
+        CompletionStage<io.github.kardane.jarvisminecraft.common.brain.ai.JevClassification>
+            classification;
+        try {
+            classification = brain.classifyProactive(
+                context,
+                now.plus(JdkJevClassifier.MAX_TIMEOUT)
+            );
+        } catch (RuntimeException failure) {
+            proactiveInFlight.set(false);
+            return CompletableFuture.completedFuture(false);
+        }
+
+        CompletableFuture<Boolean> accepted =
+            new CompletableFuture<>();
+        classification.whenComplete((decision, failure) -> {
+            if (
+                failure != null
+                    || decision == null
+                    || !JdkJevClassifier.MODEL.equals(
+                        decision.model()
+                    )
+                    || decision.engagement()
+                        != JevEngagement.START_CONVERSATION
+            ) {
+                proactiveInFlight.set(false);
+                accepted.complete(false);
+                return;
+            }
+
+            scheduleProactiveActivation(
+                requesterUuid,
+                requesterName,
+                context,
+                decision.engagementConfidence(),
+                accepted
+            );
+        });
+        return accepted;
+    }
+
+    private void scheduleProactiveActivation(
+        UUID requesterUuid,
+        String requesterName,
+        List<AmbientChatMessage> context,
+        double engagementConfidence,
+        CompletableFuture<Boolean> accepted
+    ) {
+        try {
+            serverScheduler.submit(() -> {
+                try {
+                    accepted.complete(
+                        activateProactive(
+                            requesterUuid,
+                            requesterName,
+                            context,
+                            engagementConfidence
+                        )
+                    );
+                } finally {
+                    proactiveInFlight.set(false);
+                }
+                return CompletableFuture.completedFuture(null);
+            });
+        } catch (RuntimeException failure) {
+            proactiveInFlight.set(false);
+            accepted.complete(false);
+        }
+    }
+
+    private boolean activateProactive(
+        UUID requesterUuid,
+        String requesterName,
+        List<AmbientChatMessage> context,
+        double engagementConfidence
+    ) {
+        synchronized (this) {
+            if (!started || stopped) {
+                return false;
+            }
+        }
+        if (!platform.isServerThread()) {
+            return false;
+        }
+
+        JarvisConfig.Interaction interaction =
+            configManager.current().interaction();
+        if (
+            interaction.mode()
+                != JarvisConfig.InteractionMode.ACTIVE
+                || engagementConfidence
+                    < interaction.proactive()
+                        .confidenceThreshold()
+        ) {
+            return false;
+        }
+
+        Instant now = clock.instant();
+        synchronized (this) {
+            if (now.isBefore(proactiveCooldownUntil)) {
+                return false;
+            }
+        }
+
+        PlayerIdentity current = platform
+            .interactionPlayer(requesterUuid)
+            .orElse(null);
+        if (
+            current == null
+                || !interactions.isAuthorized(current)
+                || sessions.activeSession(requesterUuid).isPresent()
+        ) {
+            return false;
+        }
+
+        UUID sessionId = sessions.start(
+            requesterUuid,
+            Duration.ofSeconds(
+                interaction.followUpSeconds()
+            )
+        );
+        synchronized (this) {
+            proactiveCooldownUntil = now.plusSeconds(
+                interaction.proactive().cooldownSeconds()
+            );
+        }
+
+        String proactiveText =
+            AmbientConversationTracker.promptContext(
+                context
+            );
+        submitChat(
+            requesterUuid,
+            requesterName,
+            sessionId,
+            "PROACTIVE",
+            proactiveText
+        ).whenComplete((sent, failure) -> {
+            if (
+                failure != null
+                    || !Boolean.TRUE.equals(sent)
+            ) {
+                sessions.end(requesterUuid, sessionId);
+                brain.cancelSession(
+                    requesterUuid,
+                    sessionId
+                );
+            }
+        });
+        return true;
+    }
+
+    @Override
     public void cancelActor(UUID requesterUuid, CancelReason reason) {
         Objects.requireNonNull(requesterUuid, "requesterUuid");
         Objects.requireNonNull(reason, "reason");
         sessions.invalidate(requesterUuid);
+        ambientTracker.clearActor(requesterUuid);
         brain.cancelActor(requesterUuid);
     }
 
