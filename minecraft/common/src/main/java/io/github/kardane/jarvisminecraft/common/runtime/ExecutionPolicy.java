@@ -40,12 +40,12 @@ public final class ExecutionPolicy {
 
         for (ToolName tool : candidates) {
             if (
-                allows(
+                evaluate(
                     current,
                     tool,
                     requesterToolAuthority,
                     interactionOrigin
-                )
+                ).allowed()
             ) {
                 allowed.add(tool);
             }
@@ -58,7 +58,19 @@ public final class ExecutionPolicy {
         boolean requesterToolAuthority,
         String interactionOrigin
     ) {
-        return allows(
+        return evaluate(
+            Objects.requireNonNull(tool, "tool"),
+            requesterToolAuthority,
+            interactionOrigin
+        ).allowed();
+    }
+
+    public Decision evaluate(
+        ToolName tool,
+        boolean requesterToolAuthority,
+        String interactionOrigin
+    ) {
+        return evaluate(
             configManager.current(),
             Objects.requireNonNull(tool, "tool"),
             requesterToolAuthority,
@@ -66,7 +78,7 @@ public final class ExecutionPolicy {
         );
     }
 
-    private boolean allows(
+    private Decision evaluate(
         JarvisConfig current,
         ToolName tool,
         boolean requesterToolAuthority,
@@ -80,27 +92,44 @@ public final class ExecutionPolicy {
         );
 
         if (!requesterToolAuthority) {
-            return false;
+            return Decision.denied(
+                DenialReason.NO_REQUESTER_AUTHORITY,
+                config.mode()
+            );
         }
 
         if (
             isProactive(interactionOrigin)
                 && tool.stateChanging()
         ) {
-            return false;
+            return Decision.denied(
+                DenialReason.PROACTIVE_MUTATION_BLOCK,
+                config.mode()
+            );
         }
 
         if (tool == ToolName.SCHEDULE_ACTION) {
+            if (
+                config.mode()
+                    == JarvisConfig.ExecutionMode.READ_TALK
+            ) {
+                return Decision.denied(
+                    DenialReason.READ_TALK,
+                    config.mode()
+                );
+            }
             return current.scheduling().enabled()
-                && config.mode()
-                    != JarvisConfig.ExecutionMode.READ_TALK
-                && !isProactive(interactionOrigin);
+                ? Decision.allowed(config.mode())
+                : Decision.denied(
+                    DenialReason.NOT_ALLOWLISTED,
+                    config.mode()
+                );
         }
         if (
             tool
                 == ToolName.CANCEL_SCHEDULED_ACTION
         ) {
-            return true;
+            return Decision.allowed(config.mode());
         }
 
         JarvisConfig.ToolFilter filter = switch (config.mode()) {
@@ -113,31 +142,90 @@ public final class ExecutionPolicy {
             filter != null
                 && contains(filter.denyTools(), tool)
         ) {
-            return false;
+            return Decision.denied(
+                DenialReason.DENYLISTED,
+                config.mode()
+            );
         }
 
         if (!tool.stateChanging()) {
-            return true;
-        }
-
-        if (isProactive(interactionOrigin)) {
-            return false;
+            return Decision.allowed(config.mode());
         }
 
         return switch (config.mode()) {
-            case READ_TALK -> false;
+            case READ_TALK -> Decision.denied(
+                DenialReason.READ_TALK,
+                config.mode()
+            );
             case EXECUTE_LITE ->
                 tool.risk() == Risk.LOW
                     && contains(
                         config.lite().allowTools(),
                         tool
+                    )
+                    ? Decision.allowed(config.mode())
+                    : Decision.denied(
+                        DenialReason.NOT_ALLOWLISTED,
+                        config.mode()
                     );
             case EXECUTE ->
                 contains(
                     config.full().allowTools(),
                     tool
-                );
+                )
+                    ? Decision.allowed(config.mode())
+                    : Decision.denied(
+                        DenialReason.NOT_ALLOWLISTED,
+                        config.mode()
+                    );
         };
+    }
+
+    public enum DenialReason {
+        NO_REQUESTER_AUTHORITY,
+        READ_TALK,
+        NOT_ALLOWLISTED,
+        DENYLISTED,
+        PROACTIVE_MUTATION_BLOCK,
+        POLICY_CHANGED,
+        TOOL_INACTIVE
+    }
+
+    public record Decision(
+        boolean allowed,
+        DenialReason reason,
+        JarvisConfig.ExecutionMode executionMode
+    ) {
+        public Decision {
+            Objects.requireNonNull(executionMode, "executionMode");
+            if (allowed && reason != null) {
+                throw new IllegalArgumentException(
+                    "Allowed execution decision must not have a denial reason."
+                );
+            }
+            if (!allowed && reason == null) {
+                throw new IllegalArgumentException(
+                    "Denied execution decision requires a denial reason."
+                );
+            }
+        }
+
+        public static Decision allowed(
+            JarvisConfig.ExecutionMode executionMode
+        ) {
+            return new Decision(true, null, executionMode);
+        }
+
+        public static Decision denied(
+            DenialReason reason,
+            JarvisConfig.ExecutionMode executionMode
+        ) {
+            return new Decision(
+                false,
+                Objects.requireNonNull(reason, "reason"),
+                executionMode
+            );
+        }
     }
 
     private boolean isProactive(String origin) {
