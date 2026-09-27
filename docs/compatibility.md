@@ -1,7 +1,6 @@
 # T00 호환성·재사용 조사
 
 작성일: 2026-09-24  
-기준 문서: [Minecraft_JARVIS_WORK_SPEC.md](Minecraft_JARVIS_WORK_SPEC.md)  
 상태: **T00 문서 조사 완료 / T01 착수 가능, 빌드·실서버·유료 API live 검증은 아직 수행하지 않음**
 
 ## 1. 조사 범위와 판정 규칙

@@ -3,8 +3,7 @@
 ## 프로젝트와 문서 기준
 
 - 이 저장소는 Minecraft 서버용 JARVIS를 구현한다. 서버 플랫폼 어댑터(Paper, Fabric, NeoForge), 공통 Java 모듈, TypeScript Brain, 언어 중립 protocol contract를 함께 관리한다.
-- 제품 범위와 완료 조건은 [`docs/Minecraft_JARVIS_WORK_SPEC.md`](docs/Minecraft_JARVIS_WORK_SPEC.md)를 기준으로 한다. 초기 아이디어인 [`docs/Minecraft_JARVIS_PLAN.md`](docs/Minecraft_JARVIS_PLAN.md)와 충돌하면 작업 명세서를 따른다.
-- 메시지 envelope와 연결 규칙은 [`docs/protocol.md`](docs/protocol.md), Tool 입력·결과·범위는 [`docs/tools.md`](docs/tools.md), 버전 및 빌드 기준은 [`docs/compatibility.md`](docs/compatibility.md)와 [`docs/build.md`](docs/build.md)를 따른다. 동일 계약을 이 문서에 복제하지 말고 해당 문서를 갱신한다.
+- 현재 구조와 플랫폼 책임은 [`docs/architecture.md`](docs/architecture.md)를, Phase 1–8 검증 순서와 release gate는 [`docs/JarvisMinecraft_Phase1-8_Test_Guide.md`](docs/JarvisMinecraft_Phase1-8_Test_Guide.md)를 기준으로 한다. 메시지 envelope와 연결 규칙은 [`docs/protocol.md`](docs/protocol.md), Tool 입력·결과·범위는 [`docs/tools.md`](docs/tools.md), 버전 및 빌드 기준은 [`docs/compatibility.md`](docs/compatibility.md)와 [`docs/build.md`](docs/build.md)를 따른다. 동일 계약을 이 문서에 복제하지 말고 해당 문서를 갱신한다.
 - 구현 전 현재 branch, worktree, 변경 파일을 확인한다. 이미 있는 staged, modified, untracked 파일은 보존하고 요청된 경로만 수정한다.
 - `AGENTS.md`에는 현재 commit SHA, branch 진행률, release gate, 최근 테스트 결과처럼 빠르게 변하는 상태를 기록하지 않는다. 그런 증거는 `docs/verification/`의 날짜·작업별 snapshot에 남기고, architecture 문서는 현재 구조만 설명한다.
 - 로컬 snapshot과 원격 진행 상태가 다르면 오래된 tracking ref를 현재 원격 상태로 간주하지 않는다. 사용자가 의도한 최신 worktree/증거를 찾고, 기존 구현이나 테스트를 다시 만들거나 checkout을 임의 reset하지 않는다. 이 로컬 checkout에 없는 remote-only source를 수정할 때에는 현재 task의 checkout 범위부터 확인한다.
@@ -21,7 +20,7 @@
 
 - v0.1 상호작용자는 현재 접속 중이고 서버가 OP로 인정하는 플레이어다. Brain 또는 모델 payload는 권한 증거가 아니다. 접수, Tool 실행, 결과 전달 경계에서 서버의 권한을 확인한다.
 - 모델 출력은 신뢰할 수 없는 제안으로 처리한다. 등록된 Tool allowlist, capability, strict argument validation, 범위 제한을 모두 통과한 요청만 처리한다.
-- 임의 콘솔 명령, SQL, 코드 실행, 임의 파일 접근, 다른 플레이어 강제 이동, ban/warn 및 rollback을 추가하지 않는다. 범위 확장은 해당 작업 명세서와 계약에서 먼저 승인된 뒤 진행한다.
+- 임의 콘솔 명령, SQL, 코드 실행, 임의 파일 접근, 다른 플레이어 강제 이동, ban/warn 및 rollback을 추가하지 않는다. 범위 확장은 architecture 문서와 관련 protocol/tool 계약에서 먼저 승인된 뒤 진행한다.
 - AI/network/disk/DB I/O를 Minecraft tick 또는 server thread에서 기다리지 않는다. Minecraft API는 플랫폼이 요구하는 execution context에서만 호출한다. 비동기 결과를 보낼 때도 플레이어의 OP·접속 상태를 다시 확인한다.
 - Brain의 API 키는 Brain 환경에서만 읽는다. 공유 비밀은 loopback WebSocket handshake의 `X-Jarvis-Secret` 헤더로만 전달한다. 비밀, 전체 프롬프트, 불필요한 개인 정보는 로그나 모델 입력에 넣지 않는다.
 - Jev가 실패하거나 불확실하면 변경 Tool을 제공하지 않는다. Luna가 실패하면 사실을 만들지 않고 정해진 오류 경로를 사용한다. 변경 요청의 outcome이 불명확하면 `OUTCOME_UNKNOWN`으로 남기고 자동 재실행하지 않는다.
@@ -33,3 +32,11 @@
 - 기존 CI와 검증 스크립트를 변경된 계약에 맞춰 갱신한다. 사용자가 테스트나 검증 실행을 요청하지 않았다면 테스트, 빌드, 서버 또는 유료 모델 호출을 실행하지 않는다. 수행하지 않은 검증을 통과했다고 보고하지 않는다.
 - 상태 보고에서는 문서/정적 분석, 빌드, 서버 기동, 플랫폼 UI, 외부 모델 호출, 실제 E2E 결과를 구분한다. 각 결론을 현재 checkout의 실제 증거에 연결한다.
 - 외부 배포, publish, push, merge, 유료 API 호출, 서버 재시작처럼 저장소 밖에 영향을 주는 작업은 사용자의 명시 요청 범위에서만 진행한다.
+
+## 로컬 Paper 테스트 서버
+
+- 서버 실행 방법과 수동 시나리오는 [`test-server/README.md`](test-server/README.md)를 따른다. 서버 파일, 월드, 설정, 로그는 `test-server/paper/` 아래에 있으며 로컬 사용자 데이터로 취급한다. 요청하지 않은 삭제·초기화·커밋을 하지 않는다.
+- 플러그인 설정과 provider 자격 증명의 기준 파일은 `test-server/paper/plugins/JarvisMinecraft/config.yml`이다. Paper Adapter는 Java system property, 프로세스 환경 변수, 이 설정 파일 순으로 값을 선택한다. 루트 `config/.env.local` 값을 서버 프로세스에 주입하거나 키를 다른 파일로 복사하지 않는다. 키 값은 명령 출력, 로그, 문서에 기록하지 않는다.
+- Paper artifact를 빌드할 때는 저장소의 Java 21 및 Gradle Wrapper 기준을 따른다. Paper 단독 artifact는 `minecraft/paper/build/libs/jarvisminecraft-paper.jar`에 생성되며, 테스트 서버의 `test-server/paper/plugins/jarvisminecraft-paper.jar`를 교체하기 전에 서버가 정지했는지 확인한다.
+- 서버는 저장소 루트에서 `.\test-server\paper\start-server.ps1`로 시작한다. 스크립트는 Java 21, EULA 동의, RCON 비활성화를 확인한다. 기본 접속 주소는 `localhost:25565`이며, 종료할 때는 서버 콘솔에 `stop`을 입력한다.
+- 기동 확인은 로그의 JARVIS 플러그인 활성화와 Paper 부팅 완료, 그리고 `localhost:25565` 연결로 각각 확인한다. 실제 provider 요청이나 유료 모델 호출은 사용자가 명시적으로 요청한 경우에만 실행한다.

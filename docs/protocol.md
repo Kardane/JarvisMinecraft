@@ -4,7 +4,7 @@
 
 작성일: 2026-09-24  
 관련 작업: T01  
-선행 기준: docs/compatibility.md, docs/Minecraft_JARVIS_WORK_SPEC.md  
+선행 기준: docs/compatibility.md, docs/tools.md
 정규 스키마: ../protocol/schema/protocol.schema.json
 
 ## 1. 목적과 적용 범위
