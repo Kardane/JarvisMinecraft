@@ -22,6 +22,8 @@ public final class JarvisEvents {
     public static final String LUNA_ROUND_COMPLETED = "luna.round_completed";
     public static final String LUNA_FAILED = "luna.failed";
 
+    public static final String TOOL_EXPOSURE_RESOLVED =
+        "tool.exposure_resolved";
     public static final String TOOL_EXPOSED = "tool.exposed";
     public static final String TOOL_STARTED = "tool.started";
     public static final String TOOL_COMPLETED = "tool.completed";
