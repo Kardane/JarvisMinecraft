@@ -1211,7 +1211,7 @@ public final class ToolSpec {
         private Values(
             Map<String, Object> values
         ) {
-            this.values = Map.copyOf(values);
+            this.values = Collections.unmodifiableMap(\n                new LinkedHashMap<>(values)\n            );
         }
 
         @SuppressWarnings("unchecked")
