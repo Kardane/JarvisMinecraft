@@ -176,6 +176,17 @@ Phase 6 action Tool은 모두 `Risk.LOW`이며 raw command를 만들지 않는�
 
 CoreProtect, WorldGuard, CMI 기능은 Paper에서 optional Provider로 로딩하며 초기화 실패/의존성 부재 시 관련 Tool을 등록하지 않는다.
 
+## 운영 로깅
+
+Operational logging Phase L1/L2가 공통 runtime에 연결되어 있다.
+
+- `JarvisLog` / `ConfiguredJarvisLog`가 공통 event/level/category gate를 담당하고 Paper/Fabric/NeoForge adapter가 각 플랫폼 console logger로 전달한다.
+- 기본 console 형식은 `[JARVIS] event key=value`이며 `LogSanitizer`가 sensitive key, OpenAI key pattern, Bearer token, 개행과 과도하게 긴 값을 정리한다.
+- `jarvis.logging.*` 설정으로 level, console, request lifecycle, Jev/Luna, Tool, proactive, health 항목을 제어한다. Phase L1/L2에서는 request와 Jev/Luna 항목만 runtime event에 연결되어 있다.
+- request path는 `request.accepted/completed/failed`, planning path는 `jev.completed/failed/fallback`, `routing.resolved`, `reasoning.resolved`, model path는 `luna.round_completed/failed`를 기록한다.
+- raw player chat, Luna prompt/response, Jev raw body는 operational field에 넣지 않는다. 기존 `AsyncJsonlAuditSink`와 mutation fail-closed semantics는 변경하지 않는다.
+- 기존 직접 생성/test 경로는 `NoOpJarvisLog`를 기본값으로 사용해 기능 동작을 바꾸지 않는다.
+
 ## AI와 스레드 경계
 
 Jev와 Luna 네트워크 호출은 Minecraft server/tick thread를 점유하지 않는다. 플랫폼 API 호출만 각 플랫폼의 scheduler/execution context에서 수행한다. Jev에는 최신 사용자 메시지, bounded short topic, interaction origin, capability 이름만 전달한다. Luna에는 요청 처리에 필요한 bounded 대화, capability, 허용된 Tool schema/result만 전달한다. Progress delay는 JDK delayed executor에서 기다리고 실제 메시지/사운드 API 호출은 platform `ServerScheduler`로 되돌린다.
