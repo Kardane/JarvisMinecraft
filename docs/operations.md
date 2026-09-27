@@ -28,8 +28,7 @@ Do not log provider keys, raw process environments, or complete configuration ob
 
 ## Platform configuration
 
-The runtime-policy snapshot is deliberately separate from provider
-credentials. Phase 2 applies the interaction subset at runtime:
+The runtime-policy snapshot and operator prompt content are deliberately separate from provider credentials. Phase 2 applies the interaction subset at runtime:
 
 - `jarvis.interaction.wake-words`
 - `jarvis.interaction.follow-up-seconds`
@@ -123,14 +122,22 @@ Phase 7 applies `jarvis.scheduling.*`:
 requesting player. Actor invalidation/logout and Brain shutdown also cancel
 that actor's pending schedules.
 
-`/jm reload` remains pending a later phase.
+Persona/knowledge configuration:
 
-A failed initial runtime-policy parse stops JARVIS startup. Each runtime
-shares one `ConfigManager` snapshot across interaction admission, Brain policy,
-response/status/logging paths. Gateway wiring rejects mixed-manager
-configurations. `ConfigManager` already provides fail-safe snapshot
-replacement semantics for the later reload command: an invalid replacement does
-not overwrite the previous valid snapshot.
+- `jarvis.personality.enabled`
+- `jarvis.knowledge.enabled`
+- `jarvis.knowledge.max-files`
+- `jarvis.knowledge.max-file-bytes`
+- `jarvis.knowledge.max-total-bytes`
+
+Default prompt-content limits are 32 knowledge files, 32 KiB per knowledge file,
+and 128 KiB total knowledge. `persona.md` is limited to 32 KiB.
+
+A failed initial runtime-policy or enabled prompt-content validation stops JARVIS
+startup. Production runtimes share one `RuntimeConfigurationManager` composite
+snapshot across interaction admission, Brain policy, persona/knowledge context,
+response/status/logging paths. Invalid reload candidates never partially replace the
+active config or prompt content.
 
 ### Paper
 
@@ -146,6 +153,8 @@ Runtime-policy groups:
 
 - `jarvis.interaction.*`
 - `jarvis.model.*`
+- `jarvis.personality.*`
+- `jarvis.knowledge.*`
 - `jarvis.response.*`
 - `jarvis.execution.*`
 - `jarvis.scheduling.*`
@@ -183,19 +192,57 @@ Audit directory:
 
 `config/jarvisminecraft/audit`
 
+## Persona and server knowledge
+
+Platform locations:
+
+```text
+Paper
+plugins/JarvisMinecraft/
+├─ config.yml
+├─ persona.md
+└─ knowledge/
+   ├─ README.md
+   └─ *.md
+
+Fabric / NeoForge
+config/jarvisminecraft/
+├─ jarvis.properties
+├─ persona.md
+└─ knowledge/
+   ├─ README.md
+   └─ *.md
+```
+
+On first startup JARVIS creates `persona.md` and `knowledge/README.md` only
+when they are missing. Existing files are never overwritten. The knowledge README is
+operator guidance and is not sent to the model.
+
+`persona.md` controls conversational style only. Files under `knowledge/*.md`
+provide bounded server-specific reference context such as rules, locations, ranks,
+lore, and services. Do not store API keys, passwords, private player data, or other
+secrets in these files. Persona/knowledge content is runtime context, not model
+training and not persistent model memory.
+
+Knowledge loading is non-recursive and UTF-8 only. Non-Markdown files,
+subdirectories, and `knowledge/README.md` are ignored. Symlink/path escapes outside
+the platform JARVIS directory are rejected. Knowledge files are ordered
+deterministically by normalized filename.
+
 ## Startup
 
 At platform startup JARVIS:
 
-1. loads and validates the Phase 1 runtime-policy snapshot;
-2. validates server ID and provider credentials;
-3. builds the platform Tool registry;
-4. activates optional Paper Providers only when their dependencies/API discovery succeed;
-5. constructs `CommonRuntime`;
-6. constructs `ChatSessionManager`;
-7. constructs `EmbeddedBrainGateway` and `EmbeddedBrain`;
-8. constructs the Jev HTTP classifier, Luna client, AI scheduler and JSONL audit sink;
-9. starts accepting chat requests from players allowed by the configured audience.
+1. creates missing prompt-content templates without overwriting existing files;
+2. loads and validates one atomic runtime snapshot containing structured config plus enabled persona/knowledge;
+3. validates server ID and provider credentials;
+4. builds the platform Tool registry;
+5. activates optional Paper Providers only when their dependencies/API discovery succeed;
+6. constructs `CommonRuntime`;
+7. constructs `ChatSessionManager`;
+8. constructs `EmbeddedBrainGateway` and `EmbeddedBrain`;
+9. constructs the Jev HTTP classifier, Luna client, AI scheduler and JSONL audit sink;
+10. starts accepting chat requests from players allowed by the configured audience.
 
 Configuration failure disables/stops JARVIS startup rather than falling back to a weaker policy.
 
@@ -269,11 +316,32 @@ Paper/Fabric/NeoForge expose OP-only:
 
 ```text
 /jm status
+/jm reload
 ```
 
 The status summary includes runtime state, interaction/audience/execution mode, scheduling state, AI queue/active counts, proactive in-flight state, and Audit health/queue/file summary. It never prints secrets or raw AI/chat content.
 
-`/jm reload` and `/jm test` are not implemented yet.
+`/jm reload` asynchronously reloads structured config, `persona.md`, and
+`knowledge/*.md`. Disk I/O runs on the dedicated `jarvis-config-reload`
+executor, not the Minecraft server thread. At most one reload runs at a time.
+On success the complete new runtime snapshot is published. On any parse, UTF-8,
+path, size, or content-loading failure the complete previous snapshot remains active.
+
+Success:
+
+```text
+[JARVIS] Configuration reloaded.
+```
+
+Failure:
+
+```text
+[JARVIS] Reload failed; previous configuration remains active.
+```
+
+Player-visible output does not contain prompt content, secrets, raw external paths, or
+stack traces. Operational success logs contain only configuration summary and prompt
+document/byte counts. `/jm test` is not implemented yet.
 
 ## Stored audit fields
 
@@ -380,8 +448,9 @@ Deterministic verification:
 ./gradlew build
 ```
 
-This includes the Phase 1 `JarvisConfig` validation/fail-safe reload
-verification, E12 Embedded policy parity/safety verification, T06/T07/T08
+This includes `JarvisConfig` atomic reload verification,
+`promptContentVerification` for persona/knowledge loader/template boundaries,
+E12 Embedded policy parity/safety verification, T06/T07/T08
 platform contract tests, existing Provider tests, and E16 deployable-artifact
 content verification.
 
