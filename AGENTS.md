@@ -1,42 +1,42 @@
-# 저장소 작업 지침
+# Repository Working Guidelines
 
-## 프로젝트와 문서 기준
+## Project and Documentation Baseline
 
-- 이 저장소는 Minecraft 서버용 JARVIS를 구현한다. 서버 플랫폼 어댑터(Paper, Fabric, NeoForge), 공통 Java 모듈, TypeScript Brain, 언어 중립 protocol contract를 함께 관리한다.
-- 현재 구조와 플랫폼 책임은 [`docs/architecture.md`](docs/architecture.md)를, Phase 1–8 검증 순서와 release gate는 [`docs/JarvisMinecraft_Phase1-8_Test_Guide.md`](docs/JarvisMinecraft_Phase1-8_Test_Guide.md)를 기준으로 한다. 메시지 envelope와 연결 규칙은 [`docs/protocol.md`](docs/protocol.md), Tool 입력·결과·범위는 [`docs/tools.md`](docs/tools.md), 버전 및 빌드 기준은 [`docs/compatibility.md`](docs/compatibility.md)와 [`docs/build.md`](docs/build.md)를 따른다. 동일 계약을 이 문서에 복제하지 말고 해당 문서를 갱신한다.
-- 구현 전 현재 branch, worktree, 변경 파일을 확인한다. 이미 있는 staged, modified, untracked 파일은 보존하고 요청된 경로만 수정한다.
-- `AGENTS.md`에는 현재 commit SHA, branch 진행률, release gate, 최근 테스트 결과처럼 빠르게 변하는 상태를 기록하지 않는다. 그런 증거는 `docs/verification/`의 날짜·작업별 snapshot에 남기고, architecture 문서는 현재 구조만 설명한다.
-- 로컬 snapshot과 원격 진행 상태가 다르면 오래된 tracking ref를 현재 원격 상태로 간주하지 않는다. 사용자가 의도한 최신 worktree/증거를 찾고, 기존 구현이나 테스트를 다시 만들거나 checkout을 임의 reset하지 않는다. 이 로컬 checkout에 없는 remote-only source를 수정할 때에는 현재 task의 checkout 범위부터 확인한다.
+- This repository implements JARVIS for Minecraft servers. It maintains the server platform adapters (Paper, Fabric, NeoForge), the shared Java module, the TypeScript Brain, and the language-neutral protocol contract together.
+- Use [`docs/architecture.md`](docs/architecture.md) as the source of truth for the current architecture and platform responsibilities, and [`docs/JarvisMinecraft_Phase1-8_Test_Guide.md`](docs/JarvisMinecraft_Phase1-8_Test_Guide.md) for the Phase 1–8 verification sequence and release gates. Follow [`docs/protocol.md`](docs/protocol.md) for message envelopes and connection rules, [`docs/tools.md`](docs/tools.md) for Tool inputs/results/ranges, and [`docs/compatibility.md`](docs/compatibility.md) plus [`docs/build.md`](docs/build.md) for version and build baselines. Do not duplicate those contracts here; update the authoritative document instead.
+- Before making changes, inspect the current branch, worktree, and changed files. Preserve existing staged, modified, and untracked files, and modify only the paths required by the request.
+- Do not record rapidly changing state such as the current commit SHA, branch progress, release-gate status, or recent test results in `AGENTS.md`. Store that evidence as dated/task-specific snapshots under `docs/verification/`, and keep architecture documents focused on the current structure.
+- If a local snapshot and remote progress differ, do not treat stale tracking refs as the current remote state. Find the latest worktree/evidence intended by the user, and do not recreate existing implementation/tests or reset a checkout arbitrarily. When modifying remote-only source that is not present in the local checkout, first confirm the checkout scope for the current task.
 
-## 기술 및 모듈 경계
+## Technical and Module Boundaries
 
-- 현재 고정 기준은 Minecraft 1.21.8, Java 21, Gradle Wrapper 8.14.5, Node.js 24다. 버전 변경은 호환성 근거와 함께 관련 결정 문서 및 lock 파일을 검토한다.
-- 공통 Java 모듈은 Bukkit/Paper, Fabric, NeoForge, NMS API를 import하지 않는다. Minecraft 플랫폼 객체를 Brain이나 transport 경계 밖으로 넘기지 않고 제한된 DTO snapshot으로 변환한다.
-- 플랫폼별 이벤트, 권한 확인, 스케줄러 연결, 공식 서버 API 호출은 각 Adapter가 담당한다. 다른 플랫폼 Adapter의 구현을 직접 참조하지 않는다.
-- Brain은 세션·요청 예산·분류·응답 생성·Tool 제안을 조립한다. Adapter는 현재 서버 상태와 권한을 근거로 capability 및 Tool을 다시 확인하고 최종 실행을 결정한다.
-- protocol 구조를 바꾸면 JSON Schema, valid/invalid fixtures, manifest, protocol 문서, 소비자(Java/TypeScript)를 함께 갱신한다. 구현 편의를 이유로 wire contract나 fixture 의미를 임의로 느슨하게 하지 않는다.
+- The current pinned baseline is Minecraft 1.21.8, Java 21, Gradle Wrapper 8.14.5, and Node.js 24. When changing versions, review the relevant decision documents and lock files together with compatibility evidence.
+- The shared Java module must not import Bukkit/Paper, Fabric, NeoForge, or NMS APIs. Do not pass Minecraft platform objects across Brain or transport boundaries; convert them to bounded DTO snapshots.
+- Platform-specific events, permission checks, scheduler integration, and official server API calls belong to each Adapter. Do not directly depend on another platform Adapter implementation.
+- The Brain composes sessions, request budgets, classification, response generation, and Tool proposals. The Adapter uses current server state and authority to re-check capabilities and Tools and make the final execution decision.
+- If the protocol shape changes, update JSON Schema, valid/invalid fixtures, the manifest, protocol documentation, and consumers (Java/TypeScript) together. Do not loosen the wire contract or fixture semantics merely for implementation convenience.
 
-## 보안과 런타임 규칙
+## Security and Runtime Rules
 
-- v0.1 상호작용자는 현재 접속 중이고 서버가 OP로 인정하는 플레이어다. Brain 또는 모델 payload는 권한 증거가 아니다. 접수, Tool 실행, 결과 전달 경계에서 서버의 권한을 확인한다.
-- 모델 출력은 신뢰할 수 없는 제안으로 처리한다. 등록된 Tool allowlist, capability, strict argument validation, 범위 제한을 모두 통과한 요청만 처리한다.
-- 임의 콘솔 명령, SQL, 코드 실행, 임의 파일 접근, 다른 플레이어 강제 이동, ban/warn 및 rollback을 추가하지 않는다. 범위 확장은 architecture 문서와 관련 protocol/tool 계약에서 먼저 승인된 뒤 진행한다.
-- AI/network/disk/DB I/O를 Minecraft tick 또는 server thread에서 기다리지 않는다. Minecraft API는 플랫폼이 요구하는 execution context에서만 호출한다. 비동기 결과를 보낼 때도 플레이어의 OP·접속 상태를 다시 확인한다.
-- Brain의 API 키는 Brain 환경에서만 읽는다. 공유 비밀은 loopback WebSocket handshake의 `X-Jarvis-Secret` 헤더로만 전달한다. 비밀, 전체 프롬프트, 불필요한 개인 정보는 로그나 모델 입력에 넣지 않는다.
-- Jev가 실패하거나 불확실하면 변경 Tool을 제공하지 않는다. Luna가 실패하면 사실을 만들지 않고 정해진 오류 경로를 사용한다. 변경 요청의 outcome이 불명확하면 `OUTCOME_UNKNOWN`으로 남기고 자동 재실행하지 않는다.
-- Paper 외부 Provider는 공개 API 및 실제 runtime capability 확인을 거친 optional 기능으로 취급한다. 플러그인이 설치되어 있다는 이유만으로 Tool을 활성화하지 않는다.
+- In v0.1, an interactive actor must be currently online and recognized as an OP by the server. Brain or model payloads are not authority evidence. Re-check server authority at admission, Tool execution, and result-delivery boundaries.
+- Treat model output as an untrusted proposal. Process requests only after they pass the registered Tool allowlist, capability checks, strict argument validation, and range limits.
+- Do not add arbitrary console commands, SQL, code execution, arbitrary file access, forced movement of other players, ban/warn actions, or rollback. Scope expansion must first be approved in the architecture document and the relevant protocol/tool contracts.
+- Do not wait for AI/network/disk/DB I/O on a Minecraft tick or server thread. Call Minecraft APIs only from the execution context required by the platform. Re-check the player's OP and online state before delivering asynchronous results.
+- Read Brain API keys only from the Brain environment. Pass the shared secret only through the loopback WebSocket handshake's `X-Jarvis-Secret` header. Do not put secrets, full prompts, or unnecessary personal information in logs or model input.
+- If Jev fails or is uncertain, do not expose mutation Tools. If Luna fails, do not invent facts; use the defined failure path. If the outcome of a mutation request is uncertain, return `OUTCOME_UNKNOWN` and do not retry automatically.
+- Treat external Paper Providers as optional features that require both public APIs and verified runtime capabilities. Do not enable a Tool merely because a plugin is installed.
 
-## 변경 및 확인
+## Changes and Verification
 
-- 문서와 코드에서 한국어를 기본으로 사용하고, Java/Kotlin/TypeScript 식별자, 프로토콜 필드, Tool 이름, 모델·SDK 버전은 원문 표기를 보존한다.
-- 기존 CI와 검증 스크립트를 변경된 계약에 맞춰 갱신한다. 사용자가 테스트나 검증 실행을 요청하지 않았다면 테스트, 빌드, 서버 또는 유료 모델 호출을 실행하지 않는다. 수행하지 않은 검증을 통과했다고 보고하지 않는다.
-- 상태 보고에서는 문서/정적 분석, 빌드, 서버 기동, 플랫폼 UI, 외부 모델 호출, 실제 E2E 결과를 구분한다. 각 결론을 현재 checkout의 실제 증거에 연결한다.
-- 외부 배포, publish, push, merge, 유료 API 호출, 서버 재시작처럼 저장소 밖에 영향을 주는 작업은 사용자의 명시 요청 범위에서만 진행한다.
+- Use English by default in documentation and code comments. Preserve Java/Kotlin/TypeScript identifiers, protocol fields, Tool names, and model/SDK versions exactly as defined.
+- Update existing CI and verification scripts when the contract changes. If the user did not explicitly request tests or verification, do not run tests, builds, servers, or paid-model calls. Never report an unrun verification as passed.
+- In status reports, distinguish documentation/static analysis, builds, server startup, platform UI, external-model calls, and real E2E results. Tie each conclusion to actual evidence from the current checkout.
+- External publication, publish, push, merge, paid API calls, server restarts, or other actions that affect systems outside the repository must stay within the user's explicit request scope.
 
-## 로컬 Paper 테스트 서버
+## Local Paper Test Server
 
-- 서버 실행 방법과 수동 시나리오는 [`test-server/README.md`](test-server/README.md)를 따른다. 서버 파일, 월드, 설정, 로그는 `test-server/paper/` 아래에 있으며 로컬 사용자 데이터로 취급한다. 요청하지 않은 삭제·초기화·커밋을 하지 않는다.
-- 플러그인 설정과 provider 자격 증명의 기준 파일은 `test-server/paper/plugins/JarvisMinecraft/config.yml`이다. Paper Adapter는 Java system property, 프로세스 환경 변수, 이 설정 파일 순으로 값을 선택한다. 루트 `config/.env.local` 값을 서버 프로세스에 주입하거나 키를 다른 파일로 복사하지 않는다. 키 값은 명령 출력, 로그, 문서에 기록하지 않는다.
-- Paper artifact를 빌드할 때는 저장소의 Java 21 및 Gradle Wrapper 기준을 따른다. Paper 단독 artifact는 `minecraft/paper/build/libs/jarvisminecraft-paper.jar`에 생성되며, 테스트 서버의 `test-server/paper/plugins/jarvisminecraft-paper.jar`를 교체하기 전에 서버가 정지했는지 확인한다.
-- 서버는 저장소 루트에서 `.\test-server\paper\start-server.ps1`로 시작한다. 스크립트는 Java 21, EULA 동의, RCON 비활성화를 확인한다. 기본 접속 주소는 `localhost:25565`이며, 종료할 때는 서버 콘솔에 `stop`을 입력한다.
-- 기동 확인은 로그의 JARVIS 플러그인 활성화와 Paper 부팅 완료, 그리고 `localhost:25565` 연결로 각각 확인한다. 실제 provider 요청이나 유료 모델 호출은 사용자가 명시적으로 요청한 경우에만 실행한다.
+- Follow [`test-server/README.md`](test-server/README.md) for server startup and manual scenarios. Server files, worlds, configuration, and logs live under `test-server/paper/` and are local user data. Do not delete, reset, or commit them unless explicitly requested.
+- The authoritative file for plugin configuration and Provider credentials is `test-server/paper/plugins/JarvisMinecraft/config.yml`. The Paper Adapter resolves values in this order: Java system property, process environment variable, then this configuration file. Do not inject root `config/.env.local` values into the server process or copy keys into other files. Never print key values in command output, logs, or documentation.
+- Build Paper artifacts using the repository's Java 21 and Gradle Wrapper baseline. The Paper-only artifact is generated at `minecraft/paper/build/libs/jarvisminecraft-paper.jar`. Verify that the server is stopped before replacing `test-server/paper/plugins/jarvisminecraft-paper.jar`.
+- Start the server from the repository root with `.\test-server\paper\start-server.ps1`. The script verifies Java 21, EULA acceptance, and disabled RCON. The default address is `localhost:25565`; stop the server by entering `stop` in the server console.
+- Verify startup separately through JARVIS plugin activation in the logs, Paper boot completion, and connectivity to `localhost:25565`. Run real Provider requests or paid-model calls only when the user explicitly requests them.
