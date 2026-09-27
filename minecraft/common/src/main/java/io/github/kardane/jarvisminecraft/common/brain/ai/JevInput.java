@@ -2,6 +2,7 @@ package io.github.kardane.jarvisminecraft.common.brain.ai;
 
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
 import io.github.kardane.jarvisminecraft.common.brain.ConversationEntry;
+import io.github.kardane.jarvisminecraft.common.chat.AmbientChatMessage;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -116,6 +117,39 @@ public record JevInput(
                 .map(Capability::name)
                 .toList(),
             interactionOrigin
+        );
+    }
+
+    public static JevInput fromAmbient(
+        List<AmbientChatMessage> context,
+        List<Capability> capabilities
+    ) {
+        Objects.requireNonNull(context, "context");
+        Objects.requireNonNull(capabilities, "capabilities");
+        if (context.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Ambient context must not be empty."
+            );
+        }
+
+        AmbientChatMessage latest =
+            context.get(context.size() - 1);
+        List<String> topicEntries = new ArrayList<>();
+        for (AmbientChatMessage message : context) {
+            topicEntries.add(
+                message.senderName()
+                    + ": "
+                    + clip(message.text(), 320)
+            );
+        }
+
+        return new JevInput(
+            latest.text(),
+            String.join("\n", topicEntries),
+            capabilities.stream()
+                .map(Capability::name)
+                .toList(),
+            "PROACTIVE_CANDIDATE"
         );
     }
 

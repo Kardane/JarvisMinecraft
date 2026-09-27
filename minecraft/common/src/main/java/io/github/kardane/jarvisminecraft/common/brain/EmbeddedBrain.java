@@ -4,12 +4,14 @@ import io.github.kardane.jarvisminecraft.common.audit.AuditArgumentSummaries;
 import io.github.kardane.jarvisminecraft.common.brain.ai.DeterministicRoutePolicy;
 import io.github.kardane.jarvisminecraft.common.brain.ai.JdkJevClassifier;
 import io.github.kardane.jarvisminecraft.common.brain.ai.JevClassifier;
+import io.github.kardane.jarvisminecraft.common.brain.ai.JevClassification;
 import io.github.kardane.jarvisminecraft.common.brain.ai.JevInput;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaClient;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaTurnInput;
 import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningLevel;
 import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
+import io.github.kardane.jarvisminecraft.common.chat.AmbientChatMessage;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
@@ -182,6 +184,29 @@ public final class EmbeddedBrain {
         this.audit = Objects.requireNonNull(audit, "audit");
         this.toolRuntime = Objects.requireNonNull(toolRuntime, "toolRuntime");
         this.clock = Objects.requireNonNull(clock, "clock");
+    }
+
+    public CompletionStage<JevClassification> classifyProactive(
+        List<AmbientChatMessage> context,
+        Instant deadlineAt
+    ) {
+        Objects.requireNonNull(context, "context");
+        Objects.requireNonNull(deadlineAt, "deadlineAt");
+        if (stopped) {
+            return CompletableFuture.failedFuture(
+                new ProtocolException(
+                    ErrorCode.CANCELLED,
+                    "Embedded Brain is stopped."
+                )
+            );
+        }
+        return jev.classify(
+            JevInput.fromAmbient(
+                context,
+                currentCapabilities()
+            ),
+            deadlineAt
+        );
     }
 
     public CompletionStage<Reply> submit(ChatRequest request) {

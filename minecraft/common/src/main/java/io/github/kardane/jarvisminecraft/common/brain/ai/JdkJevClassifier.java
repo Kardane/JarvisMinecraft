@@ -73,9 +73,8 @@ public final class JdkJevClassifier implements JevClassifier {
 
     private static final String ENGAGEMENT_INSTRUCTIONS =
         "Decide whether JARVIS should engage with the latest message. "
-            + "If interaction_origin is DIRECT or FOLLOW_UP, choose RESPOND. "
-            + "Choose START_CONVERSATION or IGNORE only for a future "
-            + "PROACTIVE_CANDIDATE origin.";
+            + "If interaction_origin is DIRECT, FOLLOW_UP, or PROACTIVE, choose RESPOND. "
+            + "For PROACTIVE_CANDIDATE choose START_CONVERSATION only when a useful, context-aware JARVIS intervention is warranted; otherwise choose IGNORE.";
 
     private static final String REASONING_INSTRUCTIONS =
         "Choose the minimum reasoning effort that is sufficient for a safe, "

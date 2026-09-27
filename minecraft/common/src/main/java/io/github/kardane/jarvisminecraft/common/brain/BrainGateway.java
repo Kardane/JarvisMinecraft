@@ -1,6 +1,7 @@
 package io.github.kardane.jarvisminecraft.common.brain;
 
 import java.util.UUID;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.CancelReason;
@@ -13,6 +14,14 @@ public interface BrainGateway {
         String mode,
         String text
     );
+
+    default CompletionStage<Boolean> considerProactive(
+        UUID requesterUuid,
+        String requesterName,
+        String text
+    ) {
+        return CompletableFuture.completedFuture(false);
+    }
 
     void cancelActor(UUID requesterUuid, CancelReason reason);
 
