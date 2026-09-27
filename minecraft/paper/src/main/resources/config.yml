@@ -56,7 +56,7 @@ jarvis:
     actors: OP
 
     lite:
-      # Tool wire names only. Example: [teleport_staff]
+      # Tool wire names only. Example: [teleport_staff, weather_set, time_set]
       allow-tools: []
       # deny-tools overrides allow-tools and may also hide read-only Tools.
       deny-tools: []

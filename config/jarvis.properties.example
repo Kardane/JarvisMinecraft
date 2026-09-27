@@ -39,7 +39,7 @@ jarvis.execution.mode=READ_TALK
 jarvis.execution.actors=OP
 
 # Tool wire names use | as the separator.
-# Example: jarvis.execution.lite.allow-tools=teleport_staff
+# Example: jarvis.execution.lite.allow-tools=teleport_staff|weather_set|time_set
 jarvis.execution.lite.allow-tools=
 jarvis.execution.lite.deny-tools=
 jarvis.execution.full.allow-tools=
