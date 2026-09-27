@@ -169,7 +169,12 @@ public final class OpenAiLunaClient implements LunaClient {
     ) {
         ResponseCreateParams.Builder builder = ResponseCreateParams.builder()
             .model(LunaPrompt.MODEL)
-            .instructions(LunaPrompt.instructions(routing))
+            .instructions(
+                LunaPrompt.instructions(
+                    routing,
+                    input.promptContent()
+                )
+            )
             .input(ResponseCreateParams.Input.ofResponse(List.copyOf(state.inputItems)))
             .parallelToolCalls(true)
             .reasoning(
