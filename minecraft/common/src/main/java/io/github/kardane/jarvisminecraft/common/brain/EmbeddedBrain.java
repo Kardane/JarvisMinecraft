@@ -1277,25 +1277,20 @@ public final class EmbeddedBrain {
         ChatRequest origin,
         DeterministicRoutePolicy.RoutingDecision routing,
         ScheduleActionArguments schedule,
+        UUID scheduleId,
         int runIndex
     ) {
-        if (
-            stopped
-                || !schedulingPolicy.stillAllowed(
-                    schedule
-                )
-                || !toolRuntime.activeTools().contains(
-                    schedule.tool()
-                )
-                || !executionPolicy.allows(
-                    schedule.tool(),
-                    origin.toolsAllowed(),
-                    "SCHEDULED"
-                )
-        ) {
-            return CompletableFuture.completedFuture(
-                false
+        String blockedReason =
+            scheduledAbortReason(origin, schedule);
+        if (blockedReason != null) {
+            logScheduleAborted(
+                scheduleId,
+                origin.requesterUuid(),
+                schedule.tool(),
+                runIndex,
+                blockedReason
             );
+            return CompletableFuture.completedFuture(false);
         }
 
         LunaStep.ToolCall nested =
@@ -1308,6 +1303,19 @@ public final class EmbeddedBrain {
             sentAt.plus(TOOL_TIMEOUT);
         UUID toolCallId = UUID.randomUUID();
         UUID actionId = UUID.randomUUID();
+
+        log.debug(
+            JarvisEvents.SCHEDULE_RUN_STARTED,
+            JarvisFields.of(
+                "scheduleId", scheduleId,
+                "runIndex", runIndex,
+                "requestId", origin.requestId(),
+                "requesterUuid", origin.requesterUuid(),
+                "tool", schedule.tool().wireName(),
+                "toolCallId", toolCallId,
+                "actionId", actionId
+            )
+        );
 
         CompletionStage<Void> preAudit =
             requirePreAudit(
@@ -1331,24 +1339,25 @@ public final class EmbeddedBrain {
             );
 
         return preAudit.thenCompose(ignored -> {
-            if (
-                stopped
-                    || !schedulingPolicy.stillAllowed(
-                        schedule
-                    )
-                    || !toolRuntime.activeTools().contains(
-                        schedule.tool()
-                    )
-                    || !executionPolicy.allows(
-                        schedule.tool(),
-                        origin.toolsAllowed(),
-                        "SCHEDULED"
-                    )
-            ) {
-                return CompletableFuture.completedFuture(
-                    false
+            String currentBlockedReason =
+                scheduledAbortReason(origin, schedule);
+            if (currentBlockedReason != null) {
+                logScheduleAborted(
+                    scheduleId,
+                    origin.requesterUuid(),
+                    schedule.tool(),
+                    runIndex,
+                    currentBlockedReason
                 );
+                return CompletableFuture.completedFuture(false);
             }
+
+            logToolStarted(
+                origin,
+                schedule.tool(),
+                toolCallId,
+                actionId
+            );
 
             CommonRuntime.ToolInvocation invocation =
                 new CommonRuntime.ToolInvocation(
@@ -1373,6 +1382,42 @@ public final class EmbeddedBrain {
                             clock.instant()
                         ).toMillis()
                     );
+
+                    logToolCompleted(
+                        origin,
+                        schedule.tool(),
+                        toolCallId,
+                        actionId,
+                        result,
+                        latency
+                    );
+                    log.debug(
+                        JarvisEvents.SCHEDULE_RUN_COMPLETED,
+                        JarvisFields.of(
+                            "scheduleId", scheduleId,
+                            "runIndex", runIndex,
+                            "requestId", origin.requestId(),
+                            "tool", schedule.tool().wireName(),
+                            "toolCallId", toolCallId,
+                            "actionId", actionId,
+                            "outcome", result.status(),
+                            "errorCode", toolErrorCode(result),
+                            "latencyMs", latency
+                        )
+                    );
+
+                    String abortReason =
+                        scheduleResultAbortReason(result);
+                    if (abortReason != null) {
+                        logScheduleAborted(
+                            scheduleId,
+                            origin.requesterUuid(),
+                            schedule.tool(),
+                            runIndex,
+                            abortReason
+                        );
+                    }
+
                     return tryPostAudit(
                         auditEvent(
                             origin,
@@ -1389,19 +1434,22 @@ public final class EmbeddedBrain {
                             POST_AUDIT_TIMEOUT
                         )
                     ).thenApply(postIgnored ->
-                        result.status()
-                            == io.github.kardane.jarvisminecraft.common.protocol.Protocol.ResultStatus.OK
-                            || result.status()
-                            == io.github.kardane.jarvisminecraft.common.protocol.Protocol.ResultStatus.EMPTY
+                        abortReason == null
                     );
                 });
-        }).handle(
-            (keepGoing, failure) ->
-                failure == null
-                    && Boolean.TRUE.equals(
-                        keepGoing
-                    )
-        );
+        }).handle((keepGoing, failure) -> {
+            if (failure != null) {
+                logScheduleAborted(
+                    scheduleId,
+                    origin.requesterUuid(),
+                    schedule.tool(),
+                    runIndex,
+                    scheduleFailureReason(failure)
+                );
+                return false;
+            }
+            return Boolean.TRUE.equals(keepGoing);
+        });
     }
 
     private CompletionStage<Void> requirePreAudit(
