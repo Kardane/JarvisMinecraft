@@ -125,9 +125,12 @@ that actor's pending schedules.
 
 `/jm reload` remains pending a later phase.
 
-A failed initial runtime-policy parse stops JARVIS startup. `ConfigManager`
-already provides fail-safe snapshot replacement semantics for the later reload
-command: an invalid replacement does not overwrite the previous valid snapshot.
+A failed initial runtime-policy parse stops JARVIS startup. 각 실행 runtime은
+하나의 `ConfigManager` snapshot을 interaction admission, Brain policy,
+response/status/logging 경로에 공유한다. Gateway는 서로 다른 manager를 섞은
+wiring을 거부한다. `ConfigManager` already provides fail-safe snapshot
+replacement semantics for the later reload command: an invalid replacement does
+not overwrite the previous valid snapshot.
 
 ### Paper
 
