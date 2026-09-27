@@ -7,5 +7,4 @@
 *.iml
 *.log
 .DS_Store
-/test-server/*
-!/test-server/README.md
+/test-server/
