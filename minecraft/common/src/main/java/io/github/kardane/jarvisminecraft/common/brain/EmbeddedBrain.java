@@ -27,6 +27,7 @@ import io.github.kardane.jarvisminecraft.common.runtime.SchedulingPolicy;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -284,7 +285,7 @@ public final class EmbeddedBrain {
                     request.requesterUuid(),
                     request.sessionId()
                 ),
-                capabilities,
+                currentCapabilities(),
                 request.mode()
             );
 
@@ -353,7 +354,7 @@ public final class EmbeddedBrain {
                 request.requestId(),
                 request.requesterName(),
                 history.history(request.requesterUuid(), request.sessionId()),
-                capabilities,
+                currentCapabilities(),
                 effectiveRouting.availableTools(),
                 budget.remainingToolCalls(),
                 budget.remainingModelRounds(),
@@ -451,6 +452,27 @@ public final class EmbeddedBrain {
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
         }
+    }
+
+    private List<Capability> currentCapabilities() {
+        if (!schedulingPolicy.schedulingEnabled()) {
+            return capabilities;
+        }
+        for (Capability capability : capabilities) {
+            if ("action.schedule".equals(capability.name())) {
+                return capabilities;
+            }
+        }
+        List<Capability> expanded =
+            new ArrayList<>(capabilities);
+        expanded.add(
+            new Capability(
+                "action.schedule",
+                "JarvisCommon",
+                "phase7"
+            )
+        );
+        return List.copyOf(expanded);
     }
 
     private DeterministicRoutePolicy.RoutingDecision currentRouting(
