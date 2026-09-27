@@ -88,19 +88,19 @@ public final class JarvisFabricMod implements ModInitializer {
                                         current.runtimeConfiguration().reload();
                                     if (result.success()) {
                                         context.getSource().sendFeedback(
-                                                    () -> Text.literal(
-                                                        "[JARVIS] Configuration reloaded."
-                                                    ),
-                                                    false
-                                                );
+                                            () -> Text.literal(
+                                                "[JARVIS] Configuration reloaded."
+                                            ),
+                                            false
+                                        );
                                         logReloadSuccess(result);
                                         return 1;
                                     }
                                     context.getSource().sendError(
-                                                    Text.literal(
-                                                        "[JARVIS] Reload failed; previous configuration remains active."
-                                                    )
-                                                );
+                                        Text.literal(
+                                            "[JARVIS] Reload failed; previous configuration remains active."
+                                        )
+                                    );
                                     LOGGER.warning(
                                         "JARVIS configuration reload failed; previous configuration remains active."
                                     );
@@ -288,7 +288,7 @@ public final class JarvisFabricMod implements ModInitializer {
 
         LOGGER.info(
             "JARVIS runtime policy config validated "
-                + "(interaction + proactive + reasoning + response + execution + scheduling policy active; admin commands pending): "
+                + "(interaction + proactive + reasoning + response + execution + scheduling policy active; /jm reload active): "
                 + JarvisConfigSummary.from(configManager.current()).toLogLine()
         );
         LOGGER.info(
