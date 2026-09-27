@@ -7,6 +7,10 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.LunaClient;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.OpenAiLunaClient;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
+import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
+import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
+import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.platform.AdapterPlatformAccess;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
@@ -34,6 +38,7 @@ import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ErrorCo
 public final class EmbeddedBrainGateway implements BrainGateway {
     private final EmbeddedBrain brain;
     private final ChatSessionManager sessions;
+    private final InteractionCoordinator interactions;
     private final AdapterPlatformAccess platform;
     private final ServerScheduler serverScheduler;
     private final Clock clock;
@@ -54,6 +59,31 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         this(
             brain,
             sessions,
+            new InteractionCoordinator(
+                sessions,
+                new ConfigManager(JarvisConfig::defaults)
+            ),
+            platform,
+            serverScheduler,
+            clock,
+            null,
+            null,
+            null
+        );
+    }
+
+    public EmbeddedBrainGateway(
+        EmbeddedBrain brain,
+        ChatSessionManager sessions,
+        InteractionCoordinator interactions,
+        AdapterPlatformAccess platform,
+        ServerScheduler serverScheduler,
+        Clock clock
+    ) {
+        this(
+            brain,
+            sessions,
+            interactions,
             platform,
             serverScheduler,
             clock,
@@ -66,6 +96,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     private EmbeddedBrainGateway(
         EmbeddedBrain brain,
         ChatSessionManager sessions,
+        InteractionCoordinator interactions,
         AdapterPlatformAccess platform,
         ServerScheduler serverScheduler,
         Clock clock,
@@ -75,6 +106,10 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     ) {
         this.brain = Objects.requireNonNull(brain, "brain");
         this.sessions = Objects.requireNonNull(sessions, "sessions");
+        this.interactions = Objects.requireNonNull(
+            interactions,
+            "interactions"
+        );
         this.platform = Objects.requireNonNull(platform, "platform");
         this.serverScheduler = Objects.requireNonNull(
             serverScheduler,
@@ -93,6 +128,39 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         String typesafeApiKey,
         Path auditDirectory,
         ChatSessionManager sessions,
+        ToolRegistry registry,
+        CommonRuntime commonRuntime,
+        ServerScheduler serverScheduler,
+        AdapterPlatformAccess platform,
+        Clock clock
+    ) {
+        return live(
+            serverId,
+            capabilities,
+            openAiApiKey,
+            typesafeApiKey,
+            auditDirectory,
+            sessions,
+            new InteractionCoordinator(
+                sessions,
+                new ConfigManager(JarvisConfig::defaults)
+            ),
+            registry,
+            commonRuntime,
+            serverScheduler,
+            platform,
+            clock
+        );
+    }
+
+    public static EmbeddedBrainGateway live(
+        String serverId,
+        List<Capability> capabilities,
+        String openAiApiKey,
+        String typesafeApiKey,
+        Path auditDirectory,
+        ChatSessionManager sessions,
+        InteractionCoordinator interactions,
         ToolRegistry registry,
         CommonRuntime commonRuntime,
         ServerScheduler serverScheduler,
@@ -149,6 +217,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         return new EmbeddedBrainGateway(
             brain,
             sessions,
+            interactions,
             platform,
             serverScheduler,
             clock,
@@ -209,7 +278,13 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 )
             );
         }
-        if (!platform.isOnlineOperator(requesterUuid)) {
+        PlayerIdentity currentPlayer = platform
+            .interactionPlayer(requesterUuid)
+            .orElse(null);
+        if (
+            currentPlayer == null
+                || !interactions.isAuthorized(currentPlayer)
+        ) {
             return CompletableFuture.completedFuture(false);
         }
         if (!sessions.isActive(requesterUuid, sessionId)) {
@@ -225,7 +300,8 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             mode,
             text,
             now,
-            now.plusMillis(RequestBudget.MAX_REQUEST_MILLIS)
+            now.plusMillis(RequestBudget.MAX_REQUEST_MILLIS),
+            currentPlayer.operator()
         );
 
         final CompletionStage<EmbeddedBrain.Reply> processing;
@@ -274,7 +350,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     ) {
         scheduleDelivery(() -> {
             if (
-                !platform.isOnlineOperator(requesterUuid)
+                !isInteractionAuthorized(requesterUuid)
                     || !sessions.isActive(requesterUuid, sessionId)
             ) {
                 return;
@@ -306,12 +382,18 @@ public final class EmbeddedBrainGateway implements BrainGateway {
         String text = safeErrorText(code);
         scheduleDelivery(() -> {
             if (
-                platform.isOnlineOperator(requesterUuid)
+                isInteractionAuthorized(requesterUuid)
                     && sessions.isActive(requesterUuid, sessionId)
             ) {
                 platform.sendPublicPlain(text);
             }
         });
+    }
+
+    private boolean isInteractionAuthorized(UUID requesterUuid) {
+        return platform.interactionPlayer(requesterUuid)
+            .map(interactions::isAuthorized)
+            .orElse(false);
     }
 
     private void scheduleDelivery(Runnable delivery) {

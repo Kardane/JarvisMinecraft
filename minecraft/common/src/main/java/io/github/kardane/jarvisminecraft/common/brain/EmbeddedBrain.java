@@ -167,7 +167,9 @@ public final class EmbeddedBrain {
                 )
             );
 
-            Set<ToolName> activeTools = toolRuntime.activeTools();
+            Set<ToolName> activeTools = request.toolsAllowed()
+                ? toolRuntime.activeTools()
+                : Set.of();
             JevInput input = JevInput.fromConversation(
                 history.history(request.requesterUuid(), request.sessionId()),
                 capabilities
@@ -605,8 +607,32 @@ public final class EmbeddedBrain {
         String mode,
         String text,
         Instant receivedAt,
-        Instant deadlineAt
+        Instant deadlineAt,
+        boolean toolsAllowed
     ) {
+        public ChatRequest(
+            UUID requestId,
+            UUID requesterUuid,
+            String requesterName,
+            UUID sessionId,
+            String mode,
+            String text,
+            Instant receivedAt,
+            Instant deadlineAt
+        ) {
+            this(
+                requestId,
+                requesterUuid,
+                requesterName,
+                sessionId,
+                mode,
+                text,
+                receivedAt,
+                deadlineAt,
+                true
+            );
+        }
+
         public ChatRequest {
             Objects.requireNonNull(requestId, "requestId");
             Objects.requireNonNull(requesterUuid, "requesterUuid");
