@@ -10,6 +10,7 @@ import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -107,7 +108,8 @@ final class GatewayReplyPresenter {
         UUID requesterUuid,
         UUID sessionId,
         EmbeddedBrain.Reply reply,
-        JarvisConfig.Response responseConfig
+        JarvisConfig.Response responseConfig,
+        long latencyMillis
     ) {
         scheduleDelivery(() -> {
             if (
@@ -123,7 +125,9 @@ final class GatewayReplyPresenter {
             platform.sendPublicStyled(
                 styled(
                     responseConfig,
-                    reply.text()
+                    reply.text(),
+                    reply.usage(),
+                    latencyMillis
                 )
             );
             playResponseSound(
@@ -151,7 +155,8 @@ final class GatewayReplyPresenter {
         UUID requesterUuid,
         UUID sessionId,
         Throwable failure,
-        JarvisConfig.Response responseConfig
+        JarvisConfig.Response responseConfig,
+        long latencyMillis
     ) {
         Throwable cause = unwrap(failure);
         ErrorCode code =
@@ -176,7 +181,12 @@ final class GatewayReplyPresenter {
                     )
             ) {
                 platform.sendPublicStyled(
-                    styled(responseConfig, text)
+                    styled(
+                        responseConfig,
+                        text,
+                        LunaStep.Usage.unavailable(),
+                        latencyMillis
+                    )
                 );
                 playResponseSound(
                     requesterUuid,
@@ -190,10 +200,65 @@ final class GatewayReplyPresenter {
         JarvisConfig.Response responseConfig,
         String body
     ) {
-        return StyledChatMessage.fromLegacyPrefix(
+        return StyledChatMessage.fromConfiguredPrefix(
             responseConfig.prefix(),
             body
         );
+    }
+
+    private StyledChatMessage styled(
+        JarvisConfig.Response responseConfig,
+        String body,
+        LunaStep.Usage usage,
+        long latencyMillis
+    ) {
+        StyledChatMessage message = styled(
+            responseConfig,
+            body
+        );
+        JarvisConfig.ResponseMetrics metrics =
+            responseConfig.metrics();
+        if (!metrics.enabled()) {
+            return message;
+        }
+        return message.withHoverSuffix(
+            " " + metrics.icon(),
+            metricsTooltip(
+                usage,
+                latencyMillis
+            )
+        );
+    }
+
+    private String metricsTooltip(
+        LunaStep.Usage usage,
+        long latencyMillis
+    ) {
+        StringBuilder tooltip = new StringBuilder();
+        if (usage.complete()) {
+            tooltip.append("Luna 토큰: ")
+                .append(usage.totalTokens())
+                .append("\n입력: ")
+                .append(usage.inputTokens())
+                .append(" / 출력: ")
+                .append(usage.outputTokens());
+        } else {
+            tooltip.append("Luna 토큰: 확인 불가");
+        }
+        tooltip.append("\n처리 시간: ");
+        if (latencyMillis < 1_000L) {
+            tooltip.append(latencyMillis)
+                .append(" ms");
+        } else {
+            tooltip.append(
+                String.format(
+                    Locale.ROOT,
+                    "%.2f s",
+                    latencyMillis / 1_000.0
+                )
+            );
+        }
+        return tooltip.toString();
     }
 
     private void playResponseSound(
