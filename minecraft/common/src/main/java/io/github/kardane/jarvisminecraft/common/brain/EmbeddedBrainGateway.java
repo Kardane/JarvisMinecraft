@@ -37,6 +37,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -566,6 +567,12 @@ public final class EmbeddedBrainGateway implements BrainGateway {
                 || !interactions.isAuthorized(current)
                 || sessions.activeSession(requesterUuid).isPresent()
         ) {
+            logProactiveIgnored(
+                requesterUuid,
+                "ACTOR_INELIGIBLE",
+                null,
+                null
+            );
             return CompletableFuture.completedFuture(false);
         }
 
@@ -716,6 +723,10 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             });
         } catch (RuntimeException failure) {
             proactiveInFlight.set(false);
+            logProactiveFailure(
+                requesterUuid,
+                "ACTIVATION_SCHEDULER_FAILED"
+            );
             accepted.complete(false);
         }
     }
