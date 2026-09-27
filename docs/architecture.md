@@ -1,6 +1,6 @@
 # Minecraft JARVIS Architecture
 
-Last updated: 2026-09-27  
+Last updated: 2026-09-28  
 Scope: current Paper, Fabric, and NeoForge Adapter architecture and the in-JVM Embedded Brain.
 
 ## Current Architecture
@@ -39,11 +39,11 @@ WebSocket transport, shared-secret authentication, hello/capabilities handshake,
 
 1. The platform Adapter constructs the current online player identity, and `InteractionCoordinator` evaluates the `OP / WHITELIST / ALL / BLACKLIST` audience, configurable wake word, active session, and termination/escape handling.
 2. `EmbeddedBrainGateway` delegates to `GatewayRequestCoordinator` as an API façade. The coordinator re-checks current identity and interaction authorization, creates the request, and submits it to the bounded `AiRequestScheduler`. If the requester is not currently an OP, the request's Tool set is fixed to empty.
-3. `EmbeddedBrain` prepares request budget/history/lifecycle state and delegates planning to `RequestPlanner`. `ExecutionPolicy` first filters the active Tool set using current runtime configuration, requester Tool authority, and interaction origin.
+3. `EmbeddedBrain` prepares request budget/history/lifecycle state, captures one immutable `PromptContentSnapshot` for the request, and delegates planning to `RequestPlanner`. `ExecutionPolicy` first filters the active Tool set using current runtime configuration, requester Tool authority, and interaction origin.
 4. `RequestPlanner` sends the latest message, bounded short topic, interaction origin, and capability names to Jev so `engagement + route + reasoning` are decided in one classification request.
 5. `DeterministicRoutePolicy` narrows the execution-filtered Tool set to the route category. Jev errors, `UNCERTAIN`, and low-confidence fallback expose read-only Tools only.
 6. `ReasoningPolicy` combines runtime configuration with the Jev result to select `NONE / LOW / MEDIUM / HIGH` for the request and applies the same effort to every Luna model round.
-7. `ModelConversationLoop` runs Luna rounds. Luna sees only allowed Tool schemas, and the latest `ExecutionPolicy` is re-applied both on subsequent model rounds and immediately before actual Tool execution in `ToolExecutionCoordinator`.
+7. `ModelConversationLoop` runs Luna rounds using the request's captured prompt snapshot for every round. `LunaPrompt` composes immutable Core Policy, optional operator persona, and bounded server knowledge in that order. Luna sees only allowed Tool schemas, and the latest `ExecutionPolicy` is re-applied both on subsequent model rounds and immediately before actual Tool execution in `ToolExecutionCoordinator`.
 8. Shared `ToolSpec` is the source of truth for Tool shape/range/schema. `ToolArgumentCodec` and Luna function schemas consume it together. Model output is strictly parsed again through `ToolArgumentCodec` and is not execution authority.
 9. A state-changing Tool reaches `CommonRuntime.ExecutionRuntime` only after `ToolExecutionCoordinator` completes pre-execution audit and a fresh `ExecutionPolicy` check. `schedule_action` / `cancel_scheduled_action` and repeated execution lifecycle are handled by `ScheduledToolCoordinator` using the same audit/policy support.
 10. `CommonRuntime` re-checks current OP status, active Tool, deadline, deduplication/action semantics, then invokes the real Minecraft/Provider API through the platform scheduler.
@@ -72,11 +72,13 @@ NeoForge read the optional
 `config/jarvisminecraft/jarvis.properties` file through the common
 properties source. Missing Fabric/NeoForge policy files use built-in defaults.
 
-Each runtime composition root creates exactly one `ConfigManager` and shares it with
-`InteractionCoordinator`, `EmbeddedBrainGateway`, `ReasoningPolicy`,
-`ExecutionPolicy`, `SchedulingPolicy`, and operational logging.
-Gateway wiring rejects configurations where interaction policy and Brain policy refer to
-different `ConfigManager` instances.
+Each production runtime composition root creates one `RuntimeConfigurationManager`.
+It owns a single atomic composite snapshot containing the validated `JarvisConfig`
+and `PromptContentSnapshot`. Its managed `ConfigManager` and
+`PromptContentManager` views are shared with interaction admission, Brain policy,
+prompt composition, scheduling, response/status, and operational logging. Reload
+publishes a new composite snapshot only after both structured configuration and prompt
+content validate successfully. Gateway wiring rejects split configuration ownership.
 
 Phase 2 consumes the base interaction portion through
 `InteractionCoordinator`, `AudiencePolicy`, and `InvocationMatcher`.
@@ -159,12 +161,54 @@ Tool registration, pre-execution audit, and current online OP authority through
 or outcome-unknown run stops the remaining repetition. Pending schedules are
 memory-only and are cancelled on actor invalidation or Brain shutdown.
 
-Admin reload commands are still not wired.
-
 Provider credentials and logical server identity remain in
 `EmbeddedBrainSettings`; they are not copied into `JarvisConfig`.
-`ConfigManager.reload()` replaces the snapshot only after a complete
-successful parse, otherwise the previous valid snapshot remains active.
+`/jm reload` is OP-only on all three platforms and delegates to the atomic
+runtime configuration coordinator. File/config loading runs on the dedicated
+`jarvis-config-reload` executor rather than the Minecraft server thread; completion
+is handed back to the platform server thread. Failed reloads leave the complete
+previous runtime snapshot active.
+
+## Configurable Persona and Server Knowledge
+
+JARVIS supports operator-editable prompt context without model fine-tuning or persistent
+model memory. The platform data directory contains:
+
+```text
+persona.md
+knowledge/
+  README.md
+  *.md
+```
+
+Paper uses `plugins/JarvisMinecraft/`; Fabric and NeoForge use
+`config/jarvisminecraft/`. On first startup, shared common code creates
+`persona.md` and `knowledge/README.md` only when absent and never overwrites
+operator edits. `knowledge/README.md` is guidance only and is explicitly excluded
+from model context.
+
+`PromptContentLoader` accepts UTF-8 Markdown only, does not recurse, ignores
+non-Markdown files and the knowledge README, sorts knowledge filenames
+deterministically, rejects path/symlink escapes, and enforces configured file/count
+bounds. Missing optional content remains valid.
+
+The prompt precedence is:
+
+1. compiled Core Policy and deterministic Java authority;
+2. current Tool exposure and live Tool results;
+3. configured persona;
+4. configured server knowledge;
+5. bounded conversation/current request.
+
+Persona can influence tone, verbosity, formality, language preference, naming, and
+conversational style. Knowledge is reference context that may be stale or incomplete.
+Neither can grant Tool permissions, change execution mode, weaken audit, override
+current OP/server authority, alter scheduling/deadline rules, or broaden the active Tool
+set. Current Tool evidence wins over configured knowledge for live server state.
+
+One `PromptContentSnapshot` is captured when a Brain request begins and is reused
+across every Luna Tool round in that request. A successful reload affects only new
+requests; an in-flight request never changes persona midway through execution.
 
 ## Session and Conversation State
 
@@ -199,7 +243,7 @@ Operational Logging Phases L1–L6 are connected to the shared runtime.
 
 ## AI and Threading Boundary
 
-Jev and Luna network calls do not occupy the Minecraft server/tick thread. Only platform API calls run in each platform's scheduler/execution context. Jev receives only the latest user message, bounded short topic, interaction origin, and capability names. Luna receives only the bounded conversation, capabilities, and allowed Tool schemas/results needed for request processing. Progress delay waits on the JDK delayed executor, while actual message/sound API calls return to the platform `ServerScheduler`.
+Jev and Luna network calls do not occupy the Minecraft server/tick thread. Runtime reload disk/config I/O runs on the dedicated `jarvis-config-reload` executor. Only platform API calls and completion delivery run in each platform's required server-thread scheduler/execution context. Jev receives only the latest user message, bounded short topic, interaction origin, and capability names. Luna receives only the bounded conversation, the captured persona/knowledge snapshot, capabilities, and allowed Tool schemas/results needed for request processing. Progress delay waits on the JDK delayed executor, while actual message/sound API calls return to the platform `ServerScheduler`.
 
 ## Audit
 
