@@ -9,6 +9,7 @@ import net.minecraft.server.PlayerManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
+import net.minecraft.text.HoverEvent;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Style;
 import net.minecraft.text.Text;
@@ -378,6 +379,20 @@ public final class MinecraftFabricPlatformAccess implements FabricPlatformAccess
             );
         }
         output.append(Text.literal(message.body()));
+        for (StyledChatMessage.HoverSegment segment : message.suffix()) {
+            output.append(
+                Text.literal(segment.text())
+                    .setStyle(
+                        Style.EMPTY.withHoverEvent(
+                            new HoverEvent.ShowText(
+                                Text.literal(
+                                    segment.hoverText()
+                                )
+                            )
+                        )
+                    )
+            );
+        }
         return output;
     }
 
