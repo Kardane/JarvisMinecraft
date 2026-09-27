@@ -904,12 +904,33 @@ public final class EmbeddedBrain {
             !toolRuntime.activeTools().contains(
                 arguments.tool()
             )
-                || !executionPolicy.allows(
-                    arguments.tool(),
-                    request.toolsAllowed(),
-                    request.mode()
-                )
         ) {
+            logToolDenied(
+                request,
+                arguments.tool(),
+                ExecutionPolicy.DenialReason.TOOL_INACTIVE,
+                null
+            );
+            return CompletableFuture.failedFuture(
+                new ProtocolException(
+                    ErrorCode.UNSUPPORTED,
+                    "Nested scheduled Tool is not currently allowed."
+                )
+            );
+        }
+        ExecutionPolicy.Decision nestedDecision =
+            executionPolicy.evaluate(
+                arguments.tool(),
+                request.toolsAllowed(),
+                request.mode()
+            );
+        if (!nestedDecision.allowed()) {
+            logToolDenied(
+                request,
+                arguments.tool(),
+                nestedDecision.reason(),
+                null
+            );
             return CompletableFuture.failedFuture(
                 new ProtocolException(
                     ErrorCode.UNSUPPORTED,
@@ -950,21 +971,57 @@ public final class EmbeddedBrain {
             schedulingPolicy.validateRegistration(
                 arguments
             );
-            if (
-                !executionPolicy.allows(
+            ExecutionPolicy.Decision scheduleDecision =
+                executionPolicy.evaluate(
                     call.tool(),
                     request.toolsAllowed(),
                     request.mode()
+                );
+            if (!scheduleDecision.allowed()) {
+                logToolDenied(
+                    request,
+                    call.tool(),
+                    ExecutionPolicy.DenialReason.POLICY_CHANGED,
+                    scheduleDecision.reason()
+                );
+                return CompletableFuture.failedFuture(
+                    new ProtocolException(
+                        ErrorCode.UNSUPPORTED,
+                        "Schedule was denied by the current policy."
+                    )
+                );
+            }
+            if (
+                !toolRuntime.activeTools().contains(
+                    arguments.tool()
                 )
-                    || !toolRuntime.activeTools().contains(
-                        arguments.tool()
-                    )
-                    || !executionPolicy.allows(
-                        arguments.tool(),
-                        request.toolsAllowed(),
-                        request.mode()
-                    )
             ) {
+                logToolDenied(
+                    request,
+                    arguments.tool(),
+                    ExecutionPolicy.DenialReason.TOOL_INACTIVE,
+                    null
+                );
+                return CompletableFuture.failedFuture(
+                    new ProtocolException(
+                        ErrorCode.UNSUPPORTED,
+                        "Schedule was denied by the current policy."
+                    )
+                );
+            }
+            ExecutionPolicy.Decision currentNestedDecision =
+                executionPolicy.evaluate(
+                    arguments.tool(),
+                    request.toolsAllowed(),
+                    request.mode()
+                );
+            if (!currentNestedDecision.allowed()) {
+                logToolDenied(
+                    request,
+                    arguments.tool(),
+                    ExecutionPolicy.DenialReason.POLICY_CHANGED,
+                    currentNestedDecision.reason()
+                );
                 return CompletableFuture.failedFuture(
                     new ProtocolException(
                         ErrorCode.UNSUPPORTED,
@@ -973,19 +1030,38 @@ public final class EmbeddedBrain {
                 );
             }
 
+            logToolStarted(
+                request,
+                call.tool(),
+                toolCallId,
+                actionId
+            );
+
             ToolResult result;
             try {
                 ScheduledActionService.Snapshot snapshot =
                     scheduledActions.schedule(
                         request.requesterUuid(),
                         arguments,
-                        runIndex -> runScheduledAction(
+                        (scheduleId, runIndex) -> runScheduledAction(
                             request,
                             routing,
                             arguments,
+                            scheduleId,
                             runIndex
                         )
                     );
+                log.info(
+                    JarvisEvents.SCHEDULE_CREATED,
+                    JarvisFields.of(
+                        "scheduleId", snapshot.scheduleId(),
+                        "requesterUuid", request.requesterUuid(),
+                        "tool", arguments.tool().wireName(),
+                        "delaySeconds", arguments.delaySeconds(),
+                        "intervalSeconds", arguments.intervalSeconds(),
+                        "durationSeconds", arguments.durationSeconds()
+                    )
+                );
                 result = ToolResult.ok(
                     new ScheduledActionData(
                         snapshot.scheduleId(),
@@ -1064,13 +1140,19 @@ public final class EmbeddedBrain {
                 request.requesterUuid(),
                 request.sessionId()
             );
-            if (
-                !executionPolicy.allows(
+            ExecutionPolicy.Decision cancelDecision =
+                executionPolicy.evaluate(
                     call.tool(),
                     request.toolsAllowed(),
                     request.mode()
-                )
-            ) {
+                );
+            if (!cancelDecision.allowed()) {
+                logToolDenied(
+                    request,
+                    call.tool(),
+                    ExecutionPolicy.DenialReason.POLICY_CHANGED,
+                    cancelDecision.reason()
+                );
                 return CompletableFuture.failedFuture(
                     new ProtocolException(
                         ErrorCode.UNSUPPORTED,
@@ -1079,10 +1161,26 @@ public final class EmbeddedBrain {
                 );
             }
 
+            logToolStarted(
+                request,
+                call.tool(),
+                toolCallId,
+                actionId
+            );
+
             boolean cancelled = scheduledActions.cancel(
                 request.requesterUuid(),
                 arguments.scheduleId()
             );
+            if (cancelled) {
+                log.info(
+                    JarvisEvents.SCHEDULE_CANCELLED,
+                    JarvisFields.of(
+                        "scheduleId", arguments.scheduleId(),
+                        "requesterUuid", request.requesterUuid()
+                    )
+                );
+            }
             ToolResult result = cancelled
                 ? ToolResult.ok(
                     new CancelScheduledActionData(
@@ -1129,6 +1227,14 @@ public final class EmbeddedBrain {
                 startedAt,
                 clock.instant()
             ).toMillis()
+        );
+        logToolCompleted(
+            request,
+            call.tool(),
+            toolCallId,
+            actionId,
+            result,
+            latency
         );
         return tryPostAudit(
             auditEvent(
