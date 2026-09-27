@@ -39,15 +39,16 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 
 1. 플랫폼 Adapter가 현재 온라인 플레이어 identity를 만들고 `InteractionCoordinator`가 `OP / WHITELIST / ALL / BLACKLIST` audience, configurable wake word, active session, 종료/escape를 판정한다.
 2. `EmbeddedBrainGateway`가 현재 identity와 interaction authorization을 다시 확인하고 request를 생성해 bounded `AiRequestScheduler`로 넘긴다. requester가 현재 OP가 아니면 request의 Tool set은 빈 집합으로 고정된다.
-3. Jev가 latest message, short topic, interaction origin, capability 이름을 받아 `engagement + route + reasoning`을 한 요청에서 판단한다.
-4. `DeterministicRoutePolicy`가 active Tool set을 route category에 맞게 좁힌다. Jev 오류, `UNCERTAIN`, 저신뢰 fallback에서는 read-only Tool만 노출한다.
-5. `ReasoningPolicy`가 runtime config와 Jev 결과를 결합해 요청별 `NONE / LOW / MEDIUM / HIGH` 값을 확정하고, Luna의 모든 model round에 동일한 effort를 적용한다.
-6. Luna는 허용된 Tool schema만 보고 Tool call을 제안한다.
-7. Tool 인자는 공용 `ToolArgumentCodec`으로 다시 strict parsing된다. 모델 출력은 실행 권한이 아니다.
-8. 상태 변경 Tool은 pre-execution audit 성공 후에만 `CommonRuntime.ExecutionRuntime`으로 전달된다.
-9. `CommonRuntime`이 current OP, active Tool, deadline, deduplication/action semantics를 재검사하고 플랫폼 scheduler에서 실제 Minecraft/Provider API를 호출한다.
-10. Tool result를 Luna가 해석해 최종 답을 만든다.
-11. `EmbeddedBrainGateway`는 server thread로 돌아가 현재 interaction authorization과 active session을 다시 확인한 뒤 응답을 public chat으로 broadcast한다.
+3. `ExecutionPolicy`가 현재 runtime config, requester Tool authority, interaction origin으로 active Tool set을 먼저 제한한다.
+4. Jev가 latest message, short topic, interaction origin, capability 이름을 받아 `engagement + route + reasoning`을 한 요청에서 판단한다.
+5. `DeterministicRoutePolicy`가 execution-filtered Tool set을 route category에 맞게 좁힌다. Jev 오류, `UNCERTAIN`, 저신뢰 fallback에서는 read-only Tool만 노출한다.
+6. `ReasoningPolicy`가 runtime config와 Jev 결과를 결합해 요청별 `NONE / LOW / MEDIUM / HIGH` 값을 확정하고, Luna의 모든 model round에 동일한 effort를 적용한다.
+7. Luna는 허용된 Tool schema만 보고 Tool call을 제안한다. 후속 model round와 실제 Tool 실행 직전에도 최신 `ExecutionPolicy`를 다시 적용한다.
+8. Tool 인자는 공용 `ToolArgumentCodec`으로 다시 strict parsing된다. 모델 출력은 실행 권한이 아니다.
+9. 상태 변경 Tool은 pre-execution audit 성공 후 최신 `ExecutionPolicy`를 한 번 더 통과해야 `CommonRuntime.ExecutionRuntime`으로 전달된다.
+10. `CommonRuntime`이 current OP, active Tool, deadline, deduplication/action semantics를 재검사하고 플랫폼 scheduler에서 실제 Minecraft/Provider API를 호출한다.
+11. Tool result를 Luna가 해석해 최종 답을 만든다.
+12. `EmbeddedBrainGateway`는 server thread로 돌아가 현재 interaction authorization과 active session을 다시 확인한 뒤 응답을 public chat으로 broadcast한다.
 
 ## 권한과 안전 불변조건
 
@@ -103,8 +104,24 @@ appear after the final response.
 When response sound is enabled, final/error chat stays public while the sound
 is played only to the requester. Sound feedback failure is non-critical.
 
-Execution-mode Tool filtering, scheduling, and admin reload commands are still
-not wired.
+Phase 5 now consumes `jarvis.execution.*` through `ExecutionPolicy`.
+
+- `READ_TALK`: active read-only Tools only.
+- `EXECUTE_LITE`: read-only Tools plus explicitly allowlisted LOW-risk state-changing Tools.
+- `EXECUTE`: read-only Tools plus explicitly allowlisted state-changing Tools.
+- selected-mode `deny-tools` overrides allow and may also hide read-only Tools.
+- non-OP requesters still receive no Minecraft Tools regardless of mode.
+- proactive origins are hard-blocked from state-changing Tools.
+
+Allow/deny entries use exact `ToolName.wireName()` values. Unknown names are a
+configuration error; allow lists may contain only state-changing Tools, and the
+LITE allow list may contain only LOW-risk Tools.
+
+An in-flight request cannot gain newly permitted mutation Tools after it starts.
+Policy tightening is re-applied before every model round and again immediately
+before Tool execution, including after pre-execution audit.
+
+Scheduling and admin reload commands are still not wired.
 
 Provider credentials and logical server identity remain in
 `EmbeddedBrainSettings`; they are not copied into `JarvisConfig`.

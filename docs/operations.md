@@ -58,8 +58,19 @@ Phase 4 applies `jarvis.response.*`:
 
 Session-start/end notices still use the legacy platform notice path.
 
-Execution-mode Tool filtering, scheduling, and `/jm reload` remain pending
-later phases.
+Phase 5 applies `jarvis.execution.*`:
+
+- `READ_TALK`: active read-only Tools only.
+- `EXECUTE_LITE`: read-only Tools plus LOW-risk state-changing Tools explicitly listed in `lite.allow-tools`.
+- `EXECUTE`: read-only Tools plus state-changing Tools explicitly listed in `full.allow-tools`.
+- `deny-tools` takes precedence and may hide read-only Tools too.
+- execution actor remains `OP`; broader chat audience does not grant Tool authority.
+
+Tool names are exact wire names such as `teleport_staff`. Unknown names,
+read-only entries in allow lists, and non-LOW entries in the LITE allow list
+fail configuration validation.
+
+Scheduling and `/jm reload` remain pending later phases.
 
 A failed initial runtime-policy parse stops JARVIS startup. `ConfigManager`
 already provides fail-safe snapshot replacement semantics for the later reload
@@ -140,6 +151,7 @@ InteractionCoordinator
   -> ChatSessionManager
   -> EmbeddedBrainGateway
   -> AiRequestScheduler
+  -> ExecutionPolicy
   -> Jev (engagement + route + reasoning)
   -> DeterministicRoutePolicy
   -> ReasoningPolicy
@@ -214,6 +226,14 @@ Progress is scheduled only after the configured threshold. Completion marks the
 progress handle first. Before actual public delivery, current interaction
 authorization, active session, and completion state are checked again. Progress
 feedback does not play the final-response sound.
+
+### Execution policy change
+
+An in-flight request keeps the Tool ceiling established when it began, so a
+later policy relaxation cannot add new mutation Tools to that request. Policy
+tightening is applied before each Luna round and immediately before execution.
+A state-changing Tool is checked before pre-audit and again after the audit
+record succeeds, before handoff to `CommonRuntime`.
 
 ### Audit failure
 
