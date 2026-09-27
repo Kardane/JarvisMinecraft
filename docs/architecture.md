@@ -72,11 +72,23 @@ NeoForge read the optional
 `config/jarvisminecraft/jarvis.properties` file through the common
 properties source. Missing Fabric/NeoForge policy files use built-in defaults.
 
-Phase 2 now consumes the interaction portion of that snapshot through
+Phase 2 consumes the base interaction portion through
 `InteractionCoordinator`, `AudiencePolicy`, and `InvocationMatcher`.
 Wake words, follow-up TTL, and `OP / WHITELIST / ALL / BLACKLIST` admission
-are live. `ACTIVE` currently retains the same direct-invocation/follow-up
-path as `PASSIVE`; proactive ambient-chat initiation remains a later phase.
+are live.
+
+Phase 8 completes `ACTIVE` mode. Allowed public chat remains normal public
+chat while `AmbientConversationTracker` keeps bounded in-memory context.
+Only one proactive Jev classification may be in flight at a time, with a
+one-second minimum classification interval. Jev receives
+`PROACTIVE_CANDIDATE`; only `START_CONVERSATION` at or above the configured
+confidence threshold may create a JARVIS session. Jev failure, invalid output,
+`IGNORE`, low confidence, audience change, an already-active requester
+session, or cooldown all fail closed with no unsolicited reply.
+
+A successful proactive decision starts a requester-scoped follow-up session and
+submits bounded ambient context using the `PROACTIVE` origin. The normal
+public message is never cancelled.
 
 Phase 3 now consumes the model reasoning portion. `JdkJevClassifier` asks
 three typed choice questions in parallel: `engagement`, `route`, and
@@ -87,9 +99,9 @@ three typed choice questions in parallel: `engagement`, `route`, and
 3. Jev error/invalid model/output uses the configured concrete fallback.
 
 The chosen effort is fixed for the whole Brain request, including later Tool
-rounds. Jev engagement is collected and validated now, but admitted
-`DIRECT/FOLLOW_UP` requests are not suppressed by it. Proactive
-`START_CONVERSATION/IGNORE` behavior remains a later ACTIVE-mode phase.
+rounds. `DIRECT/FOLLOW_UP/PROACTIVE` are already admitted response paths and
+use Jev engagement only as classification metadata. `PROACTIVE_CANDIDATE`
+uses `START_CONVERSATION/IGNORE` as the Phase 8 admission signal.
 
 Phase 4 now consumes the response portion. AI final/error replies and delayed
 progress messages use a platform-neutral `StyledChatMessage`. Only the
@@ -199,3 +211,33 @@ OPENAI_API_KEY=... TYPESAFE_API_KEY=... \
 ```
 
 구체적인 운영 설정과 장애 절차는 [operations.md](operations.md)를 따른다. Embedded 전환 결정은 [ADR-0007](decisions/0007-embedded-brain-boundary.md)에 기록한다.
+
+
+## ACTIVE proactive flow — Phase 8
+
+```text
+allowed PUBLIC_CHAT
+  -> normal Minecraft public chat continues
+  -> AmbientConversationTracker
+  -> asynchronous Jev(PROACTIVE_CANDIDATE)
+  -> START_CONVERSATION + confidence threshold
+  -> server-thread recheck: ACTIVE + audience + requester session + cooldown
+  -> start requester session
+  -> EmbeddedBrain PROACTIVE request
+  -> read-only Tool ceiling only
+  -> public JARVIS reply
+```
+
+ACTIVE proactive classification does not block the Minecraft tick thread.
+Paper moves observation through its server scheduler before entering the
+gateway; Fabric and NeoForge observe from their server-thread chat callbacks.
+Jev HTTP work remains asynchronous.
+
+`ExecutionPolicy` rejects every state-changing Tool for
+`PROACTIVE/PROACTIVE_CANDIDATE`, including scheduling control Tools. An OP
+proactive turn may still use currently allowed read-only server queries. A
+non-OP proactive turn receives no Minecraft Tools.
+
+Proactive turns do not emit delayed progress/waiting messages. Final responses
+use the normal public prefix and requester-only sound policy, and the created
+session accepts normal follow-up messages.

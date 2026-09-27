@@ -35,9 +35,23 @@ credentials. Phase 2 applies the interaction subset at runtime:
 - `jarvis.interaction.follow-up-seconds`
 - `jarvis.interaction.audience.*`
 
-`PASSIVE` is the default. `ACTIVE` currently behaves like PASSIVE for direct
-invocations and active-session follow-ups; proactive ambient-chat initiation is
-not implemented yet.
+`PASSIVE` remains the default. In `ACTIVE`, wake-word and follow-up behavior
+is unchanged, and allowed public chat is additionally observed for proactive
+engagement. Public chat is never suppressed by this observation.
+
+ACTIVE proactive behavior:
+
+- retain at most 50 ambient messages internally; pass only
+  `proactive.context-messages` to a decision;
+- only one proactive Jev request is in flight at a time;
+- classification starts no more than once per second;
+- require `START_CONVERSATION` and
+  `proactive.confidence-threshold`;
+- after a proactive session starts, enforce the configured server-wide
+  `proactive.cooldown-seconds`;
+- recheck ACTIVE mode, audience authorization, requester session state, and
+  cooldown on the server thread before starting the session;
+- Jev failure/IGNORE/low confidence produces no JARVIS message.
 
 Phase 3 applies `jarvis.model.reasoning.*`:
 
@@ -346,3 +360,19 @@ Never commit credentials or generated environment files.
 The old protocol schema/fixtures and `tests/acceptance/out` results are retained as historical compatibility/evidence assets. They do not describe an active WebSocket service after E14.
 
 Node-based Brain and acceptance runners were removed. New runtime verification should target the Embedded Java path.
+
+
+## ACTIVE-mode operational notes
+
+ACTIVE mode can generate more Jev traffic than PASSIVE because ordinary allowed
+public chat may become a proactive candidate. Runtime pressure is bounded by one
+in-flight proactive classifier and a one-second classification interval.
+
+Proactive context is memory-only and not persisted. Actor invalidation removes
+that actor's retained ambient entries. A proactive response creates the same
+requester-scoped follow-up session used by direct invocation.
+
+For safety, proactive requests cannot receive state-changing Tools, including
+`teleport_staff`, `weather_set`, `time_set`, `schedule_action`, or
+`cancel_scheduled_action`. This remains true even when execution mode is
+`EXECUTE`.
