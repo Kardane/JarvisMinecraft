@@ -7,6 +7,8 @@ typesafe-api-key: ""
 # intentionally deferred to later phases so current v0.1 behavior is unchanged.
 jarvis:
   interaction:
+    # PASSIVE: wake-word/session interaction only.
+    # ACTIVE: observe allowed public chat and let Jev decide whether JARVIS should initiate.
     mode: PASSIVE
     wake-words:
       - "자비스"
@@ -20,8 +22,11 @@ jarvis:
       blacklist: []
 
     proactive:
+      # ACTIVE mode only. Bounded public-chat context supplied to Jev/Luna.
       context-messages: 12
+      # Server-wide gap after a proactive conversation starts.
       cooldown-seconds: 15
+      # Minimum Jev START_CONVERSATION confidence.
       confidence-threshold: 0.75
 
   model:
