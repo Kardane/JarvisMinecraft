@@ -274,19 +274,19 @@ public record JarvisConfig(
             requireRange(
                 maxFiles,
                 1,
-                PromptContentLoader.Limits.DEFAULT_KNOWLEDGE_MAX_FILES,
+                Integer.MAX_VALUE,
                 "knowledge.maxFiles"
             );
             requireRange(
                 maxFileBytes,
                 1,
-                PromptContentLoader.Limits.DEFAULT_KNOWLEDGE_MAX_FILE_BYTES,
+                Integer.MAX_VALUE,
                 "knowledge.maxFileBytes"
             );
             requireRange(
                 maxTotalBytes,
                 1,
-                PromptContentLoader.Limits.DEFAULT_KNOWLEDGE_MAX_TOTAL_BYTES,
+                Integer.MAX_VALUE,
                 "knowledge.maxTotalBytes"
             );
             if (maxFileBytes > maxTotalBytes) {
