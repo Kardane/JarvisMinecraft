@@ -3,6 +3,7 @@ package io.github.kardane.jarvisminecraft.common.config;
 import io.github.kardane.jarvisminecraft.common.prompt.PromptContentLoader;
 import io.github.kardane.jarvisminecraft.common.prompt.PromptContentManager;
 import io.github.kardane.jarvisminecraft.common.prompt.PromptContentSnapshot;
+import io.github.kardane.jarvisminecraft.common.prompt.PromptContentTemplates;
 
 import java.nio.file.Path;
 import java.util.Objects;
@@ -27,6 +28,10 @@ public final class RuntimeConfigurationManager {
         this.configLoader = Objects.requireNonNull(
             configLoader,
             "configLoader"
+        );
+
+        PromptContentTemplates.ensureDefaults(
+            this.configRoot
         );
 
         JarvisConfig initialConfig =
