@@ -47,8 +47,9 @@ jarvis:
     max-total-bytes: 131072
 
   response:
-    # Legacy Minecraft ampersand codes are supported in the prefix only.
-    # Example: "&5[JARVIS]&r "
+    # Legacy Minecraft ampersand codes and <#RRGGBB> hex colors are supported
+    # in the prefix only.
+    # Examples: "&5[JARVIS]&r " or "<#FF00FF>[JARVIS]&r "
     prefix: "[JARVIS] "
     waiting-message:
       enabled: true
@@ -57,12 +58,31 @@ jarvis:
         - "잠시만요."
         - "확인해볼게요."
         - "서버 상태를 살펴보고 있어요."
+        - "조금만 기다려 주세요."
+        - "요청을 확인하고 있어요."
+        - "필요한 정보를 모으고 있어요."
+        - "서버 데이터를 확인 중이에요."
+        - "관련 상태를 조회하고 있어요."
+        - "요청 내용을 정리하고 있어요."
+        - "확인할 항목을 살펴보고 있어요."
+        - "잠깐 확인해볼게요."
+        - "처리할 내용을 점검하고 있어요."
+        - "서버에서 확인 중이에요."
+        - "필요한 상태를 불러오고 있어요."
+        - "요청을 처리하고 있어요."
+        - "곧 답변드릴게요."
 
     sound:
       enabled: false
       id: "minecraft:block.note_block.pling"
       volume: 1.0
       pitch: 1.0
+
+    # Appends only this icon to final/error replies. Hover it to view Luna
+    # token usage and total request processing time.
+    metrics:
+      enabled: true
+      icon: "📊"
 
   execution:
     # READ_TALK: read-only Tools only.
