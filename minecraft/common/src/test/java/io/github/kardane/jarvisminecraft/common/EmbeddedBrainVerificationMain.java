@@ -17,6 +17,7 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.LunaClient;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaTurnInput;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.platform.AdapterPlatformAccess;
@@ -68,6 +69,7 @@ public final class EmbeddedBrainVerificationMain {
         gatewayDeliveryAuthorityRecheck();
         gatewayCancellationOwnsSession();
         gatewayStopSuppressesLateDelivery();
+        gatewayRejectsSplitConfigOwnership();
         jsonlAuditContract();
         settingsContract();
         System.out.println("Embedded Brain E8-E10 verification OK");
@@ -508,6 +510,54 @@ public final class EmbeddedBrainVerificationMain {
         require(
             platform.messages.isEmpty(),
             "Gateway delivered a response after stop."
+        );
+    }
+
+    private static void gatewayRejectsSplitConfigOwnership() {
+        ChatSessionManager sessions = new ChatSessionManager(CLOCK);
+        ConfigManager interactionConfig =
+            new ConfigManager(JarvisConfig::defaults);
+        ConfigManager brainConfig =
+            new ConfigManager(JarvisConfig::defaults);
+        InteractionCoordinator interactions =
+            new InteractionCoordinator(
+                sessions,
+                interactionConfig
+            );
+
+        ToolRegistry registry = new ToolRegistry();
+        FakePlatform platform = new FakePlatform(true);
+        CommonRuntime runtime = new CommonRuntime(
+            registry,
+            directScheduler(),
+            platform::isOnlineOperator,
+            CLOCK
+        );
+
+        boolean rejected = false;
+        try {
+            EmbeddedBrainGateway.live(
+                SERVER_ID,
+                capabilities(),
+                "",
+                "",
+                Path.of("."),
+                sessions,
+                interactions,
+                brainConfig,
+                registry,
+                runtime,
+                directScheduler(),
+                platform,
+                CLOCK
+            );
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+
+        require(
+            rejected,
+            "Gateway accepted split ConfigManager ownership."
         );
     }
 
