@@ -214,7 +214,7 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         brain.start();
         getLogger().info(
             "JARVIS runtime policy config validated "
-                + "(interaction + proactive + reasoning + response + execution + scheduling policy active; admin commands pending): "
+                + "(interaction + proactive + reasoning + response + execution + scheduling policy active; /jm reload active): "
                 + JarvisConfigSummary.from(configManager.current()).toLogLine()
         );
         getLogger().info(
