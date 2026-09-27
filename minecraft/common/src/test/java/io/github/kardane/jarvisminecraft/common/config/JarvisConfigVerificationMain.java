@@ -11,6 +11,7 @@ public final class JarvisConfigVerificationMain {
         verifyDefaults();
         verifyPropertiesOverride();
         verifyInvalidConfigRejected();
+        verifyPromptContentBoundsRejected();
         verifyReloadFailureKeepsPreviousSnapshot();
         System.out.println("JarvisConfig verification OK");
     }
@@ -42,6 +43,20 @@ public final class JarvisConfigVerificationMain {
             !config.scheduling().enabled(),
             "Scheduling must default to disabled."
         );
+        require(
+            !config.personality().enabled(),
+            "Custom personality must default to disabled."
+        );
+        require(
+            !config.knowledge().enabled(),
+            "Custom knowledge must default to disabled."
+        );
+        require(
+            config.knowledge().maxFiles() == 32
+                && config.knowledge().maxFileBytes() == 32 * 1024
+                && config.knowledge().maxTotalBytes() == 128 * 1024,
+            "Prompt-content limits must retain the documented defaults."
+        );
     }
 
     private static void verifyPropertiesOverride() {
@@ -53,6 +68,26 @@ public final class JarvisConfigVerificationMain {
         properties.setProperty(
             "jarvis.interaction.follow-up-seconds",
             "90"
+        );
+        properties.setProperty(
+            "jarvis.personality.enabled",
+            "true"
+        );
+        properties.setProperty(
+            "jarvis.knowledge.enabled",
+            "true"
+        );
+        properties.setProperty(
+            "jarvis.knowledge.max-files",
+            "12"
+        );
+        properties.setProperty(
+            "jarvis.knowledge.max-file-bytes",
+            "16384"
+        );
+        properties.setProperty(
+            "jarvis.knowledge.max-total-bytes",
+            "65536"
         );
         properties.setProperty(
             "jarvis.response.sound.enabled",
@@ -79,6 +114,17 @@ public final class JarvisConfigVerificationMain {
             config.response().sound().enabled(),
             "Properties boolean override failed."
         );
+        require(
+            config.personality().enabled(),
+            "Personality boolean override failed."
+        );
+        require(
+            config.knowledge().enabled()
+                && config.knowledge().maxFiles() == 12
+                && config.knowledge().maxFileBytes() == 16384
+                && config.knowledge().maxTotalBytes() == 65536,
+            "Knowledge bounds override failed."
+        );
     }
 
     private static void verifyInvalidConfigRejected() {
@@ -97,6 +143,50 @@ public final class JarvisConfigVerificationMain {
             rejected = true;
         }
         require(rejected, "Invalid config must fail validation.");
+    }
+
+    private static void verifyPromptContentBoundsRejected() {
+        Properties properties = new Properties();
+        properties.setProperty(
+            "jarvis.knowledge.max-files",
+            "33"
+        );
+
+        boolean rejected = false;
+        try {
+            JarvisConfigLoader.load(
+                PropertiesJarvisConfigSource.from(properties)
+            );
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        require(
+            rejected,
+            "Knowledge limits above the hard safety bound must be rejected."
+        );
+
+        Properties inconsistent = new Properties();
+        inconsistent.setProperty(
+            "jarvis.knowledge.max-file-bytes",
+            "32768"
+        );
+        inconsistent.setProperty(
+            "jarvis.knowledge.max-total-bytes",
+            "16384"
+        );
+
+        rejected = false;
+        try {
+            JarvisConfigLoader.load(
+                PropertiesJarvisConfigSource.from(inconsistent)
+            );
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        require(
+            rejected,
+            "Per-file knowledge limit must not exceed total knowledge limit."
+        );
     }
 
     private static void verifyReloadFailureKeepsPreviousSnapshot() {
