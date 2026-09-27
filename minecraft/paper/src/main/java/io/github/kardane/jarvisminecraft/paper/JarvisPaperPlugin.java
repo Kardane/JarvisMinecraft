@@ -16,6 +16,7 @@ import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
+import io.github.kardane.jarvisminecraft.common.runtime.ToolReferenceWriter;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
 import io.github.kardane.jarvisminecraft.paper.chat.PaperChatListener;
@@ -125,6 +126,15 @@ public final class JarvisPaperPlugin extends JavaPlugin {
 
         integrations = IntegrationRegistry.create(getServer(), platform, clock, getLogger());
         ToolRegistry registry = integrations.toolRegistry();
+        ToolReferenceWriter.writeAsync(
+            getDataFolder().toPath(),
+            registry.tools()
+        ).exceptionally(failure -> {
+            getLogger().warning(
+                "Could not write generated JARVIS Tool reference."
+            );
+            return null;
+        });
 
         CommonRuntime commonRuntime = new CommonRuntime(
             registry,
