@@ -5,7 +5,7 @@
 
 ## 현재 구조
 
-JARVIS는 별도 Node/Brain daemon 없이 Minecraft 서버 JVM 안에서 동작한다. 플랫폼 Adapter는 현재 온라인 플레이어 identity를 구성하고 `InteractionCoordinator`의 audience/호출어/session 정책을 통과한 입력만 `EmbeddedBrainGateway`로 전달한다. `EmbeddedBrain`은 request lifecycle facade로 남고, `RequestPlanner`가 Jev/route/reasoning, `ModelConversationLoop`가 Luna round/history, `ToolExecutionCoordinator`가 Tool policy/audit/runtime 실행, `ScheduledToolCoordinator`가 schedule 등록·취소·반복 실행을 담당한다. Minecraft Tool 권한은 interaction audience와 분리되어 있으며 현재는 online OP에게만 노출된다.
+JARVIS는 별도 Node/Brain daemon 없이 Minecraft 서버 JVM 안에서 동작한다. 플랫폼 Adapter는 현재 온라인 플레이어 identity를 구성하고 `InteractionCoordinator`의 audience/호출어/session 정책을 통과한 입력만 `EmbeddedBrainGateway`로 전달한다. `EmbeddedBrainGateway`는 lifecycle/API façade이며 `EmbeddedBrainBootstrap`이 live runtime resource wiring, `GatewayRequestCoordinator`가 request 접수/완료 흐름, `ProactiveInteractionController`가 ACTIVE proactive admission, `GatewayReplyPresenter`가 server-thread delivery/progress/sound, `GatewayAuditHealthMonitor`가 audit health reporting을 담당한다. `EmbeddedBrain`은 request lifecycle facade로 남고, `RequestPlanner`가 Jev/route/reasoning, `ModelConversationLoop`가 Luna round/history, `ToolExecutionCoordinator`가 Tool policy/audit/runtime 실행, `ScheduledToolCoordinator`가 schedule 등록·취소·반복 실행을 담당한다. Minecraft Tool 권한은 interaction audience와 분리되어 있으며 현재는 online OP에게만 노출된다.
 
 ```mermaid
 flowchart LR
@@ -27,7 +27,7 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 
 | 구성 요소 | 책임 |
 |---|---|
-| `minecraft/common` | `BrainGateway`, lifecycle facade `EmbeddedBrain`, `RequestPlanner`, `ModelConversationLoop`, `ToolExecutionCoordinator`, `ScheduledToolCoordinator`, Jev/Luna client, conversation history, request budget/scheduler, audit, runtime-policy config snapshot/validation, `ToolSpec` 기반 Tool contract/argument validation, `CommonRuntime`, Tool registry, authority/deadline/deduplication |
+| `minecraft/common` | lifecycle/API façade `EmbeddedBrainGateway`, `EmbeddedBrainBootstrap`, `GatewayRequestCoordinator`, `ProactiveInteractionController`, `GatewayReplyPresenter`, `GatewayAuditHealthMonitor`, lifecycle facade `EmbeddedBrain`, `RequestPlanner`, `ModelConversationLoop`, `ToolExecutionCoordinator`, `ScheduledToolCoordinator`, Jev/Luna client, conversation history, request budget/scheduler, audit, runtime-policy config snapshot/validation, `ToolSpec` 기반 Tool contract/argument validation, `CommonRuntime`, Tool registry, authority/deadline/deduplication |
 | `minecraft/paper` | Paper entrypoint, chat/session integration, scheduler/platform access, standard Tool, CoreProtect/WorldGuard/CMI optional Provider |
 | `minecraft/fabric` | Fabric dedicated-server entrypoint, chat controller, scheduler/platform access, standard Tool |
 | `minecraft/neoforge` | NeoForge dedicated-server entrypoint, chat controller, scheduler/platform access, tick sampler, standard Tool |
@@ -38,7 +38,7 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 ## 요청 흐름
 
 1. 플랫폼 Adapter가 현재 온라인 플레이어 identity를 만들고 `InteractionCoordinator`가 `OP / WHITELIST / ALL / BLACKLIST` audience, configurable wake word, active session, 종료/escape를 판정한다.
-2. `EmbeddedBrainGateway`가 현재 identity와 interaction authorization을 다시 확인하고 request를 생성해 bounded `AiRequestScheduler`로 넘긴다. requester가 현재 OP가 아니면 request의 Tool set은 빈 집합으로 고정된다.
+2. `EmbeddedBrainGateway`는 API façade로서 `GatewayRequestCoordinator`에 요청을 위임한다. coordinator가 현재 identity와 interaction authorization을 다시 확인하고 request를 생성해 bounded `AiRequestScheduler`로 넘긴다. requester가 현재 OP가 아니면 request의 Tool set은 빈 집합으로 고정된다.
 3. `EmbeddedBrain`이 request budget/history/lifecycle을 준비하고 `RequestPlanner`에 planning을 위임한다. `ExecutionPolicy`가 현재 runtime config, requester Tool authority, interaction origin으로 active Tool set을 먼저 제한한다.
 4. `RequestPlanner`가 Jev에 latest message, short topic, interaction origin, capability 이름을 전달해 `engagement + route + reasoning`을 한 요청에서 판단한다.
 5. `DeterministicRoutePolicy`가 execution-filtered Tool set을 route category에 맞게 좁힌다. Jev 오류, `UNCERTAIN`, 저신뢰 fallback에서는 read-only Tool만 노출한다.
@@ -48,7 +48,7 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 9. 상태 변경 Tool은 `ToolExecutionCoordinator`의 pre-execution audit 성공 후 최신 `ExecutionPolicy`를 한 번 더 통과해야 `CommonRuntime.ExecutionRuntime`으로 전달된다. `schedule_action` / `cancel_scheduled_action`과 반복 실행 lifecycle은 `ScheduledToolCoordinator`가 같은 audit/policy support를 사용해 처리한다.
 10. `CommonRuntime`이 current OP, active Tool, deadline, deduplication/action semantics를 재검사하고 플랫폼 scheduler에서 실제 Minecraft/Provider API를 호출한다.
 11. Tool result를 Luna가 해석해 최종 답을 만든다.
-12. `EmbeddedBrainGateway`는 server thread로 돌아가 현재 interaction authorization과 active session을 다시 확인한 뒤 응답을 public chat으로 broadcast한다.
+12. `GatewayReplyPresenter`가 server thread로 돌아가 현재 interaction authorization과 active session을 다시 확인한 뒤 응답을 public chat으로 broadcast하고 optional progress/sound feedback을 처리한다. `EmbeddedBrainGateway`는 이 흐름의 lifecycle/API façade만 유지한다.
 
 ## 권한과 안전 불변조건
 
