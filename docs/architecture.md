@@ -5,7 +5,7 @@
 
 ## 현재 구조
 
-JARVIS는 별도 Node/Brain daemon 없이 Minecraft 서버 JVM 안에서 동작한다. 플랫폼 Adapter는 현재 온라인 플레이어 identity를 구성하고 `InteractionCoordinator`의 audience/호출어/session 정책을 통과한 입력만 `EmbeddedBrainGateway`로 전달한다. Embedded Brain은 Jev 분류, deterministic Tool narrowing, GPT-6 Luna Tool loop, 감사, 예산과 queue를 JVM 내부에서 수행한다. Minecraft Tool 권한은 interaction audience와 분리되어 있으며 현재는 online OP에게만 노출된다.
+JARVIS는 별도 Node/Brain daemon 없이 Minecraft 서버 JVM 안에서 동작한다. 플랫폼 Adapter는 현재 온라인 플레이어 identity를 구성하고 `InteractionCoordinator`의 audience/호출어/session 정책을 통과한 입력만 `EmbeddedBrainGateway`로 전달한다. `EmbeddedBrain`은 request lifecycle facade로 남고, `RequestPlanner`가 Jev/route/reasoning, `ModelConversationLoop`가 Luna round/history, `ToolExecutionCoordinator`가 Tool policy/audit/runtime 실행, `ScheduledToolCoordinator`가 schedule 등록·취소·반복 실행을 담당한다. Minecraft Tool 권한은 interaction audience와 분리되어 있으며 현재는 online OP에게만 노출된다.
 
 ```mermaid
 flowchart LR
@@ -27,7 +27,7 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 
 | 구성 요소 | 책임 |
 |---|---|
-| `minecraft/common` | `BrainGateway`, `EmbeddedBrain`, Jev/Luna client, route policy, conversation history, request budget/scheduler, delayed/repeating action scheduler, audit, runtime-policy config snapshot/validation, Tool argument validation, `CommonRuntime`, Tool registry, authority/deadline/deduplication |
+| `minecraft/common` | `BrainGateway`, lifecycle facade `EmbeddedBrain`, `RequestPlanner`, `ModelConversationLoop`, `ToolExecutionCoordinator`, `ScheduledToolCoordinator`, Jev/Luna client, conversation history, request budget/scheduler, audit, runtime-policy config snapshot/validation, Tool argument validation, `CommonRuntime`, Tool registry, authority/deadline/deduplication |
 | `minecraft/paper` | Paper entrypoint, chat/session integration, scheduler/platform access, standard Tool, CoreProtect/WorldGuard/CMI optional Provider |
 | `minecraft/fabric` | Fabric dedicated-server entrypoint, chat controller, scheduler/platform access, standard Tool |
 | `minecraft/neoforge` | NeoForge dedicated-server entrypoint, chat controller, scheduler/platform access, tick sampler, standard Tool |
@@ -39,13 +39,13 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 
 1. 플랫폼 Adapter가 현재 온라인 플레이어 identity를 만들고 `InteractionCoordinator`가 `OP / WHITELIST / ALL / BLACKLIST` audience, configurable wake word, active session, 종료/escape를 판정한다.
 2. `EmbeddedBrainGateway`가 현재 identity와 interaction authorization을 다시 확인하고 request를 생성해 bounded `AiRequestScheduler`로 넘긴다. requester가 현재 OP가 아니면 request의 Tool set은 빈 집합으로 고정된다.
-3. `ExecutionPolicy`가 현재 runtime config, requester Tool authority, interaction origin으로 active Tool set을 먼저 제한한다.
-4. Jev가 latest message, short topic, interaction origin, capability 이름을 받아 `engagement + route + reasoning`을 한 요청에서 판단한다.
+3. `EmbeddedBrain`이 request budget/history/lifecycle을 준비하고 `RequestPlanner`에 planning을 위임한다. `ExecutionPolicy`가 현재 runtime config, requester Tool authority, interaction origin으로 active Tool set을 먼저 제한한다.
+4. `RequestPlanner`가 Jev에 latest message, short topic, interaction origin, capability 이름을 전달해 `engagement + route + reasoning`을 한 요청에서 판단한다.
 5. `DeterministicRoutePolicy`가 execution-filtered Tool set을 route category에 맞게 좁힌다. Jev 오류, `UNCERTAIN`, 저신뢰 fallback에서는 read-only Tool만 노출한다.
 6. `ReasoningPolicy`가 runtime config와 Jev 결과를 결합해 요청별 `NONE / LOW / MEDIUM / HIGH` 값을 확정하고, Luna의 모든 model round에 동일한 effort를 적용한다.
-7. Luna는 허용된 Tool schema만 보고 Tool call을 제안한다. 후속 model round와 실제 Tool 실행 직전에도 최신 `ExecutionPolicy`를 다시 적용한다.
+7. `ModelConversationLoop`가 Luna round를 반복한다. Luna는 허용된 Tool schema만 보고 Tool call을 제안하며, 후속 model round와 `ToolExecutionCoordinator`의 실제 Tool 실행 직전에도 최신 `ExecutionPolicy`를 다시 적용한다.
 8. Tool 인자는 공용 `ToolArgumentCodec`으로 다시 strict parsing된다. 모델 출력은 실행 권한이 아니다.
-9. 상태 변경 Tool은 pre-execution audit 성공 후 최신 `ExecutionPolicy`를 한 번 더 통과해야 `CommonRuntime.ExecutionRuntime`으로 전달된다.
+9. 상태 변경 Tool은 `ToolExecutionCoordinator`의 pre-execution audit 성공 후 최신 `ExecutionPolicy`를 한 번 더 통과해야 `CommonRuntime.ExecutionRuntime`으로 전달된다. `schedule_action` / `cancel_scheduled_action`과 반복 실행 lifecycle은 `ScheduledToolCoordinator`가 같은 audit/policy support를 사용해 처리한다.
 10. `CommonRuntime`이 current OP, active Tool, deadline, deduplication/action semantics를 재검사하고 플랫폼 scheduler에서 실제 Minecraft/Provider API를 호출한다.
 11. Tool result를 Luna가 해석해 최종 답을 만든다.
 12. `EmbeddedBrainGateway`는 server thread로 돌아가 현재 interaction authorization과 active session을 다시 확인한 뒤 응답을 public chat으로 broadcast한다.
