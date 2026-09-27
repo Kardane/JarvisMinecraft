@@ -10,6 +10,7 @@ import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigSummary;
 import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
@@ -136,6 +137,19 @@ public final class JarvisPaperPlugin extends JavaPlugin {
             clock,
             operationalLog
         );
+
+        var statusCommand = getCommand("jm");
+        if (statusCommand != null) {
+            statusCommand.setExecutor((sender, command, label, args) -> {
+                if (args.length != 1 || !"status".equalsIgnoreCase(args[0])) {
+                    sender.sendMessage("/jm status");
+                    return true;
+                }
+                JarvisStatusFormatter.lines(brain.status())
+                    .forEach(sender::sendMessage);
+                return true;
+            });
+        }
 
         getServer().getPluginManager().registerEvents(
             new PaperChatListener(
