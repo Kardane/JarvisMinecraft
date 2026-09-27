@@ -27,7 +27,7 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 
 | 구성 요소 | 책임 |
 |---|---|
-| `minecraft/common` | `BrainGateway`, lifecycle facade `EmbeddedBrain`, `RequestPlanner`, `ModelConversationLoop`, `ToolExecutionCoordinator`, `ScheduledToolCoordinator`, Jev/Luna client, conversation history, request budget/scheduler, audit, runtime-policy config snapshot/validation, Tool argument validation, `CommonRuntime`, Tool registry, authority/deadline/deduplication |
+| `minecraft/common` | `BrainGateway`, lifecycle facade `EmbeddedBrain`, `RequestPlanner`, `ModelConversationLoop`, `ToolExecutionCoordinator`, `ScheduledToolCoordinator`, Jev/Luna client, conversation history, request budget/scheduler, audit, runtime-policy config snapshot/validation, `ToolSpec` 기반 Tool contract/argument validation, `CommonRuntime`, Tool registry, authority/deadline/deduplication |
 | `minecraft/paper` | Paper entrypoint, chat/session integration, scheduler/platform access, standard Tool, CoreProtect/WorldGuard/CMI optional Provider |
 | `minecraft/fabric` | Fabric dedicated-server entrypoint, chat controller, scheduler/platform access, standard Tool |
 | `minecraft/neoforge` | NeoForge dedicated-server entrypoint, chat controller, scheduler/platform access, tick sampler, standard Tool |
@@ -44,7 +44,7 @@ WebSocket, shared-secret authentication, hello/capabilities handshake, ping/pong
 5. `DeterministicRoutePolicy`가 execution-filtered Tool set을 route category에 맞게 좁힌다. Jev 오류, `UNCERTAIN`, 저신뢰 fallback에서는 read-only Tool만 노출한다.
 6. `ReasoningPolicy`가 runtime config와 Jev 결과를 결합해 요청별 `NONE / LOW / MEDIUM / HIGH` 값을 확정하고, Luna의 모든 model round에 동일한 effort를 적용한다.
 7. `ModelConversationLoop`가 Luna round를 반복한다. Luna는 허용된 Tool schema만 보고 Tool call을 제안하며, 후속 model round와 `ToolExecutionCoordinator`의 실제 Tool 실행 직전에도 최신 `ExecutionPolicy`를 다시 적용한다.
-8. Tool 인자는 공용 `ToolArgumentCodec`으로 다시 strict parsing된다. 모델 출력은 실행 권한이 아니다.
+8. Tool shape/range/schema의 source of truth는 공용 `ToolSpec`이며, `ToolArgumentCodec`과 Luna function schema가 이를 함께 소비한다. 모델 출력은 `ToolArgumentCodec`을 통해 다시 strict parsing되며 실행 권한이 아니다.
 9. 상태 변경 Tool은 `ToolExecutionCoordinator`의 pre-execution audit 성공 후 최신 `ExecutionPolicy`를 한 번 더 통과해야 `CommonRuntime.ExecutionRuntime`으로 전달된다. `schedule_action` / `cancel_scheduled_action`과 반복 실행 lifecycle은 `ScheduledToolCoordinator`가 같은 audit/policy support를 사용해 처리한다.
 10. `CommonRuntime`이 current OP, active Tool, deadline, deduplication/action semantics를 재검사하고 플랫폼 scheduler에서 실제 Minecraft/Provider API를 호출한다.
 11. Tool result를 Luna가 해석해 최종 답을 만든다.
@@ -71,6 +71,12 @@ adapts Bukkit YAML values through `PaperJarvisConfigSource`; Fabric and
 NeoForge read the optional
 `config/jarvisminecraft/jarvis.properties` file through the common
 properties source. Missing Fabric/NeoForge policy files use built-in defaults.
+
+각 runtime composition root는 `ConfigManager`를 하나만 생성해
+`InteractionCoordinator`, `EmbeddedBrainGateway`, `ReasoningPolicy`,
+`ExecutionPolicy`, `SchedulingPolicy`, operational logging에 같은 인스턴스를
+공유한다. Gateway wiring은 interaction policy와 Brain policy가 서로 다른
+`ConfigManager`를 참조하는 구성을 거부한다.
 
 Phase 2 consumes the base interaction portion through
 `InteractionCoordinator`, `AudiencePolicy`, and `InvocationMatcher`.
