@@ -81,7 +81,8 @@ refresh it. Wake-word-free messages during that window remain visible as ordinar
 public chat and are evaluated asynchronously by Jev against the bounded recent JARVIS
 conversation topic. Only `RESPOND` with engagement confidence at least 0.70 is
 promoted to a real `FOLLOW_UP` request. At most one follow-up classifier is in
-flight per requester, and each candidate gets a 1.5-second classification deadline.
+flight per requester, with a global maximum of four concurrent follow-up classifiers.
+Each candidate gets a 1.5-second classification deadline.
 `IGNORE`, low confidence, timeout, invalid output, concurrent-candidate suppression,
 or Jev failure produces no JARVIS response and never suppresses the player's normal
 chat message.
