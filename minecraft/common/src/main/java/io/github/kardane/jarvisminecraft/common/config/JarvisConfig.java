@@ -40,6 +40,29 @@ public record JarvisConfig(
     public JarvisConfig(
         Interaction interaction,
         Model model,
+        Personality personality,
+        Knowledge knowledge,
+        Response response,
+        Execution execution,
+        Scheduling scheduling,
+        Logging logging
+    ) {
+        this(
+            interaction,
+            model,
+            personality,
+            knowledge,
+            response,
+            ConversationArchive.defaults(),
+            execution,
+            scheduling,
+            logging
+        );
+    }
+
+    public JarvisConfig(
+        Interaction interaction,
+        Model model,
         Response response,
         Execution execution,
         Scheduling scheduling,
