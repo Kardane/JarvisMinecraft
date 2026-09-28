@@ -32,7 +32,6 @@ The runtime-policy snapshot and operator prompt content are deliberately separat
 
 - `jarvis.interaction.wake-words`
 - `jarvis.interaction.follow-up-seconds`
-- `jarvis.interaction.follow-up-max-messages`
 - `jarvis.interaction.audience.*`
 
 `PASSIVE` remains the default. In `ACTIVE`, wake-word and follow-up behavior
@@ -76,12 +75,14 @@ Response configuration under `jarvis.response.*` includes:
   Luna input/output/total token usage when available plus end-to-end request
   processing time.
 
-Starting a follow-up session emits no public TTL announcement. The default implicit
-follow-up window is 30 seconds and is fixed from session creation; forwarded follow-up
-messages do not refresh it. The default `follow-up-max-messages=1` allows one
-wake-word-free follow-up, after which ordinary player messages return to public chat.
-Set it to `0` to require the JARVIS wake word for every request, or raise it up to
-`16` for longer conversational sessions.
+Starting a follow-up session emits no public TTL announcement. The default follow-up
+window is 30 seconds and is fixed from session creation; candidate messages do not
+refresh it. Wake-word-free messages during that window remain visible as ordinary
+public chat and are evaluated asynchronously by Jev against the bounded recent JARVIS
+conversation topic. Only `RESPOND` with engagement confidence at least 0.70 is
+promoted to a real `FOLLOW_UP` request. `IGNORE`, low confidence, timeout,
+invalid output, or Jev failure produces no JARVIS response and never suppresses the
+player's normal chat message.
 
 Phase 5 applies `jarvis.execution.*`:
 
@@ -516,9 +517,13 @@ A valid `UNCERTAIN` route or configured low-confidence abstention also keeps
 the deterministic read-only fallback route. A valid Jev reasoning choice may
 still be used for that request.
 
-Jev engagement is recorded in `JevClassification`, but Phase 3 does not use
-`IGNORE` or `START_CONVERSATION` to alter already-admitted DIRECT/FOLLOW_UP
-requests.
+Jev engagement is authoritative for pre-admission interaction decisions:
+`PROACTIVE_CANDIDATE` requires `START_CONVERSATION` plus the configured
+proactive threshold, while `FOLLOW_UP_CANDIDATE` requires `RESPOND` with
+confidence at least 0.70. DIRECT requests remain admitted by the wake-word/audience
+policy, and already-promoted FOLLOW_UP requests continue through the normal route and
+reasoning classifier. Follow-up classification failure is fail-open for public chat
+and fail-closed for JARVIS engagement.
 
 ### Luna failure
 
