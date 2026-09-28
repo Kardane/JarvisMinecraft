@@ -63,7 +63,11 @@ The resolved effort remains fixed across all Luna rounds in that request.
 Response configuration under `jarvis.response.*` includes:
 
 - `prefix`: AI/error/progress prefix. Legacy `&` formatting and
-  `<#RRGGBB>` hex colors are parsed only here, never from model output.
+  `<#RRGGBB>` hex colors are supported.
+- final Luna reply bodies are rendered as bounded Minecraft rich text. Model output
+  may use `<#RRGGBB>`, legacy color codes `&0`..`&f`, `&l`, `&n`,
+  `&o`, and `&r`. Model-side `&k`/obfuscation and `&m`/strikethrough
+  are not accepted.
 - `waiting-message.enabled/threshold-ms/messages`: show at most one delayed
   public progress message while a request is still running. The built-in
   default now provides 16 message variations.
@@ -74,6 +78,20 @@ Response configuration under `jarvis.response.*` includes:
   `<#RRGGBB>` hex colors as the prefix. Hovering the icon shows aggregate
   Luna input/output/total token usage when available plus end-to-end request
   processing time.
+
+Model-facing chat formatting policy forbids Markdown decoration for final player
+replies and asks Luna to use color sparingly: cyan for JARVIS labels/key facts, green
+for healthy/success states, yellow for cautions, and red for errors. Every styled span
+must reset with `&r`. As a defensive fallback, the renderer removes Markdown
+headings, blockquote markers, fenced/inline backticks, converts list markers to a
+visible bullet, and renders paired `**strong**` spans as bold instead of exposing
+the asterisks. Exact text is preserved when the Markdown marker is unmatched, so
+patterns such as `**/*.java` are not rewritten.
+
+The rendered reply and stored conversation text intentionally differ: the player sees
+the rich component, while in-memory history and `conversations/*.jsonl` receive the
+plain visible text with presentation markup removed. This prevents color/style markup
+from polluting later conversation-memory retrieval.
 
 Starting a follow-up session emits no public TTL announcement. The default follow-up
 window is 30 seconds and is fixed from session creation; candidate messages do not
