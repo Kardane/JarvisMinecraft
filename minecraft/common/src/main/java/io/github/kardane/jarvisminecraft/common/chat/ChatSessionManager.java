@@ -30,31 +30,13 @@ public final class ChatSessionManager {
     }
 
     public synchronized UUID start(UUID requesterUuid, Duration ttl) {
-        return start(
-            requesterUuid,
-            ttl,
-            Integer.MAX_VALUE
-        );
-    }
-
-    public synchronized UUID start(
-        UUID requesterUuid,
-        Duration ttl,
-        int maxFollowUps
-    ) {
         requireTtl(ttl);
-        if (maxFollowUps < 0) {
-            throw new IllegalArgumentException(
-                "maxFollowUps must not be negative."
-            );
-        }
         UUID sessionId = UUID.randomUUID();
         sessions.put(
             requesterUuid,
             new Session(
                 sessionId,
-                clock.instant().plus(ttl),
-                maxFollowUps
+                clock.instant().plus(ttl)
             )
         );
         return sessionId;
@@ -81,33 +63,7 @@ public final class ChatSessionManager {
             requesterUuid,
             new Session(
                 sessionId,
-                clock.instant().plus(ttl),
-                current.remainingFollowUps()
-            )
-        );
-        return true;
-    }
-
-    public synchronized boolean consumeFollowUp(
-        UUID requesterUuid,
-        UUID sessionId
-    ) {
-        Session current = liveSession(requesterUuid);
-        if (
-            current == null
-                || !current.sessionId().equals(sessionId)
-        ) {
-            return false;
-        }
-        if (current.remainingFollowUps() <= 0) {
-            return false;
-        }
-        sessions.put(
-            requesterUuid,
-            new Session(
-                current.sessionId(),
-                current.expiresAt(),
-                current.remainingFollowUps() - 1
+                clock.instant().plus(ttl)
             )
         );
         return true;
@@ -140,8 +96,7 @@ public final class ChatSessionManager {
                 requesterUuid,
                 new Session(
                     sessionId,
-                    now.plusMillis(TTL_MILLIS),
-                    Integer.MAX_VALUE
+                    now.plusMillis(TTL_MILLIS)
                 )
             );
             return Decision.forward(
@@ -174,8 +129,7 @@ public final class ChatSessionManager {
 
         Session refreshed = new Session(
             existing.sessionId(),
-            now.plusMillis(TTL_MILLIS),
-            existing.remainingFollowUps()
+            now.plusMillis(TTL_MILLIS)
         );
         sessions.put(requesterUuid, refreshed);
         return Decision.forward(
@@ -259,8 +213,7 @@ public final class ChatSessionManager {
 
     private record Session(
         UUID sessionId,
-        Instant expiresAt,
-        int remainingFollowUps
+        Instant expiresAt
     ) {}
 
     public record SessionHandle(UUID requesterUuid, UUID sessionId) {}
