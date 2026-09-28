@@ -55,11 +55,51 @@ public record StyledChatMessage(
         String text,
         String hoverText
     ) {
+        return withHoverSuffixSegments(
+            List.of(
+                new Segment(
+                    Objects.requireNonNull(text, "text"),
+                    null,
+                    false,
+                    false,
+                    false,
+                    false,
+                    false
+                )
+            ),
+            hoverText
+        );
+    }
+
+    public StyledChatMessage withConfiguredHoverSuffix(
+        String configuredText,
+        String hoverText
+    ) {
+        return withHoverSuffixSegments(
+            parseConfiguredPrefix(
+                Objects.requireNonNull(
+                    configuredText,
+                    "configuredText"
+                )
+            ),
+            hoverText
+        );
+    }
+
+    private StyledChatMessage withHoverSuffixSegments(
+        List<Segment> segments,
+        String hoverText
+    ) {
+        if (segments.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Hover suffix must contain visible text."
+            );
+        }
         List<HoverSegment> next =
             new ArrayList<>(suffix);
         next.add(
             new HoverSegment(
-                Objects.requireNonNull(text, "text"),
+                segments,
                 Objects.requireNonNull(
                     hoverText,
                     "hoverText"
@@ -80,7 +120,9 @@ public record StyledChatMessage(
         }
         output.append(body);
         for (HoverSegment segment : suffix) {
-            output.append(segment.text());
+            for (Segment part : segment.segments()) {
+                output.append(part.text());
+            }
         }
         return output.toString();
     }
@@ -200,18 +242,23 @@ public record StyledChatMessage(
     }
 
     public record HoverSegment(
-        String text,
+        List<Segment> segments,
         String hoverText
     ) {
         public HoverSegment {
-            Objects.requireNonNull(text, "text");
+            segments = List.copyOf(
+                Objects.requireNonNull(
+                    segments,
+                    "segments"
+                )
+            );
             Objects.requireNonNull(
                 hoverText,
                 "hoverText"
             );
-            if (text.isEmpty()) {
+            if (segments.isEmpty()) {
                 throw new IllegalArgumentException(
-                    "Hover segment text must not be empty."
+                    "Hover segment must contain visible text."
                 );
             }
             if (hoverText.isBlank()) {
