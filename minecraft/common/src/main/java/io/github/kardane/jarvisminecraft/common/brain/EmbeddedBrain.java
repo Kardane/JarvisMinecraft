@@ -356,6 +356,42 @@ public final class EmbeddedBrain {
         );
     }
 
+    public CompletionStage<JevClassification> classifyFollowUp(
+        UUID requesterUuid,
+        UUID sessionId,
+        String latestMessage,
+        Instant deadlineAt
+    ) {
+        Objects.requireNonNull(
+            requesterUuid,
+            "requesterUuid"
+        );
+        Objects.requireNonNull(sessionId, "sessionId");
+        Objects.requireNonNull(
+            latestMessage,
+            "latestMessage"
+        );
+        Objects.requireNonNull(deadlineAt, "deadlineAt");
+
+        guard.assertRunning();
+        guard.assertSession(
+            requesterUuid,
+            sessionId
+        );
+
+        return jev.classify(
+            JevInput.fromFollowUpCandidate(
+                history.history(
+                    requesterUuid,
+                    sessionId
+                ),
+                latestMessage,
+                currentCapabilities()
+            ),
+            deadlineAt
+        );
+    }
+
     public CompletionStage<JevClassification> classifyProactive(
         List<AmbientChatMessage> context,
         Instant deadlineAt
