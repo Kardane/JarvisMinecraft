@@ -5,6 +5,10 @@ public final class JarvisEvents {
     public static final String RUNTIME_STOPPED = "runtime.stopped";
     public static final String CONFIG_LOADED = "config.loaded";
     public static final String CONFIG_RELOAD_FAILED = "config.reload_failed";
+    public static final String CONVERSATION_ARCHIVE_FAILED =
+        "conversation_archive.failed";
+    public static final String CONVERSATION_ARCHIVE_DROPPED =
+        "conversation_archive.dropped";
 
     public static final String REQUEST_ACCEPTED = "request.accepted";
     public static final String REQUEST_COMPLETED = "request.completed";
