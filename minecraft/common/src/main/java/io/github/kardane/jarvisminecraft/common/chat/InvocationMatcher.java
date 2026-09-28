@@ -50,7 +50,11 @@ public final class InvocationMatcher {
         return find(
             message,
             wakeWords,
-            JarvisConfig.WakeWordMatching.defaults()
+            new JarvisConfig.WakeWordMatching(
+                false,
+                false,
+                0
+            )
         ).isPresent();
     }
 
@@ -392,7 +396,7 @@ public final class InvocationMatcher {
 
         if (
             !right.isEmpty()
-                && isGapSeparator(
+                && isInvocationTrailingSeparator(
                     right.charAt(0)
                 )
         ) {
@@ -421,6 +425,18 @@ public final class InvocationMatcher {
             return left + right;
         }
         return left + " " + right;
+    }
+
+    private boolean isInvocationTrailingSeparator(
+        char value
+    ) {
+        return isGapSeparator(value)
+            || value == '.'
+            || value == '!'
+            || value == '?'
+            || value == '。'
+            || value == '！'
+            || value == '？';
     }
 
     private boolean isGapSeparator(char value) {
