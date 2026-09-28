@@ -234,6 +234,18 @@ active config or prompt content.
 
 ### Paper
 
+Paper 1.21.8 remains available from `:minecraft:paper` as
+`jarvisminecraft-paper.jar`.
+
+Paper 26.3 is built separately from `:minecraft:paper263` as
+`jarvisminecraft-paper-26.3.jar`. This adapter is pinned to
+`paper-api:26.3.build.49-alpha`, targets Java 25, and refuses to enable on a
+Minecraft version other than exactly `26.3`. Its Bukkit descriptor uses
+`api-version: '26.2'` because that is the currently documented maximum plugin API
+version while running on the 26.3 server API. The module reuses the Paper adapter
+implementation and retains the optional CoreProtect, WorldEdit/WorldGuard, and CMI
+integration classes.
+
 Paper's generated `config.yml` contains the existing provider-key
 fallbacks plus the non-secret `jarvis.*` runtime-policy tree.
 

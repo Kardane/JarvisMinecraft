@@ -1,0 +1,161 @@
+# Provider credentials. Environment/system-property values take precedence.
+openai-api-key: ""
+typesafe-api-key: ""
+
+# Phase 1 runtime policy configuration.
+# These values are loaded and validated now, but chat/tool policy wiring is
+# intentionally deferred to later phases so current v0.1 behavior is unchanged.
+jarvis:
+  interaction:
+    # PASSIVE: wake-word/session interaction only.
+    # ACTIVE: observe allowed public chat and let Jev decide whether JARVIS should initiate.
+    mode: PASSIVE
+    wake-words:
+      - "자비스"
+      - "jarvis"
+      - "재비스"
+    wake-word:
+      # Match configured wake words anywhere in the message, not only at the start.
+      anywhere: true
+      # Allow one bounded typo in a wake word. Exact matches always win.
+      fuzzy-enabled: true
+      # Safety bound: 0 or 1 only.
+      max-edit-distance: 1
+    # Fixed window from the initial JARVIS invocation.
+    # Wake-word-free messages inside this window are evaluated by Jev. Only
+    # clear continuations of the active JARVIS conversation receive a response.
+    # Candidate messages do not extend this timer.
+    follow-up-seconds: 30
+    # Minimum Jev RESPOND confidence for a wake-word-free follow-up.
+    follow-up-confidence-threshold: 0.70
+
+    audience:
+      mode: OP
+      whitelist: []
+      blacklist: []
+
+    proactive:
+      # ACTIVE mode only. Bounded public-chat context supplied to Jev/Luna.
+      context-messages: 12
+      # Server-wide gap after a proactive conversation starts.
+      cooldown-seconds: 15
+      # Minimum Jev START_CONVERSATION confidence.
+      confidence-threshold: 0.75
+
+  model:
+    name: "gpt-6-luna"
+    reasoning:
+      mode: AUTO
+      fallback: MEDIUM
+
+  # Validated operator prompt content is enabled by default.
+  personality:
+    enabled: true
+
+  knowledge:
+    enabled: true
+    max-files: 32
+    max-file-bytes: 32768
+    max-total-bytes: 131072
+
+  response:
+    # Safe Minecraft formatting is supported in prefix, waiting messages,
+    # metrics.icon, and final Luna reply bodies.
+    # Configured fields support legacy & codes and <#RRGGBB> hex colors.
+    # Example: "&5[JARVIS]&r " or "<#FF00FF>[JARVIS]&r "
+    prefix: "[JARVIS] "
+    waiting-message:
+      enabled: true
+      threshold-ms: 1800
+      messages:
+        - "<#94A3B8>잠시만요.&r"
+        - "<#7DD3FC>확인해볼게요.&r"
+        - "<#94A3B8>서버 상태를 살펴보고 있어요.&r"
+        - "<#7DD3FC>조금만 기다려 주세요.&r"
+        - "<#94A3B8>요청을 확인하고 있어요.&r"
+        - "<#7DD3FC>필요한 정보를 모으고 있어요.&r"
+        - "<#94A3B8>서버 데이터를 확인 중이에요.&r"
+        - "<#7DD3FC>관련 상태를 조회하고 있어요.&r"
+        - "<#94A3B8>요청 내용을 정리하고 있어요.&r"
+        - "<#7DD3FC>확인할 항목을 살펴보고 있어요.&r"
+        - "<#94A3B8>잠깐 확인해볼게요.&r"
+        - "<#7DD3FC>처리할 내용을 점검하고 있어요.&r"
+        - "<#94A3B8>서버에서 확인 중이에요.&r"
+        - "<#7DD3FC>필요한 상태를 불러오고 있어요.&r"
+        - "<#94A3B8>요청을 처리하고 있어요.&r"
+        - "<#7DD3FC>곧 답변드릴게요.&r"
+
+    sound:
+      enabled: false
+      id: "minecraft:block.note_block.pling"
+      volume: 1.0
+      pitch: 1.0
+
+    # Appends only this icon to final/error replies. Hover it to view Luna
+    # token usage and total request processing time. The icon supports the same
+    # & formatting and <#RRGGBB> hex colors as response.prefix.
+    metrics:
+      enabled: true
+      icon: "<#7DD3FC>📊"
+
+  # Optional persistent archive of direct/follow-up USER and JARVIS messages.
+  # Stored under plugins/JarvisMinecraft/conversations/*.jsonl.
+  # Proactive ambient-chat context, Tool results, reasoning, prompts, and secrets
+  # are not archived.
+  conversation-archive:
+    enabled: true
+    max-file-bytes: 1048576
+    max-files: 30
+
+  # Optional retrieval-backed long-term conversation memory.
+  # Reads prior USER/JARVIS JSONL records for the same requester UUID only.
+  # For continuous memory across future conversations, enable conversation-archive too.
+  # Retrieved memory is bounded, previous-session only, and never grants Tool authority.
+  conversation-memory:
+    enabled: true
+    lookback-days: 30
+    max-source-files: 4
+    max-turns: 6
+    max-context-bytes: 8192
+
+  execution:
+    # READ_TALK: read-only Tools only.
+    # EXECUTE_LITE: read-only + explicitly allowed LOW-risk state-changing Tools.
+    # EXECUTE: read-only + explicitly allowed state-changing Tools.
+    mode: READ_TALK
+    actors: OP
+
+    lite:
+      # Tool wire names only. Example: [teleport_staff, weather_set, time_set]
+      allow-tools: []
+      # deny-tools overrides allow-tools and may also hide read-only Tools.
+      deny-tools: []
+
+    full:
+      # State-changing Tool wire names must be explicitly listed.
+      allow-tools: []
+      deny-tools: []
+
+  scheduling:
+    # Enables schedule_action for structured LOW-risk mutation Tools.
+    # Pending schedules are memory-only and do not survive server restart.
+    enabled: true
+    max-delay-seconds: 60
+    max-duration-seconds: 60
+
+  logging:
+    # Operational console logging. Audit JSONL remains independent.
+    level: INFO
+    console:
+      enabled: true
+    request:
+      lifecycle: true
+    ai:
+      jev: true
+      luna: true
+    tool:
+      lifecycle: true
+    proactive:
+      decisions: false
+    health:
+      interval-seconds: 30
