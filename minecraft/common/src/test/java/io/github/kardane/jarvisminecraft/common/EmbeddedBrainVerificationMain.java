@@ -693,6 +693,48 @@ public final class EmbeddedBrainVerificationMain {
             "Configured metrics icon hex color was not parsed."
         );
 
+        StyledChatMessage richBody =
+            StyledChatMessage.fromConfiguredPrefix(
+                "",
+                "<#7DD3FC>&lTPS&r: <#86EFAC>20.0&r\n"
+                    + "### 상태\n"
+                    + "> **정상**\n"
+                    + "`/jm status`\n"
+                    + "R&D\n"
+                    + "**/*.java\n"
+                    + "&k숨김&r"
+            );
+        require(
+            richBody.bodySegments().stream()
+                .anyMatch(segment ->
+                    Integer.valueOf(0x7DD3FC).equals(
+                        segment.rgb()
+                    )
+                        && segment.bold()
+                        && segment.text().contains("TPS")
+                ),
+            "Model reply hex/bold formatting was not parsed."
+        );
+        require(
+            (
+                "TPS: 20.0\n"
+                    + "상태\n"
+                    + "정상\n"
+                    + "/jm status\n"
+                    + "R&D\n"
+                    + "**/*.java\n"
+                    + "숨김"
+            ).equals(richBody.plainBody()),
+            "Model reply formatting/Markdown fallback changed visible text unexpectedly."
+        );
+        require(
+            !richBody.plainBody().contains("<#")
+                && !richBody.plainBody().contains("&r")
+                && !richBody.plainBody().contains("**정상**")
+                && !richBody.plainBody().contains("`"),
+            "Presentation markup leaked into plain model text."
+        );
+
         LunaStep.Usage usage =
             new LunaStep.Usage(
                 10,
