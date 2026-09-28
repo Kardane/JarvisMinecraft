@@ -31,7 +31,11 @@ Do not log provider keys, raw process environments, or complete configuration ob
 The runtime-policy snapshot and operator prompt content are deliberately separate from provider credentials. Phase 2 applies the interaction subset at runtime:
 
 - `jarvis.interaction.wake-words`
+- `jarvis.interaction.wake-word.anywhere`
+- `jarvis.interaction.wake-word.fuzzy-enabled`
+- `jarvis.interaction.wake-word.max-edit-distance`
 - `jarvis.interaction.follow-up-seconds`
+- `jarvis.interaction.follow-up-confidence-threshold`
 - `jarvis.interaction.audience.*`
 
 `PASSIVE` remains the default. In `ACTIVE`, wake-word and follow-up behavior
@@ -100,17 +104,35 @@ visible bullet, and renders paired `**strong**` spans as bold instead of exposin
 the asterisks. Exact text is preserved when the Markdown marker is unmatched, so
 patterns such as `**/*.java` are not rewritten.
 
+The rich-text parser also tolerates model-generated hex closing tags such as
+`</#RRGGBB>` and `</color>`. Hex spans maintain a style stack, so closing a
+nested color restores the parent color instead of exposing the closing markup or
+leaving the remainder in the wrong color. `<reset>`, `</reset>`, and `&r`
+clear the stack. Luna is still instructed to prefer the canonical
+`<#RRGGBB>text&r` form.
+
 The rendered reply and stored conversation text intentionally differ: the player sees
 the rich component, while in-memory history and `conversations/*.jsonl` receive the
 plain visible text with presentation markup removed. This prevents color/style markup
 from polluting later conversation-memory retrieval.
 
+Direct invocation matching is configurable independently from follow-up admission.
+With the defaults, `wake-word.anywhere=true`, `fuzzy-enabled=true`, and
+`max-edit-distance=1`. Exact wake words are accepted at any token position and
+their invocation token/recognized Korean particle is removed before Luna sees the
+request. Fuzzy matching is deliberately bounded: English admits one insertion,
+deletion, substitution, or adjacent transposition; Korean also checks decomposed
+Hangul-jamo distance to reject common-word lookalikes. Set `anywhere=false` to
+restore leading-only invocation, `fuzzy-enabled=false` or
+`max-edit-distance=0` for exact-only matching.
+
 Starting a follow-up session emits no public TTL announcement. The default follow-up
 window is 30 seconds and is fixed from session creation; candidate messages do not
 refresh it. Wake-word-free messages during that window remain visible as ordinary
 public chat and are evaluated asynchronously by Jev against the bounded recent JARVIS
-conversation topic. Only `RESPOND` with engagement confidence at least 0.70 is
-promoted to a real `FOLLOW_UP` request. At most one follow-up classifier is in
+conversation topic. Only `RESPOND` at or above
+`jarvis.interaction.follow-up-confidence-threshold` is promoted to a real
+`FOLLOW_UP` request; the default is 0.70. At most one follow-up classifier is in
 flight per requester, with a global maximum of four concurrent follow-up classifiers.
 Each candidate gets a 1.5-second classification deadline.
 `IGNORE`, low confidence, timeout, invalid output, concurrent-candidate suppression,

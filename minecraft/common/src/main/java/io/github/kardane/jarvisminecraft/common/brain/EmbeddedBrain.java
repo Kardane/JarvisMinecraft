@@ -44,6 +44,7 @@ public final class EmbeddedBrain {
     private final JevClassifier jev;
     private final LunaClient luna;
     private final Clock clock;
+    private final JarvisLog log;
     private final BrainRuntimeGuard guard;
     private final RequestPlanner planner;
     private final ToolExecutionCoordinator toolExecution;
@@ -308,7 +309,7 @@ public final class EmbeddedBrain {
             clock,
             "clock"
         );
-        Objects.requireNonNull(log, "log");
+        this.log = Objects.requireNonNull(log, "log");
         this.promptContent = Objects.requireNonNull(
             promptContent,
             "promptContent"

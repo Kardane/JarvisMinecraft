@@ -86,6 +86,7 @@ public final class EmbeddedBrainVerificationMain {
         promptCompositionContract();
         requestPromptSnapshotContract();
         requestMemorySnapshotContract();
+        wakeWordMatchingContract();
         jevFollowUpCandidateContract();
         styledChatContract();
         toolReferenceContract();
@@ -565,6 +566,173 @@ public final class EmbeddedBrainVerificationMain {
         );
     }
 
+    private static void wakeWordMatchingContract() {
+        Properties properties = new Properties();
+        properties.setProperty(
+            "jarvis.interaction.wake-word.anywhere",
+            "true"
+        );
+        properties.setProperty(
+            "jarvis.interaction.wake-word.fuzzy-enabled",
+            "true"
+        );
+        properties.setProperty(
+            "jarvis.interaction.wake-word.max-edit-distance",
+            "1"
+        );
+        ConfigManager config = new ConfigManager(() ->
+            JarvisConfigLoader.load(
+                PropertiesJarvisConfigSource.from(
+                    properties
+                )
+            )
+        );
+
+        PlayerIdentity player = new PlayerIdentity(
+            UUID.fromString(
+                "21200000-0000-4000-8000-000000000001"
+            ),
+            "Operator",
+            true,
+            true
+        );
+
+        requireDirectInvocation(
+            config,
+            player,
+            "TPS 알려줘 자비스",
+            "TPS 알려줘"
+        );
+        requireDirectInvocation(
+            config,
+            player,
+            "지금 자비스한테 TPS 물어봐",
+            "지금 TPS 물어봐"
+        );
+        requireDirectInvocation(
+            config,
+            player,
+            "TPS 알려줘 jarivs",
+            "TPS 알려줘"
+        );
+        requireDirectInvocation(
+            config,
+            player,
+            "TPS 알려줘 jarvs",
+            "TPS 알려줘"
+        );
+        requireDirectInvocation(
+            config,
+            player,
+            "자비스? TPS 알려줘",
+            "TPS 알려줘"
+        );
+        requireDirectInvocation(
+            config,
+            player,
+            "TPS 알려줘, 자비스",
+            "TPS 알려줘"
+        );
+        requireDirectInvocation(
+            config,
+            player,
+            "자비수 TPS 알려줘",
+            "TPS 알려줘"
+        );
+        requireDirectInvocation(
+            config,
+            player,
+            "자비스ㅏ TPS 알려줘",
+            "TPS 알려줘"
+        );
+
+        InteractionCoordinator unrelated =
+            new InteractionCoordinator(
+                new ChatSessionManager(CLOCK),
+                config
+            );
+        require(
+            unrelated.accept(
+                player,
+                "자비를 베풀어 주세요"
+            ).kind()
+                == InteractionDecision.Kind.PUBLIC_CHAT,
+            "Korean fuzzy matching confused the common noun 자비 with the wake word."
+        );
+        require(
+            unrelated.accept(
+                player,
+                "자비심이 필요해요"
+            ).kind()
+                == InteractionDecision.Kind.PUBLIC_CHAT,
+            "Korean fuzzy matching confused 자비심 with the wake word."
+        );
+        require(
+            unrelated.accept(
+                player,
+                "자비스라는 이름이 좋아요"
+            ).kind()
+                == InteractionDecision.Kind.PUBLIC_CHAT,
+            "Wake-word matching accepted an unrelated embedded Korean word."
+        );
+
+        Properties strictProperties =
+            new Properties();
+        strictProperties.setProperty(
+            "jarvis.interaction.wake-word.anywhere",
+            "false"
+        );
+        ConfigManager strictConfig =
+            new ConfigManager(() ->
+                JarvisConfigLoader.load(
+                    PropertiesJarvisConfigSource.from(
+                        strictProperties
+                    )
+                )
+            );
+        InteractionCoordinator strict =
+            new InteractionCoordinator(
+                new ChatSessionManager(CLOCK),
+                strictConfig
+            );
+        require(
+            strict.accept(
+                player,
+                "TPS 알려줘 자비스"
+            ).kind()
+                == InteractionDecision.Kind.PUBLIC_CHAT,
+            "wake-word.anywhere=false did not restore leading-only admission."
+        );
+    }
+
+    private static void requireDirectInvocation(
+        ConfigManager config,
+        PlayerIdentity player,
+        String message,
+        String expectedText
+    ) {
+        InteractionCoordinator interactions =
+            new InteractionCoordinator(
+                new ChatSessionManager(CLOCK),
+                config
+            );
+        InteractionDecision decision =
+            interactions.accept(
+                player,
+                message
+            );
+        require(
+            decision.kind()
+                == InteractionDecision.Kind.FORWARD
+                && "DIRECT".equals(decision.mode())
+                && expectedText.equals(decision.text()),
+            "Wake-word fixture failed for: "
+                + message
+                + " -> "
+                + decision
+        );
+    }
+
     private static void jevFollowUpCandidateContract() {
         MutableClock clock = new MutableClock(NOW);
         Properties properties = new Properties();
@@ -756,6 +924,44 @@ public final class EmbeddedBrainVerificationMain {
                 && !richBody.plainBody().contains("**정상**")
                 && !richBody.plainBody().contains("`"),
             "Presentation markup leaked into plain model text."
+        );
+
+        StyledChatMessage nestedColors =
+            StyledChatMessage.fromConfiguredPrefix(
+                "",
+                "<#7DD3FC>현재 TPS는 "
+                    + "<#86EFAC>20.00</#86EFAC>"
+                    + ", MSPT는 "
+                    + "<#A78BFA>3.40ms</#A78BFA>"
+                    + "로 원활해요.</#7DD3FC>"
+            );
+        require(
+            (
+                "현재 TPS는 20.00, MSPT는 3.40ms로 원활해요."
+            ).equals(
+                nestedColors.plainBody()
+            ),
+            "Hex closing tags leaked into visible chat text."
+        );
+        require(
+            nestedColors.bodySegments().stream()
+                .anyMatch(segment ->
+                    segment.text().contains(", MSPT는 ")
+                        && Integer.valueOf(0x7DD3FC).equals(
+                            segment.rgb()
+                        )
+                ),
+            "Nested hex closing tag did not restore the parent color."
+        );
+        require(
+            nestedColors.bodySegments().stream()
+                .noneMatch(segment ->
+                    segment.text().contains("</#")
+                        || segment.text().contains(
+                            "</color>"
+                        )
+                ),
+            "Rich-text closing markup remained visible."
         );
 
         StyledChatMessage waiting =

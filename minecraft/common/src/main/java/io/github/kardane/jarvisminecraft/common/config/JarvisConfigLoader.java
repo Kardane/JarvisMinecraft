@@ -45,10 +45,32 @@ public final class JarvisConfigLoader {
                 "jarvis.interaction.wake-words",
                 defaultInteraction.wakeWords()
             ),
+            new JarvisConfig.WakeWordMatching(
+                bool(
+                    source,
+                    "jarvis.interaction.wake-word.anywhere",
+                    defaultInteraction.wakeWordMatching().anywhere()
+                ),
+                bool(
+                    source,
+                    "jarvis.interaction.wake-word.fuzzy-enabled",
+                    defaultInteraction.wakeWordMatching().fuzzyEnabled()
+                ),
+                integer(
+                    source,
+                    "jarvis.interaction.wake-word.max-edit-distance",
+                    defaultInteraction.wakeWordMatching().maxEditDistance()
+                )
+            ),
             integer(
                 source,
                 "jarvis.interaction.follow-up-seconds",
                 defaultInteraction.followUpSeconds()
+            ),
+            decimal(
+                source,
+                "jarvis.interaction.follow-up-confidence-threshold",
+                defaultInteraction.followUpConfidenceThreshold()
             ),
             new JarvisConfig.Audience(
                 enumValue(

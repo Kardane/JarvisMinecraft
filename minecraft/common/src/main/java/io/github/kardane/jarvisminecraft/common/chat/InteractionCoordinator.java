@@ -68,15 +68,27 @@ public final class InteractionCoordinator {
 
         Duration ttl = Duration.ofSeconds(config.followUpSeconds());
 
-        if (invocationMatcher.matches(message, config.wakeWords())) {
+        Optional<InvocationMatcher.Match> invocation =
+            invocationMatcher.find(
+                message,
+                config.wakeWords(),
+                config.wakeWordMatching()
+            );
+        if (invocation.isPresent()) {
+            InvocationMatcher.Match match =
+                invocation.get();
             UUID sessionId = sessions.start(
                 player.uuid(),
                 ttl
             );
+            String requestText =
+                match.remainingText().isBlank()
+                    ? message
+                    : match.remainingText();
             return InteractionDecision.forward(
                 sessionId,
                 "DIRECT",
-                message,
+                requestText,
                 true,
                 config.followUpSeconds()
             );

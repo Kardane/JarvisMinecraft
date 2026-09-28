@@ -7,10 +7,17 @@
 # PASSIVE: wake-word/session only. ACTIVE: may initiate from allowed public chat.
 jarvis.interaction.mode=PASSIVE
 jarvis.interaction.wake-words=자비스|jarvis|재비스
+# Match configured wake words anywhere in the message.
+jarvis.interaction.wake-word.anywhere=true
+# Allow one bounded typo; exact matches always take precedence.
+jarvis.interaction.wake-word.fuzzy-enabled=true
+jarvis.interaction.wake-word.max-edit-distance=1
 # Fixed window from the initial invocation; follow-up candidates do not extend it.
 # Wake-word-free messages inside this window are evaluated by Jev. Only clear
 # continuations of the active JARVIS conversation receive a JARVIS response.
 jarvis.interaction.follow-up-seconds=30
+# Minimum Jev RESPOND confidence for a wake-word-free follow-up.
+jarvis.interaction.follow-up-confidence-threshold=0.70
 
 jarvis.interaction.audience.mode=OP
 jarvis.interaction.audience.whitelist=

@@ -103,11 +103,17 @@ Other = optional observer
 
 Core scenarios:
 
-- DIRECT wake-word request and FOLLOW_UP
+- DIRECT wake-word request at the beginning, middle, and end of a message
+- exact wake-word match outranks fuzzy matching; bounded typo cases such as `자비수`, `자비스ㅏ`, `jarivs`, and `jarvs` invoke JARVIS
+- common Korean lookalikes such as `자비를` and `자비심` remain ordinary public chat
+- recognized invocation text/particles are removed before Luna receives the DIRECT request
+- `wake-word.anywhere=false` restores leading-only matching and fuzzy controls can restore exact-only matching
+- FOLLOW_UP confidence uses `jarvis.interaction.follow-up-confidence-threshold`
 - `/jm status` output
 - `/jm reload` success and failure behavior
 - `response.prefix` legacy color and `<#RRGGBB>` hex color rendering
 - Luna final replies render allowed Minecraft legacy/hex color and emphasis markup
+- nested `<#RRGGBB>` spans restore the parent color when `</#RRGGBB>` or `</color>` closes and no closing markup is visible
 - all 16 default waiting-message connectors carry bounded color markup and configured connectors render hex/legacy styles
 - Luna Core Policy contains the compiled Korean natural-prose, precise-verb, evidence-claim, punctuation, terminology, and exact-syntax invariants
 - paired Markdown `**strong**`, headings, blockquotes, and backticks do not leak raw formatting markers into chat
@@ -119,7 +125,7 @@ Core scenarios:
 - no public follow-up-session TTL announcement is emitted
 - default follow-up window is 30 seconds and candidate messages do not refresh it
 - wake-word-free active-session messages remain visible as public chat while Jev evaluates continuation
-- Jev `RESPOND` at confidence >= 0.70 promotes the candidate to FOLLOW_UP
+- Jev `RESPOND` at or above the configured follow-up confidence threshold promotes the candidate to FOLLOW_UP
 - Jev `IGNORE`, low confidence, timeout, or failure produces no JARVIS response
 - unrelated public chat during an active session is not automatically treated as a follow-up
 - generated `tools.md` reflects registered, unavailable-provider, and Brain-control Tools
