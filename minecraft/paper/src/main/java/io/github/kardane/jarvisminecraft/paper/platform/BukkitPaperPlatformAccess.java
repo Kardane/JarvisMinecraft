@@ -373,15 +373,35 @@ public final class BukkitPaperPlatformAccess implements PaperPlatformAccess {
         }
         output = output.append(Component.text(message.body()));
         for (StyledChatMessage.HoverSegment segment : message.suffix()) {
+            Component suffix = Component.empty();
+            for (StyledChatMessage.Segment part : segment.segments()) {
+                Component rendered = Component.text(part.text());
+                if (part.rgb() != null) {
+                    rendered = rendered.color(TextColor.color(part.rgb()));
+                }
+                if (part.obfuscated()) {
+                    rendered = rendered.decorate(TextDecoration.OBFUSCATED);
+                }
+                if (part.bold()) {
+                    rendered = rendered.decorate(TextDecoration.BOLD);
+                }
+                if (part.strikethrough()) {
+                    rendered = rendered.decorate(TextDecoration.STRIKETHROUGH);
+                }
+                if (part.underlined()) {
+                    rendered = rendered.decorate(TextDecoration.UNDERLINED);
+                }
+                if (part.italic()) {
+                    rendered = rendered.decorate(TextDecoration.ITALIC);
+                }
+                suffix = suffix.append(rendered);
+            }
             output = output.append(
-                Component.text(segment.text())
-                    .hoverEvent(
-                        HoverEvent.showText(
-                            Component.text(
-                                segment.hoverText()
-                            )
-                        )
+                suffix.hoverEvent(
+                    HoverEvent.showText(
+                        Component.text(segment.hoverText())
                     )
+                )
             );
         }
         return output;
