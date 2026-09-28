@@ -181,44 +181,6 @@ public record StyledChatMessage(
                 continue;
             }
 
-            if (
-                modelBody
-                    && index + 1 < value.length()
-                    && value.charAt(index) == '*'
-                    && value.charAt(index + 1) == '*'
-            ) {
-                flush(segments, text, style);
-                style = style.withBold(!style.bold());
-                index += 1;
-                continue;
-            }
-
-            if (
-                modelBody
-                    && index + 1 < value.length()
-                    && value.charAt(index) == '_'
-                    && value.charAt(index + 1) == '_'
-            ) {
-                flush(segments, text, style);
-                style = style.withBold(!style.bold());
-                index += 1;
-                continue;
-            }
-
-            if (
-                modelBody
-                    && index + 1 < value.length()
-                    && value.charAt(index) == '~'
-                    && value.charAt(index + 1) == '~'
-            ) {
-                flush(segments, text, style);
-                style = style.withStrikethrough(
-                    !style.strikethrough()
-                );
-                index += 1;
-                continue;
-            }
-
             char current = value.charAt(index);
             if (
                 current != '&'
@@ -228,14 +190,21 @@ public record StyledChatMessage(
                 continue;
             }
 
-            char code = Character.toLowerCase(
-                value.charAt(index + 1)
-            );
-            if (
-                modelBody
-                    ? !isModelCode(code)
-                    : !isConfiguredCode(code)
-            ) {
+            char rawCode = value.charAt(index + 1);
+            char code = Character.toLowerCase(rawCode);
+            if (modelBody) {
+                if (
+                    rawCode != code
+                        || !isConfiguredCode(code)
+                ) {
+                    text.append(current);
+                    continue;
+                }
+                if (!isModelCode(code)) {
+                    index += 1;
+                    continue;
+                }
+            } else if (!isConfiguredCode(code)) {
                 text.append(current);
                 continue;
             }
@@ -281,12 +250,39 @@ public record StyledChatMessage(
                 line = "• " + trimmed.substring(2);
             }
 
+            line = convertStrongMarkdown(line);
             line = line.replace("\u0060", "");
 
             if (!output.isEmpty()) {
                 output.append('\n');
             }
             output.append(line);
+        }
+        return output.toString();
+    }
+
+    private static String convertStrongMarkdown(
+        String value
+    ) {
+        StringBuilder output = new StringBuilder();
+        int cursor = 0;
+        while (cursor < value.length()) {
+            int open = value.indexOf("**", cursor);
+            if (open < 0) {
+                output.append(value, cursor, value.length());
+                break;
+            }
+            int close = value.indexOf("**", open + 2);
+            if (close < 0) {
+                output.append(value, cursor, value.length());
+                break;
+            }
+
+            output.append(value, cursor, open);
+            output.append("&l");
+            output.append(value, open + 2, close);
+            output.append("&r");
+            cursor = close + 2;
         }
         return output.toString();
     }
@@ -450,30 +446,6 @@ public record StyledChatMessage(
                 false,
                 false,
                 false
-            );
-        }
-
-        StyleState withBold(boolean enabled) {
-            return new StyleState(
-                rgb,
-                obfuscated,
-                enabled,
-                strikethrough,
-                underlined,
-                italic
-            );
-        }
-
-        StyleState withStrikethrough(
-            boolean enabled
-        ) {
-            return new StyleState(
-                rgb,
-                obfuscated,
-                bold,
-                enabled,
-                underlined,
-                italic
             );
         }
 
