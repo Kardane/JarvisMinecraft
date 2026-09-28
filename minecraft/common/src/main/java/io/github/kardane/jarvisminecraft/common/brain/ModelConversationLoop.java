@@ -220,7 +220,8 @@ final class ModelConversationLoop {
                 new ConversationEntry.AssistantMessage(
                     LUNA_FAILURE_TEXT,
                     request.requestId(),
-                    clock.instant()
+                    clock.instant(),
+                    request.mode()
                 )
             );
             return CompletableFuture.completedFuture(
@@ -256,7 +257,8 @@ final class ModelConversationLoop {
                 new ConversationEntry.AssistantMessage(
                     finalStep.text(),
                     request.requestId(),
-                    clock.instant()
+                    clock.instant(),
+                    request.mode()
                 )
             );
             return CompletableFuture.completedFuture(

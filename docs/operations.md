@@ -236,6 +236,67 @@ subdirectories, and `knowledge/README.md` are ignored. Symlink/path escapes outs
 the platform JARVIS directory are rejected. Knowledge files are ordered
 deterministically by normalized filename.
 
+## Conversation archive
+
+JARVIS can optionally persist direct/follow-up user↔assistant conversation text for
+later offline use. This is disabled by default so existing servers do not begin
+retaining chat history silently.
+
+Configuration:
+
+```text
+jarvis.conversation-archive.enabled
+jarvis.conversation-archive.max-file-bytes
+jarvis.conversation-archive.max-files
+```
+
+Defaults:
+
+- enabled: `false`
+- max file size: 1 MiB
+- max files: 30
+
+Locations:
+
+```text
+Paper
+plugins/JarvisMinecraft/conversations/
+
+Fabric / NeoForge
+config/jarvisminecraft/conversations/
+```
+
+When enabled, JARVIS writes bounded UTF-8 JSONL files asynchronously on the
+dedicated `jarvis-conversation-archive` daemon thread. Minecraft server/tick
+threads never wait for archive disk I/O. Files are rotated at the configured byte
+limit and the oldest JSONL files are pruned when `max-files` is exceeded.
+
+Each JSONL record contains only:
+
+- schema version
+- timestamp
+- logical server ID
+- requester UUID
+- session ID
+- request ID
+- interaction origin
+- role (`USER` or `ASSISTANT`)
+- message text
+
+Tool results, Tool arguments, hidden prompts/policy, reasoning, persona/knowledge
+content, provider credentials, and API keys are not written. ACTIVE-mode proactive
+ambient-chat context and proactive responses are intentionally excluded because that
+context can contain messages from multiple public-chat participants.
+
+The archive is not automatically injected back into Luna and is not persistent model
+memory. It is a future-facing data source for explicit operator-controlled workflows
+such as offline search, summaries, RAG, or user-scoped memory if those features are
+designed later.
+
+`/jm reload` applies archive enablement and retention changes to subsequent
+messages without a server restart. Already queued writes may finish using the limits
+captured when they were accepted.
+
 ## Default JARVIS voice
 
 The compiled baseline voice is calm, precise, discreet, lightly formal, and
@@ -285,7 +346,7 @@ At platform startup JARVIS:
 6. constructs `CommonRuntime`;
 7. constructs `ChatSessionManager`;
 8. constructs `EmbeddedBrainGateway` and `EmbeddedBrain`;
-9. constructs the Jev HTTP classifier, Luna client, AI scheduler and JSONL audit sink;
+9. constructs the Jev HTTP classifier, Luna client, AI scheduler, JSONL audit sink, and optional conversation archive;
 10. starts accepting chat requests from players allowed by the configured audience.
 
 Configuration failure disables/stops JARVIS startup rather than falling back to a weaker policy.
@@ -479,7 +540,7 @@ Platform shutdown calls `BrainGateway.stop()`, which:
 1. stops accepting new Embedded Brain work;
 2. shuts down the bounded AI scheduler;
 3. clears active Luna request state;
-4. closes owned Luna/audit resources;
+4. closes owned Luna/audit/conversation-archive resources;
 5. rejects late delivery after the gateway is stopped.
 
 There is no external Brain process to signal.

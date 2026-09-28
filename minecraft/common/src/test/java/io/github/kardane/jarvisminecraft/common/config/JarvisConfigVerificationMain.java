@@ -16,6 +16,7 @@ public final class JarvisConfigVerificationMain {
         verifyPropertiesOverride();
         verifyInvalidConfigRejected();
         verifyPromptContentBoundsRejected();
+        verifyConversationArchiveBounds();
         verifyResponseUxDefaults();
         verifyReloadFailureKeepsPreviousSnapshot();
         verifyAtomicRuntimeReload();
@@ -59,6 +60,16 @@ public final class JarvisConfigVerificationMain {
             "Custom knowledge must default to disabled."
         );
         require(
+            !config.conversationArchive().enabled(),
+            "Conversation archive must default to disabled."
+        );
+        require(
+            config.conversationArchive().maxFileBytes()
+                    == 1024 * 1024
+                && config.conversationArchive().maxFiles() == 30,
+            "Conversation archive defaults changed unexpectedly."
+        );
+        require(
             config.knowledge().maxFiles() == 32
                 && config.knowledge().maxFileBytes() == 32 * 1024
                 && config.knowledge().maxTotalBytes() == 128 * 1024,
@@ -97,6 +108,18 @@ public final class JarvisConfigVerificationMain {
             "65536"
         );
         properties.setProperty(
+            "jarvis.conversation-archive.enabled",
+            "true"
+        );
+        properties.setProperty(
+            "jarvis.conversation-archive.max-file-bytes",
+            "131072"
+        );
+        properties.setProperty(
+            "jarvis.conversation-archive.max-files",
+            "12"
+        );
+        properties.setProperty(
             "jarvis.response.sound.enabled",
             "true"
         );
@@ -120,6 +143,14 @@ public final class JarvisConfigVerificationMain {
         require(
             config.response().sound().enabled(),
             "Properties boolean override failed."
+        );
+        require(
+            config.conversationArchive().enabled()
+                && config.conversationArchive().maxFileBytes()
+                    == 131072
+                && config.conversationArchive().maxFiles()
+                    == 12,
+            "Conversation archive override failed."
         );
         require(
             config.personality().enabled(),
@@ -193,6 +224,45 @@ public final class JarvisConfigVerificationMain {
         require(
             rejected,
             "Per-file knowledge limit must not exceed total knowledge limit."
+        );
+    }
+
+    private static void verifyConversationArchiveBounds() {
+        Properties tooSmall = new Properties();
+        tooSmall.setProperty(
+            "jarvis.conversation-archive.max-file-bytes",
+            "1024"
+        );
+
+        boolean rejected = false;
+        try {
+            JarvisConfigLoader.load(
+                PropertiesJarvisConfigSource.from(tooSmall)
+            );
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        require(
+            rejected,
+            "Conversation archive file bound must be validated."
+        );
+
+        Properties tooMany = new Properties();
+        tooMany.setProperty(
+            "jarvis.conversation-archive.max-files",
+            "366"
+        );
+        rejected = false;
+        try {
+            JarvisConfigLoader.load(
+                PropertiesJarvisConfigSource.from(tooMany)
+            );
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        require(
+            rejected,
+            "Conversation archive retention count must be validated."
         );
     }
 

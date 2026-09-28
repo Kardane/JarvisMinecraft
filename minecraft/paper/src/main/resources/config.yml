@@ -36,7 +36,7 @@ jarvis:
       fallback: MEDIUM
 
   # User prompt content remains disabled by default for backward compatibility.
-  # Phase P3 will wire these validated settings into Luna prompt composition.
+  # When enabled, validated content is included in Luna prompt composition.
   personality:
     enabled: false
 
@@ -48,7 +48,8 @@ jarvis:
 
   response:
     # Legacy Minecraft ampersand codes and <#RRGGBB> hex colors are supported
-    # in the prefix only.
+    # in configured presentation fields such as prefix and metrics.icon.
+    # Model-generated response body text is never parsed as formatting.
     # Examples: "&5[JARVIS]&r " or "<#FF00FF>[JARVIS]&r "
     prefix: "[JARVIS] "
     waiting-message:
@@ -84,6 +85,15 @@ jarvis:
     metrics:
       enabled: true
       icon: "<#7DD3FC>📊"
+
+  # Optional persistent archive of direct/follow-up USER and JARVIS messages.
+  # Stored under plugins/JarvisMinecraft/conversations/*.jsonl.
+  # Proactive ambient-chat context, Tool results, reasoning, prompts, and secrets
+  # are not archived.
+  conversation-archive:
+    enabled: false
+    max-file-bytes: 1048576
+    max-files: 30
 
   execution:
     # READ_TALK: read-only Tools only.

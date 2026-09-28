@@ -29,6 +29,7 @@ Run individually when needed:
 ```bash
 ./gradlew :minecraft:common:jarvisConfigVerification --stacktrace
 ./gradlew :minecraft:common:promptContentVerification --stacktrace
+./gradlew :minecraft:common:conversationArchiveVerification --stacktrace
 ./gradlew :minecraft:common:embeddedBrainVerification --stacktrace
 ./gradlew :minecraft:common:embeddedBrainParityVerification --stacktrace
 
@@ -109,6 +110,10 @@ Core scenarios:
 - disabling `response.metrics.enabled` removes the hover suffix
 - no public follow-up-session TTL announcement is emitted
 - generated `tools.md` reflects registered, unavailable-provider, and Brain-control Tools
+- conversation archive disabled by default creates no archive files
+- enabling conversation archive writes DIRECT/FOLLOW_UP USER and ASSISTANT JSONL records
+- archive rotation respects max-file-bytes/max-files
+- Tool results and ACTIVE proactive ambient context do not appear in conversation archive files
 - edit `persona.md`, reload, and confirm only new requests use the new persona
 - add ordered `knowledge/*.md`, reload, and confirm server-specific context is available
 - malformed/oversized prompt content fails reload while the previous config/persona/knowledge stays active
@@ -205,7 +210,27 @@ Chat presentation deterministic coverage also checks hex-prefix parsing, hover
 suffix preservation, Luna token-usage aggregation, and generated Tool-reference
 classification.
 
-## 9. Audit and Operational Logging Verification
+## 9. Conversation archive verification
+
+The deterministic `conversationArchiveVerification` task covers:
+
+- disabled-by-default behavior
+- USER/ASSISTANT JSONL persistence
+- requester/session/request/origin metadata
+- exclusion of Tool result records
+- exclusion of ACTIVE proactive ambient context/responses
+- generated archive README
+- per-file byte rotation
+- oldest-file pruning at the configured file-count bound
+
+Manual privacy verification should also confirm that API keys, hidden policy,
+persona/knowledge contents, reasoning, and Tool arguments are absent from
+`conversations/*.jsonl`.
+
+Archive records are not automatically supplied to Luna. Any future retrieval or
+memory feature requires a separate explicit design and verification boundary.
+
+## 10. Audit and Operational Logging Verification
 
 Audit:
 
@@ -222,12 +247,13 @@ Operational log:
 - unchanged Audit health is not logged again on every poll
 - `/jm status` shows runtime, interaction, execution, scheduling, AI queue, proactive in-flight, and Audit health
 
-## 10. Release gate
+## 11. Release gate
 
 Minimum pre-release gate:
 
 - `./gradlew build` PASS
 - `promptContentVerification` PASS
+- `conversationArchiveVerification` PASS
 - atomic reload verification PASS
 - clean boot PASS on all three platforms
 - core gameplay smoke PASS on Paper/Fabric/NeoForge

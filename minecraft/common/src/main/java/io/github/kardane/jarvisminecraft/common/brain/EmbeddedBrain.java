@@ -459,7 +459,8 @@ public final class EmbeddedBrain {
                 new ConversationEntry.UserMessage(
                     request.text(),
                     request.requestId(),
-                    clock.instant()
+                    clock.instant(),
+                    request.mode()
                 )
             );
 

@@ -18,24 +18,44 @@ public sealed interface ConversationEntry
     record UserMessage(
         String text,
         UUID requestId,
-        Instant at
+        Instant at,
+        String origin
     ) implements ConversationEntry {
+        public UserMessage(
+            String text,
+            UUID requestId,
+            Instant at
+        ) {
+            this(text, requestId, at, "UNKNOWN");
+        }
+
         public UserMessage {
             Objects.requireNonNull(text, "text");
             Objects.requireNonNull(requestId, "requestId");
             Objects.requireNonNull(at, "at");
+            Objects.requireNonNull(origin, "origin");
         }
     }
 
     record AssistantMessage(
         String text,
         UUID requestId,
-        Instant at
+        Instant at,
+        String origin
     ) implements ConversationEntry {
+        public AssistantMessage(
+            String text,
+            UUID requestId,
+            Instant at
+        ) {
+            this(text, requestId, at, "UNKNOWN");
+        }
+
         public AssistantMessage {
             Objects.requireNonNull(text, "text");
             Objects.requireNonNull(requestId, "requestId");
             Objects.requireNonNull(at, "at");
+            Objects.requireNonNull(origin, "origin");
         }
     }
 

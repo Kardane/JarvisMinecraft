@@ -212,7 +212,9 @@ requests; an in-flight request never changes persona midway through execution.
 
 ## Session and Conversation State
 
-`ChatSessionManager` exclusively owns session IDs, TTL, active state, termination, and invalidation. The Embedded Brain does not create a separate session TTL store; it stores only model conversation history in `ConversationHistoryStore`.
+`ChatSessionManager` exclusively owns session IDs, TTL, active state, termination, and invalidation. The Embedded Brain does not create a separate session TTL store. Bounded model conversation context remains owned by `ConversationHistoryStore` and is memory-only.
+
+When `jarvis.conversation-archive.enabled=true`, production wiring wraps the in-memory history store with `ArchivingConversationHistoryStore` and asynchronously mirrors only USER/ASSISTANT entries into `AsyncConversationArchive`. The archive lives under the platform JARVIS configuration root, uses bounded rotated JSONL files, and is not read back into model context. Tool messages and ACTIVE proactive ambient-chat context/responses are excluded. Archive disk work runs on the dedicated `jarvis-conversation-archive` daemon executor and archive failure does not change request/Tool semantics.
 
 The default session TTL is 120 seconds and can be changed with `jarvis.interaction.follow-up-seconds`. The default direct wake words are `자비스`, `jarvis`, and `재비스`, replaceable via `jarvis.interaction.wake-words`. A wake word is accepted only as an independent token at the beginning of the message. The literal commands `대화 끝` and `!내용` are handled locally before any model call.
 
