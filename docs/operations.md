@@ -32,6 +32,7 @@ The runtime-policy snapshot and operator prompt content are deliberately separat
 
 - `jarvis.interaction.wake-words`
 - `jarvis.interaction.follow-up-seconds`
+- `jarvis.interaction.follow-up-max-messages`
 - `jarvis.interaction.audience.*`
 
 `PASSIVE` remains the default. In `ACTIVE`, wake-word and follow-up behavior
@@ -75,8 +76,12 @@ Response configuration under `jarvis.response.*` includes:
   Luna input/output/total token usage when available plus end-to-end request
   processing time.
 
-Starting a follow-up session no longer emits the old public "120 seconds"
-session-rules announcement. The configured follow-up TTL itself is unchanged.
+Starting a follow-up session emits no public TTL announcement. The default implicit
+follow-up window is 30 seconds and is fixed from session creation; forwarded follow-up
+messages do not refresh it. The default `follow-up-max-messages=1` allows one
+wake-word-free follow-up, after which ordinary player messages return to public chat.
+Set it to `0` to require the JARVIS wake word for every request, or raise it up to
+`16` for longer conversational sessions.
 
 Phase 5 applies `jarvis.execution.*`:
 
