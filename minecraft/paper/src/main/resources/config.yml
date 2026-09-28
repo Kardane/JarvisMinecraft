@@ -85,6 +85,15 @@ jarvis:
       enabled: true
       icon: "<#7DD3FC>📊"
 
+  # Optional persistent archive of direct/follow-up USER and JARVIS messages.
+  # Stored under plugins/JarvisMinecraft/conversations/*.jsonl.
+  # Proactive ambient-chat context, Tool results, reasoning, prompts, and secrets
+  # are not archived.
+  conversation-archive:
+    enabled: false
+    max-file-bytes: 1048576
+    max-files: 30
+
   execution:
     # READ_TALK: read-only Tools only.
     # EXECUTE_LITE: read-only + explicitly allowed LOW-risk state-changing Tools.
