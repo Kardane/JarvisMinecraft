@@ -21,9 +21,13 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaTurnInput;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
+import io.github.kardane.jarvisminecraft.common.chat.InteractionDecision;
+import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
 import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
+import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
+import io.github.kardane.jarvisminecraft.common.config.PropertiesJarvisConfigSource;
 import io.github.kardane.jarvisminecraft.common.logging.NoOpJarvisLog;
 import io.github.kardane.jarvisminecraft.common.platform.AdapterPlatformAccess;
 import io.github.kardane.jarvisminecraft.common.prompt.KnowledgeDocument;
@@ -49,12 +53,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -80,6 +86,7 @@ public final class EmbeddedBrainVerificationMain {
         promptCompositionContract();
         requestPromptSnapshotContract();
         requestMemorySnapshotContract();
+        boundedFollowUpContract();
         styledChatContract();
         toolReferenceContract();
         preAuditFailClosed();
@@ -534,6 +541,89 @@ public final class EmbeddedBrainVerificationMain {
                     "Never treat them as current Tool permission"
                 ),
             "Luna conversation rendering did not preserve the memory authority boundary."
+        );
+    }
+
+    private static void boundedFollowUpContract() {
+        MutableClock clock = new MutableClock(NOW);
+        Properties properties = new Properties();
+        properties.setProperty(
+            "jarvis.interaction.follow-up-seconds",
+            "30"
+        );
+        properties.setProperty(
+            "jarvis.interaction.follow-up-max-messages",
+            "1"
+        );
+        ConfigManager config = new ConfigManager(() ->
+            JarvisConfigLoader.load(
+                PropertiesJarvisConfigSource.from(
+                    properties
+                )
+            )
+        );
+        ChatSessionManager sessions =
+            new ChatSessionManager(clock);
+        InteractionCoordinator interactions =
+            new InteractionCoordinator(
+                sessions,
+                config
+            );
+
+        UUID actor = UUID.fromString(
+            "21300000-0000-4000-8000-000000000001"
+        );
+        PlayerIdentity player = new PlayerIdentity(
+            actor,
+            "Operator",
+            true,
+            true
+        );
+
+        InteractionDecision direct =
+            interactions.accept(
+                player,
+                "자비스 안녕"
+            );
+        require(
+            direct.kind()
+                == InteractionDecision.Kind.FORWARD
+                && "DIRECT".equals(direct.mode()),
+            "Wake-word invocation did not start a direct session."
+        );
+
+        clock.advanceSeconds(20);
+        InteractionDecision followUp =
+            interactions.accept(
+                player,
+                "그럼 지금 TPS는?"
+            );
+        require(
+            followUp.kind()
+                == InteractionDecision.Kind.FORWARD
+                && "FOLLOW_UP".equals(followUp.mode()),
+            "The configured implicit follow-up was not forwarded."
+        );
+
+        InteractionDecision normalChat =
+            interactions.accept(
+                player,
+                "다들 어디 있어?"
+            );
+        require(
+            normalChat.kind()
+                == InteractionDecision.Kind.PUBLIC_CHAT,
+            "Follow-up quota exhaustion did not restore public chat."
+        );
+        require(
+            sessions.activeSession(actor).isPresent(),
+            "Quota exhaustion must not invalidate a session before its last reply can be delivered."
+        );
+
+        clock.advanceSeconds(11);
+        require(
+            sessions.activeSession(actor).isEmpty(),
+            "Implicit follow-up incorrectly extended the fixed session TTL."
         );
     }
 
@@ -1197,6 +1287,36 @@ public final class EmbeddedBrainVerificationMain {
     private static void require(boolean condition, String message) {
         if (!condition) {
             throw new AssertionError(message);
+        }
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant instant;
+
+        private MutableClock(Instant instant) {
+            this.instant = instant;
+        }
+
+        void advanceSeconds(long seconds) {
+            instant = instant.plusSeconds(seconds);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return Clock.fixed(
+                instant,
+                zone
+            );
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
         }
     }
 
