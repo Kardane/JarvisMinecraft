@@ -50,11 +50,6 @@ public final class JarvisConfigLoader {
                 "jarvis.interaction.follow-up-seconds",
                 defaultInteraction.followUpSeconds()
             ),
-            integer(
-                source,
-                "jarvis.interaction.follow-up-max-messages",
-                defaultInteraction.followUpMaxMessages()
-            ),
             new JarvisConfig.Audience(
                 enumValue(
                     source,
