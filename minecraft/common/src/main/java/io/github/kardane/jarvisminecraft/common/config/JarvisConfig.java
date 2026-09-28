@@ -17,6 +17,7 @@ public record JarvisConfig(
     Personality personality,
     Knowledge knowledge,
     Response response,
+    ConversationArchive conversationArchive,
     Execution execution,
     Scheduling scheduling,
     Logging logging
@@ -27,6 +28,10 @@ public record JarvisConfig(
         Objects.requireNonNull(personality, "personality");
         Objects.requireNonNull(knowledge, "knowledge");
         Objects.requireNonNull(response, "response");
+        Objects.requireNonNull(
+            conversationArchive,
+            "conversationArchive"
+        );
         Objects.requireNonNull(execution, "execution");
         Objects.requireNonNull(scheduling, "scheduling");
         Objects.requireNonNull(logging, "logging");
@@ -46,6 +51,7 @@ public record JarvisConfig(
             Personality.defaults(),
             Knowledge.defaults(),
             response,
+            ConversationArchive.defaults(),
             execution,
             scheduling,
             logging
@@ -65,6 +71,7 @@ public record JarvisConfig(
             Personality.defaults(),
             Knowledge.defaults(),
             response,
+            ConversationArchive.defaults(),
             execution,
             scheduling,
             Logging.defaults()
@@ -118,6 +125,7 @@ public record JarvisConfig(
                 ),
                 ResponseMetrics.defaults()
             ),
+            ConversationArchive.defaults(),
             new Execution(
                 ExecutionMode.READ_TALK,
                 ExecutionActors.OP,
@@ -401,6 +409,35 @@ public record JarvisConfig(
             return new ResponseMetrics(
                 true,
                 "<#7DD3FC>📊"
+            );
+        }
+    }
+
+    public record ConversationArchive(
+        boolean enabled,
+        int maxFileBytes,
+        int maxFiles
+    ) {
+        public ConversationArchive {
+            requireRange(
+                maxFileBytes,
+                64 * 1024,
+                16 * 1024 * 1024,
+                "conversationArchive.maxFileBytes"
+            );
+            requireRange(
+                maxFiles,
+                1,
+                365,
+                "conversationArchive.maxFiles"
+            );
+        }
+
+        public static ConversationArchive defaults() {
+            return new ConversationArchive(
+                false,
+                1024 * 1024,
+                30
             );
         }
     }
