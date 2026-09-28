@@ -33,7 +33,8 @@ jarvis.knowledge.max-file-bytes=32768
 jarvis.knowledge.max-total-bytes=131072
 
 # Legacy Minecraft ampersand codes and <#RRGGBB> hex colors are supported
-# in the prefix only.
+# in configured presentation fields such as prefix and metrics.icon.
+# Model-generated response body text is never parsed as formatting.
 # Example: jarvis.response.prefix=<#FF00FF>[JARVIS]&r 
 jarvis.response.prefix=[JARVIS] 
 jarvis.response.waiting-message.enabled=true
