@@ -1179,6 +1179,22 @@
           ],
           "properties": {
             "tool": {
+              "const": "run_command"
+            },
+            "arguments": {
+              "$ref": "#/$defs/commandArguments"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tool",
+            "arguments"
+          ],
+          "properties": {
+            "tool": {
               "const": "schedule_action"
             },
             "arguments": {
@@ -2301,6 +2317,116 @@
           ],
           "properties": {
             "tool": {
+              "const": "run_command"
+            },
+            "result": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "status",
+                "data",
+                "error",
+                "observedAt",
+                "source",
+                "truncated"
+              ],
+              "properties": {
+                "status": {
+                  "enum": [
+                    "OK",
+                    "EMPTY",
+                    "ERROR",
+                    "UNSUPPORTED"
+                  ]
+                },
+                "data": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/commandData"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "error": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/$defs/errorObject"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "observedAt": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "source": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 128
+                },
+                "truncated": {
+                  "type": "boolean"
+                }
+              },
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "ERROR",
+                          "UNSUPPORTED"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "data": {
+                        "type": "null"
+                      },
+                      "error": {
+                        "$ref": "#/$defs/errorObject"
+                      }
+                    }
+                  }
+                },
+                {
+                  "if": {
+                    "properties": {
+                      "status": {
+                        "enum": [
+                          "OK",
+                          "EMPTY"
+                        ]
+                      }
+                    }
+                  },
+                  "then": {
+                    "properties": {
+                      "error": {
+                        "type": "null"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "tool",
+            "result"
+          ],
+          "properties": {
+            "tool": {
               "const": "schedule_action"
             },
             "result": {
@@ -3330,6 +3456,7 @@
                       "teleport_staff",
                       "weather_set",
                       "time_set",
+                      "run_command",
                       "cancel_scheduled_action",
                       "schedule_action",
                       "lookup_area_history",
@@ -3587,6 +3714,7 @@
                       "teleport_staff",
                       "weather_set",
                       "time_set",
+                      "run_command",
                       "schedule_action",
                       "cancel_scheduled_action"
                     ]
@@ -3681,6 +3809,7 @@
                       "teleport_staff",
                       "weather_set",
                       "time_set",
+                      "run_command",
                       "schedule_action",
                       "cancel_scheduled_action"
                     ]
@@ -4216,6 +4345,42 @@
           "format": "uuid"
         },
         "cancelled": {
+          "const": true
+        }
+      }
+    },
+    "commandArguments": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command"
+      ],
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        }
+      }
+    },
+    "commandData": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "commandRoot",
+        "resultCode",
+        "completed"
+      ],
+      "properties": {
+        "commandRoot": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "resultCode": {
+          "type": "integer"
+        },
+        "completed": {
           "const": true
         }
       }

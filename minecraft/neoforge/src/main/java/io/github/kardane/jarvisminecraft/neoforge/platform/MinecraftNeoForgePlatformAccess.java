@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.neoforge.platform;
 
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
 import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WeatherType;
@@ -217,6 +218,42 @@ public final class MinecraftNeoForgePlatformAccess implements NeoForgePlatformAc
                 completed
             )
         );
+    }
+
+    @Override
+    public Set<String> commandRoots() {
+        requireServerThread();
+        return server.getCommands()
+            .getDispatcher()
+            .getRoot()
+            .getChildren()
+            .stream()
+            .map(node -> node.getName())
+            .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
+    @Override
+    public CommandExecutionSnapshot executeConsoleCommand(
+        String command
+    ) {
+        requireServerThread();
+        try {
+            int result = server.getCommands()
+                .getDispatcher()
+                .execute(
+                    command,
+                    server.createCommandSourceStack()
+                );
+            return new CommandExecutionSnapshot(
+                result,
+                true
+            );
+        } catch (CommandSyntaxException failure) {
+            return new CommandExecutionSnapshot(
+                0,
+                false
+            );
+        }
     }
 
     @Override

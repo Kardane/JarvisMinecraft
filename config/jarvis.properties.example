@@ -36,8 +36,8 @@ jarvis.model.reasoning.fallback=MEDIUM
 
 # Optional operator-defined prompt context. Files remain under
 # config/jarvisminecraft/{persona.md,knowledge/*.md}.
-jarvis.personality.enabled=false
-jarvis.knowledge.enabled=false
+jarvis.personality.enabled=true
+jarvis.knowledge.enabled=true
 jarvis.knowledge.max-files=32
 jarvis.knowledge.max-file-bytes=32768
 jarvis.knowledge.max-total-bytes=131072
@@ -65,14 +65,14 @@ jarvis.response.metrics.icon=<#7DD3FC>📊
 # Stored under config/jarvisminecraft/conversations/*.jsonl.
 # Proactive ambient-chat context, Tool results, reasoning, prompts, and secrets
 # are not archived.
-jarvis.conversation-archive.enabled=false
+jarvis.conversation-archive.enabled=true
 jarvis.conversation-archive.max-file-bytes=1048576
 jarvis.conversation-archive.max-files=30
 
 # Optional retrieval-backed long-term conversation memory.
 # Reads previous-session archive records for the same requester UUID only.
 # Enable conversation-archive as well to keep accumulating future memory.
-jarvis.conversation-memory.enabled=false
+jarvis.conversation-memory.enabled=true
 jarvis.conversation-memory.lookback-days=30
 jarvis.conversation-memory.max-source-files=4
 jarvis.conversation-memory.max-turns=6
@@ -92,7 +92,7 @@ jarvis.execution.full.allow-tools=
 jarvis.execution.full.deny-tools=
 
 # Enables schedule_action. Pending schedules are memory-only.
-jarvis.scheduling.enabled=false
+jarvis.scheduling.enabled=true
 jarvis.scheduling.max-delay-seconds=60
 jarvis.scheduling.max-duration-seconds=60
 

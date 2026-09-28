@@ -38,6 +38,31 @@ The runtime-policy snapshot and operator prompt content are deliberately separat
 - `jarvis.interaction.follow-up-confidence-threshold`
 - `jarvis.interaction.audience.*`
 
+## Command action configuration
+
+JARVIS maintains a separate command-action policy next to its normal runtime config:
+
+- Paper: `plugins/JarvisMinecraft/actions.properties`
+- Fabric / NeoForge: `config/jarvisminecraft/actions.properties`
+
+The file is generated from the command roots actually registered in the running server, so it covers vanilla commands plus plugin/mod commands. Missing roots are added automatically as `false`; existing operator choices are preserved. The only supported value is `true` or `false`.
+
+Example:
+
+~~~properties
+give=false
+gamemode=false
+teleport=true
+execute=false
+essentials:home=false
+~~~
+
+`run_command` executes as server console only for a current online OP and only when the root is enabled. Command policy is checked again immediately before dispatch. For `execute ... run` and `return run`, the nested command root must also be enabled. Vanilla `minecraft:` aliases are normalized to the same root. Changes are read at execution time and do not require `/jm reload`.
+
+Because plugin roots may expose many subcommands, one `true` grants that entire root. Likewise, `function` or other datapack-invoking roots may execute additional datapack commands; leave them `false` unless that transitive authority is intended. All generated entries default to `false`.
+
+The generic command Tool remains unavailable to proactive turns, requires fail-closed pre-execution audit, and records only the command root in its argument audit summary.
+
 `PASSIVE` remains the default. In `ACTIVE`, wake-word and follow-up behavior
 is unchanged, and allowed public chat is additionally observed for proactive
 engagement. Public chat is never suppressed by this observation.

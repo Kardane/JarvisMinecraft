@@ -6,20 +6,11 @@ Canonical input/result schema: ../protocol/schema/protocol.schema.json
 
 ## 1. Principles
 
-Tools are not an interface that gives the LLM unrestricted Minecraft server authority. They are a **narrow, pre-registered function allowlist**.
+Tools do not give the LLM unrestricted Minecraft server authority. Structured Tools remain pre-registered and the generic command bridge is separately gated by an operator-owned `actions.properties` file.
 
-The initial release does not provide:
+JARVIS still does not provide SQL execution, arbitrary file access, or host code execution. Server commands are available only through the registered `run_command` Tool, only for current online OP requesters, only after fail-closed pre-execution audit, and only when the exact command root is enabled by the action policy.
 
-- arbitrary console commands
-- SQL execution
-- code execution
-- arbitrary file access
-- arbitrary-coordinate teleportation
-- forced teleportation of another player
-- ban / warn
-- rollback
-
-Even if the Brain invents an arbitrary Tool name, the Adapter does not execute it.
+Even if the Brain invents an arbitrary Tool name or command root, the Adapter does not execute it.
 
 ## 2. Catalog by Release
 
@@ -41,8 +32,9 @@ Even if the Brain invents an arbitrary Tool name, the Adapter does not execute i
 |---|---|---:|---|
 | weather_set | world.weather.set | mutation | LOW |
 | time_set | world.time.set | mutation | LOW |
+| run_command | command.execute | mutation | CRITICAL |
 
-Neither Tool executes a raw console command. Each operates only on one currently loaded world
+The two structured world Tools do not execute a raw console command. Each operates only on one currently loaded world
 through direct platform APIs and must pass both the execution-policy allowlist and a fresh current-online-OP
 check.
 
@@ -284,6 +276,37 @@ Constraints:
 - propose only for an explicit time-change request
 - implementation uses the platform world-time API directly and never constructs a command string
 - successful result includes `worldId`, the actually applied `timeOfDay`, and `completed=true`
+
+## 10.3 run_command — configurable command actions
+
+Input:
+
+~~~json
+{
+  "command": "give Steve minecraft:diamond 1"
+}
+~~~
+
+The command string is dispatched as the server console and must not contain a leading slash. The action boundary is not a hard-coded vanilla list: at startup each Adapter reads the server's actual registered command roots and synchronizes a separate `actions.properties` file. This includes vanilla commands and commands contributed by installed Paper plugins or Fabric/NeoForge mods.
+
+Policy rules:
+
+- every newly detected command root is written as `false`;
+- operators enable a root only by changing its value to `true`;
+- Paper path: `plugins/JarvisMinecraft/actions.properties`;
+- Fabric / NeoForge path: `config/jarvisminecraft/actions.properties`;
+- the file is re-read for every command execution, so boolean changes apply without a JARVIS config reload;
+- requester must still be a current online OP;
+- proactive turns cannot execute it;
+- Luna may call it only for an explicit user-requested server action;
+- `execute ... run <command>` and `return run <command>` recursively require both the outer root and the nested command root to be enabled;
+- `minecraft:` aliases are normalized to the same vanilla root so a namespaced alias cannot bypass a disabled vanilla command;
+- enabling a plugin command root grants all of that command's subcommands;
+- enabling `function` or commands that invoke datapack logic may transitively execute commands inside that datapack and should be treated accordingly;
+- the audit summary records only the command root, not the full command arguments, to avoid persisting potentially sensitive command text;
+- the Tool result returns only the root, platform result code, and completion flag.
+
+The generic command Tool is intentionally classified `CRITICAL` and uses the same action-id deduplication, pre-execution audit, deadline, and current-OP checks as other state-changing Tools. The per-root `actions.properties` policy is the explicit execution authority for this Tool and is independent from the coarse structured-Tool allowlists under `jarvis.execution.*`.
 
 ## 11. lookup_area_history — v0.1.1
 

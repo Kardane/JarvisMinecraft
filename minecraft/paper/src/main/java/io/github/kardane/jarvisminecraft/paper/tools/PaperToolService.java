@@ -1,9 +1,11 @@
 package io.github.kardane.jarvisminecraft.paper.tools;
 
+import io.github.kardane.jarvisminecraft.common.runtime.CommandActionPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftToolService;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperPlatformAccess;
 
+import java.nio.file.Path;
 import java.time.Clock;
 
 public final class PaperToolService {
@@ -18,6 +20,23 @@ public final class PaperToolService {
             SOURCE,
             SOURCE,
             60_000L
+        );
+    }
+
+    public PaperToolService(
+        PaperPlatformAccess platform,
+        Clock clock,
+        Path dataDirectory
+    ) {
+        this.delegate = new StandardMinecraftToolService(
+            platform,
+            clock,
+            SOURCE,
+            SOURCE,
+            60_000L,
+            new CommandActionPolicy(
+                dataDirectory.resolve("actions.properties")
+            )
         );
     }
 

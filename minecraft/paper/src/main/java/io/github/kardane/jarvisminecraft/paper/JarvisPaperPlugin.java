@@ -127,7 +127,13 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         platform = new BukkitPaperPlatformAccess(getServer());
         ServerScheduler serverScheduler = new PaperServerScheduler(this);
 
-        integrations = IntegrationRegistry.create(getServer(), platform, clock, getLogger());
+        integrations = IntegrationRegistry.create(
+            getServer(),
+            platform,
+            clock,
+            getDataFolder().toPath(),
+            getLogger()
+        );
         ToolRegistry registry = integrations.toolRegistry();
         ToolReferenceWriter.writeAsync(
             getDataFolder().toPath(),

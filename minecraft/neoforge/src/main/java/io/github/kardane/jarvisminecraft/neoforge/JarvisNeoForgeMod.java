@@ -296,7 +296,11 @@ public final class JarvisNeoForgeMod {
         ServerScheduler serverScheduler = new NeoForgeServerScheduler(server);
 
         ToolRegistry registry = new ToolRegistry();
-        new NeoForgeToolService(platform, clock).register(registry);
+        new NeoForgeToolService(
+            platform,
+            clock,
+            dataDirectory
+        ).register(registry);
         ToolReferenceWriter.writeAsync(
             dataDirectory,
             registry.tools()
