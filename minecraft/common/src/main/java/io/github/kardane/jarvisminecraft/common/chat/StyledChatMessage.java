@@ -170,6 +170,48 @@ public record StyledChatMessage(
         StyleState style = new StyleState();
 
         for (int index = 0; index < value.length(); index += 1) {
+            if (
+                modelBody
+                    && value.charAt(index) == '`'
+            ) {
+                int close = value.indexOf(
+                    '`',
+                    index + 1
+                );
+                if (close > index) {
+                    flush(segments, text, style);
+                    addLiteral(
+                        segments,
+                        value.substring(index + 1, close),
+                        style
+                    );
+                    index = close;
+                    continue;
+                }
+            }
+
+            if (
+                modelBody
+                    && index + 1 < value.length()
+                    && value.charAt(index) == '*'
+                    && value.charAt(index + 1) == '*'
+            ) {
+                int close = value.indexOf(
+                    "**",
+                    index + 2
+                );
+                if (close >= 0) {
+                    flush(segments, text, style);
+                    addBoldLiteral(
+                        segments,
+                        value.substring(index + 2, close),
+                        style
+                    );
+                    index = close + 1;
+                    continue;
+                }
+            }
+
             if (isHexColorAt(value, index)) {
                 flush(segments, text, style);
                 int rgb = Integer.parseInt(
@@ -261,32 +303,6 @@ public record StyledChatMessage(
         return output.toString();
     }
 
-    private static String convertStrongMarkdown(
-        String value
-    ) {
-        StringBuilder output = new StringBuilder();
-        int cursor = 0;
-        while (cursor < value.length()) {
-            int open = value.indexOf("**", cursor);
-            if (open < 0) {
-                output.append(value, cursor, value.length());
-                break;
-            }
-            int close = value.indexOf("**", open + 2);
-            if (close < 0) {
-                output.append(value, cursor, value.length());
-                break;
-            }
-
-            output.append(value, cursor, open);
-            output.append("&l");
-            output.append(value, open + 2, close);
-            output.append("&r");
-            cursor = close + 2;
-        }
-        return output.toString();
-    }
-
     private static int headingPrefixLength(
         String value
     ) {
@@ -335,6 +351,48 @@ public record StyledChatMessage(
             }
         }
         return true;
+    }
+
+    private static void addLiteral(
+        List<Segment> segments,
+        String value,
+        StyleState style
+    ) {
+        if (value.isEmpty()) {
+            return;
+        }
+        segments.add(
+            new Segment(
+                value,
+                style.rgb(),
+                false,
+                style.bold(),
+                false,
+                style.underlined(),
+                style.italic()
+            )
+        );
+    }
+
+    private static void addBoldLiteral(
+        List<Segment> segments,
+        String value,
+        StyleState style
+    ) {
+        if (value.isEmpty()) {
+            return;
+        }
+        segments.add(
+            new Segment(
+                value,
+                style.rgb(),
+                false,
+                true,
+                false,
+                style.underlined(),
+                style.italic()
+            )
+        );
     }
 
     private static void flush(
