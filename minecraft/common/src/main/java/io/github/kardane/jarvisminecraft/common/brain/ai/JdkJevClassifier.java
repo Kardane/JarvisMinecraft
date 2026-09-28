@@ -47,11 +47,11 @@ public final class JdkJevClassifier implements JevClassifier {
     private static final Map<JevEngagement, String> ENGAGEMENTS =
         Map.of(
             JevEngagement.IGNORE,
-            "Only for proactive-candidate ambient chat that does not need JARVIS.",
+            "Use for proactive ambient chat that does not need JARVIS, or for FOLLOW_UP_CANDIDATE messages that are ordinary chat and not a continuation of the active JARVIS conversation.",
             JevEngagement.RESPOND,
-            "The user directly invoked JARVIS or is continuing an active JARVIS conversation.",
+            "Use for DIRECT/FOLLOW_UP requests. For FOLLOW_UP_CANDIDATE, choose only when the latest message is clearly a reply, clarification, continuation, or closely related question to the recent JARVIS conversation in short_topic.",
             JevEngagement.START_CONVERSATION,
-            "Only for a proactive-candidate message where JARVIS should initiate a new conversation."
+            "Only for a PROACTIVE_CANDIDATE message where JARVIS should initiate a new conversation."
         );
 
     private static final Map<ReasoningLevel, String> REASONING =
@@ -74,6 +74,7 @@ public final class JdkJevClassifier implements JevClassifier {
     private static final String ENGAGEMENT_INSTRUCTIONS =
         "Decide whether JARVIS should engage with the latest message. "
             + "If interaction_origin is DIRECT, FOLLOW_UP, or PROACTIVE, choose RESPOND. "
+            + "If interaction_origin is FOLLOW_UP_CANDIDATE, compare latest_message with short_topic and choose RESPOND only when it is clearly continuing or replying to that JARVIS conversation; unrelated ordinary chat must be IGNORE. "
             + "For PROACTIVE_CANDIDATE choose START_CONVERSATION only when a useful, context-aware JARVIS intervention is warranted; otherwise choose IGNORE.";
 
     private static final String REASONING_INSTRUCTIONS =

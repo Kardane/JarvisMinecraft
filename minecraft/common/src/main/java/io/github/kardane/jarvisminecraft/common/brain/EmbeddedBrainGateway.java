@@ -27,6 +27,7 @@ public final class EmbeddedBrainGateway implements BrainGateway {
     private final ConfigManager configManager;
     private final EmbeddedBrainBootstrap.LiveRuntime ownedRuntime;
     private final GatewayRequestCoordinator requests;
+    private final FollowUpInteractionController followUp;
     private final ProactiveInteractionController proactive;
     private final GatewayAuditHealthMonitor auditHealth;
 
@@ -137,6 +138,18 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             presenter,
             this::isRunning
         );
+        this.followUp =
+            new FollowUpInteractionController(
+                brain,
+                sessions,
+                interactions,
+                platform,
+                serverScheduler,
+                clock,
+                log,
+                this::isRunning,
+                requests::submit
+            );
         this.proactive =
             new ProactiveInteractionController(
                 brain,
@@ -482,6 +495,21 @@ public final class EmbeddedBrainGateway implements BrainGateway {
             requesterName,
             sessionId,
             mode,
+            text
+        );
+    }
+
+    @Override
+    public CompletionStage<Boolean> considerFollowUp(
+        UUID requesterUuid,
+        String requesterName,
+        UUID sessionId,
+        String text
+    ) {
+        return followUp.consider(
+            requesterUuid,
+            requesterName,
+            sessionId,
             text
         );
     }

@@ -112,6 +112,15 @@ public final class FabricChatController {
                 yield true;
             }
             case PUBLIC_ESCAPE -> true;
+            case FOLLOW_UP_CANDIDATE -> {
+                brain.considerFollowUp(
+                    requesterUuid,
+                    sender.getGameProfile().getName(),
+                    decision.sessionId(),
+                    decision.text()
+                );
+                yield true;
+            }
             case END -> {
                 brain.cancelSession(
                     requesterUuid,

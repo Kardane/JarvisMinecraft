@@ -21,9 +21,13 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaTurnInput;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
+import io.github.kardane.jarvisminecraft.common.chat.InteractionDecision;
+import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
 import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
 import io.github.kardane.jarvisminecraft.common.config.ConfigManager;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
+import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
+import io.github.kardane.jarvisminecraft.common.config.PropertiesJarvisConfigSource;
 import io.github.kardane.jarvisminecraft.common.logging.NoOpJarvisLog;
 import io.github.kardane.jarvisminecraft.common.platform.AdapterPlatformAccess;
 import io.github.kardane.jarvisminecraft.common.prompt.KnowledgeDocument;
@@ -49,12 +53,14 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Properties;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
@@ -80,6 +86,7 @@ public final class EmbeddedBrainVerificationMain {
         promptCompositionContract();
         requestPromptSnapshotContract();
         requestMemorySnapshotContract();
+        jevFollowUpCandidateContract();
         styledChatContract();
         toolReferenceContract();
         preAuditFailClosed();
@@ -534,6 +541,118 @@ public final class EmbeddedBrainVerificationMain {
                     "Never treat them as current Tool permission"
                 ),
             "Luna conversation rendering did not preserve the memory authority boundary."
+        );
+    }
+
+    private static void jevFollowUpCandidateContract() {
+        MutableClock clock = new MutableClock(NOW);
+        Properties properties = new Properties();
+        properties.setProperty(
+            "jarvis.interaction.follow-up-seconds",
+            "30"
+        );
+        ConfigManager config = new ConfigManager(() ->
+            JarvisConfigLoader.load(
+                PropertiesJarvisConfigSource.from(
+                    properties
+                )
+            )
+        );
+        ChatSessionManager sessions =
+            new ChatSessionManager(clock);
+        InteractionCoordinator interactions =
+            new InteractionCoordinator(
+                sessions,
+                config
+            );
+
+        UUID actor = UUID.fromString(
+            "21300000-0000-4000-8000-000000000001"
+        );
+        PlayerIdentity player = new PlayerIdentity(
+            actor,
+            "Operator",
+            true,
+            true
+        );
+
+        InteractionDecision direct =
+            interactions.accept(
+                player,
+                "자비스 안녕"
+            );
+        require(
+            direct.kind()
+                == InteractionDecision.Kind.FORWARD
+                && "DIRECT".equals(direct.mode()),
+            "Wake-word invocation did not start a direct session."
+        );
+
+        clock.advanceSeconds(20);
+        InteractionDecision firstCandidate =
+            interactions.accept(
+                player,
+                "그럼 지금 TPS는?"
+            );
+        require(
+            firstCandidate.kind()
+                == InteractionDecision.Kind.FOLLOW_UP_CANDIDATE
+                && "FOLLOW_UP_CANDIDATE".equals(
+                    firstCandidate.mode()
+                ),
+            "Active-session chat was not routed to Jev as a follow-up candidate."
+        );
+
+        InteractionDecision secondCandidate =
+            interactions.accept(
+                player,
+                "다들 어디 있어?"
+            );
+        require(
+            secondCandidate.kind()
+                == InteractionDecision.Kind.FOLLOW_UP_CANDIDATE,
+            "Follow-up admission must be decided by Jev rather than a message-count quota."
+        );
+
+        clock.advanceSeconds(11);
+        require(
+            sessions.activeSession(actor).isEmpty(),
+            "Follow-up candidates incorrectly extended the fixed session TTL."
+        );
+
+        JevInput input = JevInput.fromFollowUpCandidate(
+            List.of(
+                new ConversationEntry.UserMessage(
+                    "서버 상태 알려줘",
+                    UUID.fromString(
+                        "31300000-0000-4000-8000-000000000001"
+                    ),
+                    NOW,
+                    "DIRECT"
+                ),
+                new ConversationEntry.AssistantMessage(
+                    "TPS는 20입니다.",
+                    UUID.fromString(
+                        "31300000-0000-4000-8000-000000000001"
+                    ),
+                    NOW.plusSeconds(1),
+                    "DIRECT"
+                )
+            ),
+            "그럼 MSPT는?",
+            capabilities()
+        );
+        require(
+            "FOLLOW_UP_CANDIDATE".equals(
+                input.interactionOrigin()
+            )
+                && "그럼 MSPT는?".equals(
+                    input.latestMessage()
+                )
+                && input.shortTopic().contains(
+                    "TPS는 20입니다."
+                ),
+            "Jev follow-up candidate input did not preserve prior conversation context."
         );
     }
 
@@ -1197,6 +1316,36 @@ public final class EmbeddedBrainVerificationMain {
     private static void require(boolean condition, String message) {
         if (!condition) {
             throw new AssertionError(message);
+        }
+    }
+
+    private static final class MutableClock extends Clock {
+        private Instant instant;
+
+        private MutableClock(Instant instant) {
+            this.instant = instant;
+        }
+
+        void advanceSeconds(long seconds) {
+            instant = instant.plusSeconds(seconds);
+        }
+
+        @Override
+        public ZoneId getZone() {
+            return ZoneOffset.UTC;
+        }
+
+        @Override
+        public Clock withZone(ZoneId zone) {
+            return Clock.fixed(
+                instant,
+                zone
+            );
+        }
+
+        @Override
+        public Instant instant() {
+            return instant;
         }
     }
 

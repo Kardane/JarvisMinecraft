@@ -139,7 +139,7 @@ public record JarvisConfig(
             new Interaction(
                 InteractionMode.PASSIVE,
                 List.of("자비스", "jarvis", "재비스"),
-                120,
+                30,
                 new Audience(AudienceMode.OP, List.of(), List.of()),
                 new Proactive(12, 15, 0.75)
             ),

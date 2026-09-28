@@ -34,7 +34,10 @@ public final class ChatSessionManager {
         UUID sessionId = UUID.randomUUID();
         sessions.put(
             requesterUuid,
-            new Session(sessionId, clock.instant().plus(ttl))
+            new Session(
+                sessionId,
+                clock.instant().plus(ttl)
+            )
         );
         return sessionId;
     }
@@ -58,7 +61,10 @@ public final class ChatSessionManager {
         }
         sessions.put(
             requesterUuid,
-            new Session(sessionId, clock.instant().plus(ttl))
+            new Session(
+                sessionId,
+                clock.instant().plus(ttl)
+            )
         );
         return true;
     }
@@ -205,7 +211,10 @@ public final class ChatSessionManager {
         }
     }
 
-    private record Session(UUID sessionId, Instant expiresAt) {}
+    private record Session(
+        UUID sessionId,
+        Instant expiresAt
+    ) {}
 
     public record SessionHandle(UUID requesterUuid, UUID sessionId) {}
 

@@ -40,6 +40,10 @@ public final class JarvisConfigVerificationMain {
             "Default audience must remain OP."
         );
         require(
+            config.interaction().followUpSeconds() == 30,
+            "Default follow-up window must be 30 seconds."
+        );
+        require(
             "gpt-6-luna".equals(config.model().name()),
             "Model must remain pinned to gpt-6-luna."
         );
@@ -171,7 +175,7 @@ public final class JarvisConfigVerificationMain {
         );
         require(
             config.interaction().followUpSeconds() == 90,
-            "Properties integer override failed."
+            "Follow-up window override failed."
         );
         require(
             config.response().sound().enabled(),
