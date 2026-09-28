@@ -387,8 +387,8 @@ public final class EmbeddedBrainVerificationMain {
             StyledChatMessage.fromConfiguredPrefix(
                 "<#FF00FF>[JARVIS]&r ",
                 "hello"
-            ).withHoverSuffix(
-                " 📊",
+            ).withConfiguredHoverSuffix(
+                " <#7DD3FC>📊",
                 "Luna 토큰: 42"
             );
 
@@ -408,6 +408,15 @@ public final class EmbeddedBrainVerificationMain {
                 message.suffix().getFirst().hoverText()
             ),
             "Hover suffix text was not retained."
+        );
+        require(
+            message.suffix().getFirst().segments().stream()
+                .anyMatch(segment ->
+                    Integer.valueOf(0x7DD3FC).equals(
+                        segment.rgb()
+                    )
+                ),
+            "Configured metrics icon hex color was not parsed."
         );
 
         LunaStep.Usage usage =
