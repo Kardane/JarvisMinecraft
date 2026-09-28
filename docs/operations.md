@@ -80,9 +80,11 @@ window is 30 seconds and is fixed from session creation; candidate messages do n
 refresh it. Wake-word-free messages during that window remain visible as ordinary
 public chat and are evaluated asynchronously by Jev against the bounded recent JARVIS
 conversation topic. Only `RESPOND` with engagement confidence at least 0.70 is
-promoted to a real `FOLLOW_UP` request. `IGNORE`, low confidence, timeout,
-invalid output, or Jev failure produces no JARVIS response and never suppresses the
-player's normal chat message.
+promoted to a real `FOLLOW_UP` request. At most one follow-up classifier is in
+flight per requester, and each candidate gets a 1.5-second classification deadline.
+`IGNORE`, low confidence, timeout, invalid output, concurrent-candidate suppression,
+or Jev failure produces no JARVIS response and never suppresses the player's normal
+chat message.
 
 Phase 5 applies `jarvis.execution.*`:
 
