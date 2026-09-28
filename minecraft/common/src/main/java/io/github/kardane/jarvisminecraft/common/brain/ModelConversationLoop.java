@@ -5,6 +5,7 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.LunaClient;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaTurnInput;
 import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningLevel;
+import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisEvents;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisFields;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
@@ -278,11 +279,15 @@ final class ModelConversationLoop {
                 )
             );
             validateFinal(finalStep);
+            String plainAssistantText =
+                StyledChatMessage.plainModelText(
+                    finalStep.text()
+                );
             history.append(
                 request.requesterUuid(),
                 request.sessionId(),
                 new ConversationEntry.AssistantMessage(
-                    finalStep.text(),
+                    plainAssistantText,
                     request.requestId(),
                     clock.instant(),
                     request.mode()

@@ -369,7 +369,21 @@ public final class MinecraftNeoForgePlatformAccess implements NeoForgePlatformAc
                 Component.literal(segment.text()).setStyle(style)
             );
         }
-        output.append(Component.literal(message.body()));
+        for (StyledChatMessage.Segment segment : message.bodySegments()) {
+            Style style = Style.EMPTY;
+            if (segment.rgb() != null) {
+                style = style.withColor(segment.rgb());
+            }
+            style = style
+                .withObfuscated(segment.obfuscated())
+                .withBold(segment.bold())
+                .withStrikethrough(segment.strikethrough())
+                .withUnderlined(segment.underlined())
+                .withItalic(segment.italic());
+            output.append(
+                Component.literal(segment.text()).setStyle(style)
+            );
+        }
         for (StyledChatMessage.HoverSegment segment : message.suffix()) {
             MutableComponent suffix = Component.empty();
             for (StyledChatMessage.Segment part : segment.segments()) {

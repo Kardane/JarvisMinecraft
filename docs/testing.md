@@ -107,6 +107,13 @@ Core scenarios:
 - `/jm status` output
 - `/jm reload` success and failure behavior
 - `response.prefix` legacy color and `<#RRGGBB>` hex color rendering
+- Luna final replies render allowed Minecraft legacy/hex color and emphasis markup
+- all 16 default waiting-message connectors carry bounded color markup and configured connectors render hex/legacy styles
+- Luna Core Policy contains the compiled Korean natural-prose, precise-verb, evidence-claim, punctuation, terminology, and exact-syntax invariants
+- paired Markdown `**strong**`, headings, blockquotes, and backticks do not leak raw formatting markers into chat
+- unsupported model-side `&k`/`&m` formatting is not applied
+- exact unmatched syntax such as `**/*.java` and ordinary text such as `R&D` remain intact
+- assistant history/archive stores plain visible text without Minecraft presentation markup
 - final/error reply metrics icon hover shows token usage/time only when enabled
 - disabling `response.metrics.enabled` removes the hover suffix
 - no public follow-up-session TTL announcement is emitted

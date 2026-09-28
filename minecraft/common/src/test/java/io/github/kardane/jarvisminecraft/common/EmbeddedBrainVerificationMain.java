@@ -288,6 +288,27 @@ public final class EmbeddedBrainVerificationMain {
             "Luna prompt is missing the prompt-content authority boundary."
         );
         require(
+            instructions.contains(
+                "KOREAN RESPONSE POLICY"
+            )
+                && instructions.contains(
+                    "Write idiomatic Korean"
+                )
+                && instructions.contains(
+                    "Never use the colloquial technical verb 박다"
+                )
+                && instructions.contains(
+                    "Use 확인했다 only for directly observed evidence"
+                )
+                && instructions.contains(
+                    "Do not use ·, /, or + as generic prose delimiters"
+                )
+                && instructions.contains(
+                    "Exact syntax is exempt from prose normalization"
+                ),
+            "Luna prompt is missing compiled Korean response policy invariants."
+        );
+        require(
             instructions.indexOf("[rules.md]")
                 < instructions.indexOf("[server.md]"),
             "Luna prompt did not preserve deterministic knowledge order."
@@ -691,6 +712,74 @@ public final class EmbeddedBrainVerificationMain {
                     )
                 ),
             "Configured metrics icon hex color was not parsed."
+        );
+
+        StyledChatMessage richBody =
+            StyledChatMessage.fromConfiguredPrefix(
+                "",
+                "<#7DD3FC>&lTPS&r: <#86EFAC>20.0&r\n"
+                    + "### 상태\n"
+                    + "> **정상**\n"
+                    + "`/jm status`\n"
+                    + "`echo &a`\n"
+                    + "R&D\n"
+                    + "**/*.java\n"
+                    + "&k숨김&r"
+            );
+        require(
+            richBody.bodySegments().stream()
+                .anyMatch(segment ->
+                    Integer.valueOf(0x7DD3FC).equals(
+                        segment.rgb()
+                    )
+                        && segment.bold()
+                        && segment.text().contains("TPS")
+                ),
+            "Model reply hex/bold formatting was not parsed."
+        );
+        require(
+            (
+                "TPS: 20.0\n"
+                    + "상태\n"
+                    + "정상\n"
+                    + "/jm status\n"
+                    + "echo &a\n"
+                    + "R&D\n"
+                    + "**/*.java\n"
+                    + "숨김"
+            ).equals(richBody.plainBody()),
+            "Model reply formatting/Markdown fallback changed visible text unexpectedly."
+        );
+        require(
+            !richBody.plainBody().contains("<#")
+                && !richBody.plainBody().contains("&r")
+                && !richBody.plainBody().contains("**정상**")
+                && !richBody.plainBody().contains("`"),
+            "Presentation markup leaked into plain model text."
+        );
+
+        StyledChatMessage waiting =
+            StyledChatMessage.fromConfiguredPrefix(
+                "[JARVIS] ",
+                "<#7DD3FC>확인해볼게요.&r"
+            );
+        require(
+            waiting.bodySegments().stream()
+                .anyMatch(segment ->
+                    Integer.valueOf(0x7DD3FC).equals(
+                        segment.rgb()
+                    )
+                        && segment.text().contains(
+                            "확인해볼게요."
+                        )
+                ),
+            "Waiting-message body hex color was not parsed."
+        );
+        require(
+            "확인해볼게요.".equals(
+                waiting.plainBody()
+            ),
+            "Waiting-message presentation markup leaked into visible plain text."
         );
 
         LunaStep.Usage usage =

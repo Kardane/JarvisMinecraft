@@ -31,7 +31,7 @@ public record StyledChatMessage(
         String body
     ) {
         return new StyledChatMessage(
-            parseConfiguredPrefix(
+            parseConfiguredText(
                 Objects.requireNonNull(
                     configuredPrefix,
                     "configuredPrefix"
@@ -49,6 +49,25 @@ public record StyledChatMessage(
             configuredPrefix,
             body
         );
+    }
+
+    public List<Segment> bodySegments() {
+        return parseModelBody(body);
+    }
+
+    public String plainBody() {
+        StringBuilder output = new StringBuilder();
+        for (Segment segment : bodySegments()) {
+            output.append(segment.text());
+        }
+        return output.toString();
+    }
+
+    public static String plainModelText(String value) {
+        return new StyledChatMessage(
+            List.of(),
+            Objects.requireNonNull(value, "value")
+        ).plainBody();
     }
 
     public StyledChatMessage withHoverSuffix(
@@ -76,7 +95,7 @@ public record StyledChatMessage(
         String hoverText
     ) {
         return withHoverSuffixSegments(
-            parseConfiguredPrefix(
+            parseConfiguredText(
                 Objects.requireNonNull(
                     configuredText,
                     "configuredText"
@@ -118,7 +137,7 @@ public record StyledChatMessage(
         for (Segment segment : prefix) {
             output.append(segment.text());
         }
-        output.append(body);
+        output.append(plainBody());
         for (HoverSegment segment : suffix) {
             for (Segment part : segment.segments()) {
                 output.append(part.text());
@@ -127,14 +146,72 @@ public record StyledChatMessage(
         return output.toString();
     }
 
-    private static List<Segment> parseConfiguredPrefix(
+    private static List<Segment> parseConfiguredText(
         String value
+    ) {
+        return parseFormatting(value, false);
+    }
+
+    private static List<Segment> parseModelBody(
+        String value
+    ) {
+        return parseFormatting(
+            normalizeModelMarkdown(value),
+            true
+        );
+    }
+
+    private static List<Segment> parseFormatting(
+        String value,
+        boolean modelBody
     ) {
         List<Segment> segments = new ArrayList<>();
         StringBuilder text = new StringBuilder();
         StyleState style = new StyleState();
 
         for (int index = 0; index < value.length(); index += 1) {
+            if (
+                modelBody
+                    && value.charAt(index) == '`'
+            ) {
+                int close = value.indexOf(
+                    '`',
+                    index + 1
+                );
+                if (close > index) {
+                    flush(segments, text, style);
+                    addLiteral(
+                        segments,
+                        value.substring(index + 1, close),
+                        style
+                    );
+                    index = close;
+                    continue;
+                }
+            }
+
+            if (
+                modelBody
+                    && index + 1 < value.length()
+                    && value.charAt(index) == '*'
+                    && value.charAt(index + 1) == '*'
+            ) {
+                int close = value.indexOf(
+                    "**",
+                    index + 2
+                );
+                if (close >= 0) {
+                    flush(segments, text, style);
+                    addBoldLiteral(
+                        segments,
+                        value.substring(index + 2, close),
+                        style
+                    );
+                    index = close + 1;
+                    continue;
+                }
+            }
+
             if (isHexColorAt(value, index)) {
                 flush(segments, text, style);
                 int rgb = Integer.parseInt(
@@ -155,10 +232,21 @@ public record StyledChatMessage(
                 continue;
             }
 
-            char code = Character.toLowerCase(
-                value.charAt(index + 1)
-            );
-            if (!isLegacyCode(code)) {
+            char rawCode = value.charAt(index + 1);
+            char code = Character.toLowerCase(rawCode);
+            if (modelBody) {
+                if (
+                    rawCode != code
+                        || !isConfiguredCode(code)
+                ) {
+                    text.append(current);
+                    continue;
+                }
+                if (!isModelCode(code)) {
+                    index += 1;
+                    continue;
+                }
+            } else if (!isConfiguredCode(code)) {
                 text.append(current);
                 continue;
             }
@@ -170,6 +258,70 @@ public record StyledChatMessage(
 
         flush(segments, text, style);
         return List.copyOf(segments);
+    }
+
+    private static String normalizeModelMarkdown(
+        String value
+    ) {
+        String[] lines = value.split("\\R", -1);
+        StringBuilder output = new StringBuilder();
+
+        for (int index = 0; index < lines.length; index += 1) {
+            String line = lines[index];
+            String trimmed = line.stripLeading();
+
+            if (
+                trimmed.startsWith(
+                    "\u0060\u0060\u0060"
+                )
+            ) {
+                continue;
+            }
+
+            int headingLength =
+                headingPrefixLength(trimmed);
+            if (headingLength > 0) {
+                line = trimmed.substring(headingLength);
+            } else if (trimmed.startsWith("> ")) {
+                line = trimmed.substring(2);
+            } else if (
+                trimmed.startsWith("- ")
+                    || trimmed.startsWith("* ")
+                    || trimmed.startsWith("+ ")
+            ) {
+                line = "• " + trimmed.substring(2);
+            }
+
+            line = convertStrongMarkdown(line);
+            line = line.replace("\u0060", "");
+
+            if (!output.isEmpty()) {
+                output.append('\n');
+            }
+            output.append(line);
+        }
+        return output.toString();
+    }
+
+    private static int headingPrefixLength(
+        String value
+    ) {
+        int hashes = 0;
+        while (
+            hashes < value.length()
+                && hashes < 6
+                && value.charAt(hashes) == '#'
+        ) {
+            hashes += 1;
+        }
+        if (
+            hashes > 0
+                && hashes < value.length()
+                && value.charAt(hashes) == ' '
+        ) {
+            return hashes + 1;
+        }
+        return 0;
     }
 
     private static boolean isHexColorAt(
@@ -184,12 +336,63 @@ public record StyledChatMessage(
         ) {
             return false;
         }
-        for (int cursor = index + 2; cursor < index + 8; cursor += 1) {
-            if (Character.digit(value.charAt(cursor), 16) < 0) {
+        for (
+            int cursor = index + 2;
+            cursor < index + 8;
+            cursor += 1
+        ) {
+            if (
+                Character.digit(
+                    value.charAt(cursor),
+                    16
+                ) < 0
+            ) {
                 return false;
             }
         }
         return true;
+    }
+
+    private static void addLiteral(
+        List<Segment> segments,
+        String value,
+        StyleState style
+    ) {
+        if (value.isEmpty()) {
+            return;
+        }
+        segments.add(
+            new Segment(
+                value,
+                style.rgb(),
+                false,
+                style.bold(),
+                false,
+                style.underlined(),
+                style.italic()
+            )
+        );
+    }
+
+    private static void addBoldLiteral(
+        List<Segment> segments,
+        String value,
+        StyleState style
+    ) {
+        if (value.isEmpty()) {
+            return;
+        }
+        segments.add(
+            new Segment(
+                value,
+                style.rgb(),
+                false,
+                true,
+                false,
+                style.underlined(),
+                style.italic()
+            )
+        );
     }
 
     private static void flush(
@@ -214,8 +417,13 @@ public record StyledChatMessage(
         text.setLength(0);
     }
 
-    private static boolean isLegacyCode(char code) {
+    private static boolean isConfiguredCode(char code) {
         return "0123456789abcdefklmnor"
+            .indexOf(code) >= 0;
+    }
+
+    private static boolean isModelCode(char code) {
+        return "0123456789abcdeflnor"
             .indexOf(code) >= 0;
     }
 
