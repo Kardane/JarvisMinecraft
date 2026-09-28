@@ -53,6 +53,7 @@ public final class AsyncConversationArchive
         - requesterUuid
         - sessionId
         - requestId
+        - origin
         - role (USER or ASSISTANT)
         - text
 
@@ -181,6 +182,9 @@ public final class AsyncConversationArchive
             entry
                 instanceof ConversationEntry.UserMessage user
         ) {
+            if (isProactive(user.origin())) {
+                return null;
+            }
             return new ArchiveRecord(
                 1,
                 user.at().toString(),
@@ -188,6 +192,7 @@ public final class AsyncConversationArchive
                 requesterUuid.toString(),
                 sessionId.toString(),
                 user.requestId().toString(),
+                user.origin(),
                 "USER",
                 user.text()
             );
@@ -196,6 +201,9 @@ public final class AsyncConversationArchive
             entry
                 instanceof ConversationEntry.AssistantMessage assistant
         ) {
+            if (isProactive(assistant.origin())) {
+                return null;
+            }
             return new ArchiveRecord(
                 1,
                 assistant.at().toString(),
@@ -203,11 +211,19 @@ public final class AsyncConversationArchive
                 requesterUuid.toString(),
                 sessionId.toString(),
                 assistant.requestId().toString(),
+                assistant.origin(),
                 "ASSISTANT",
                 assistant.text()
             );
         }
         return null;
+    }
+
+    private boolean isProactive(String origin) {
+        return "PROACTIVE".equalsIgnoreCase(origin)
+            || "PROACTIVE_CANDIDATE".equalsIgnoreCase(
+                origin
+            );
     }
 
     private void writeRecord(
@@ -382,6 +398,7 @@ public final class AsyncConversationArchive
         String requesterUuid,
         String sessionId,
         String requestId,
+        String origin,
         String role,
         String text
     ) {
