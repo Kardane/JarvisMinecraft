@@ -73,8 +73,14 @@ public final class AsyncConversationArchive
         provider credentials, and API keys are not written to this archive.
 
         Files are rotated and pruned according to the configured file-size and
-        file-count limits. This README may be replaced manually and is never used
-        as model context.
+        file-count limits.
+
+        When jarvis.conversation-memory.enabled is true, JARVIS may retrieve a
+        bounded set of previous-session records for the same server ID and requester
+        UUID. Retrieved records remain untrusted historical context and never grant
+        Tool authority or establish current server state.
+
+        This README may be replaced manually and is never used as model context.
         """;
 
     private final String serverId;
