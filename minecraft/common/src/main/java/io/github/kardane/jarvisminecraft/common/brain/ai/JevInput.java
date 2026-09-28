@@ -120,6 +120,61 @@ public record JevInput(
         );
     }
 
+    public static JevInput fromFollowUpCandidate(
+        List<ConversationEntry> history,
+        String latestMessage,
+        List<Capability> capabilities
+    ) {
+        Objects.requireNonNull(history, "history");
+        Objects.requireNonNull(
+            latestMessage,
+            "latestMessage"
+        );
+        Objects.requireNonNull(
+            capabilities,
+            "capabilities"
+        );
+
+        List<String> topicEntries = new ArrayList<>();
+        for (ConversationEntry entry : history) {
+            if (
+                entry
+                    instanceof ConversationEntry.UserMessage user
+            ) {
+                topicEntries.add(
+                    "user: " + clip(user.text(), 320)
+                );
+            } else if (
+                entry
+                    instanceof ConversationEntry.AssistantMessage assistant
+            ) {
+                topicEntries.add(
+                    "assistant: "
+                        + clip(assistant.text(), 320)
+                );
+            }
+        }
+
+        int from = Math.max(
+            0,
+            topicEntries.size() - 6
+        );
+        return new JevInput(
+            latestMessage,
+            String.join(
+                "\n",
+                topicEntries.subList(
+                    from,
+                    topicEntries.size()
+                )
+            ),
+            capabilities.stream()
+                .map(Capability::name)
+                .toList(),
+            "FOLLOW_UP_CANDIDATE"
+        );
+    }
+
     public static JevInput fromAmbient(
         List<AmbientChatMessage> context,
         List<Capability> capabilities
