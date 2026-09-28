@@ -393,12 +393,15 @@ public record JarvisConfig(
             icon = requireText(
                 icon,
                 "response.metrics.icon",
-                16
+                64
             );
         }
 
         public static ResponseMetrics defaults() {
-            return new ResponseMetrics(true, "📊");
+            return new ResponseMetrics(
+                true,
+                "<#7DD3FC>📊"
+            );
         }
     }
 
