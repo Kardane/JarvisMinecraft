@@ -365,8 +365,7 @@ final class ProactiveInteractionController {
             requesterUuid,
             Duration.ofSeconds(
                 interaction.followUpSeconds()
-            ),
-            interaction.followUpMaxMessages()
+            )
         );
         synchronized (this) {
             cooldownUntil = now.plusSeconds(
