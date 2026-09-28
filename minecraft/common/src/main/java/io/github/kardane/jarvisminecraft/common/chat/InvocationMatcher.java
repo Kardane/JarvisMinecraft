@@ -131,7 +131,6 @@ public final class InvocationMatcher {
         String message,
         String token,
         int start,
-        int tokenEnd,
         String wakeWord,
         JarvisConfig.WakeWordMatching config
     ) {
@@ -216,13 +215,21 @@ public final class InvocationMatcher {
 
             int distance = damerauLevenshtein(
                 candidate,
-                normalizedWake,
-                config.maxEditDistance()
+                normalizedWake
             );
             if (
                 distance < 1
                     || distance
                         > config.maxEditDistance()
+            ) {
+                continue;
+            }
+            if (
+                korean
+                    && damerauLevenshtein(
+                        decomposeHangul(candidate),
+                        decomposeHangul(normalizedWake)
+                    ) > config.maxEditDistance()
             ) {
                 continue;
             }
@@ -439,10 +446,46 @@ public final class InvocationMatcher {
             || value == '？';
     }
 
+    private String decomposeHangul(String value) {
+        StringBuilder decomposed =
+            new StringBuilder();
+        for (
+            int index = 0;
+            index < value.length();
+            index += 1
+        ) {
+            char ch = value.charAt(index);
+            if (
+                ch < '\uAC00'
+                    || ch > '\uD7A3'
+            ) {
+                decomposed.append(ch);
+                continue;
+            }
+
+            int syllable = ch - '\uAC00';
+            int initial = syllable / 588;
+            int medial =
+                (syllable % 588) / 28;
+            int terminal = syllable % 28;
+            decomposed.append(
+                (char) (0xE000 + initial)
+            );
+            decomposed.append(
+                (char) (0xE100 + medial)
+            );
+            if (terminal > 0) {
+                decomposed.append(
+                    (char) (0xE200 + terminal)
+                );
+            }
+        }
+        return decomposed.toString();
+    }
+
     private int damerauLevenshtein(
         String left,
-        String right,
-        int limit
+        String right
     ) {
         int rows = left.length() + 1;
         int cols = right.length() + 1;
@@ -489,9 +532,6 @@ public final class InvocationMatcher {
                     rowMinimum,
                     value
                 );
-            }
-            if (rowMinimum > limit) {
-                return rowMinimum;
             }
         }
         return distance[rows - 1][cols - 1];
