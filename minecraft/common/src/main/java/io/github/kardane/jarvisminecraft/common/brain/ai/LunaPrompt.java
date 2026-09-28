@@ -82,6 +82,7 @@ public final class LunaPrompt {
             "When server knowledge conflicts with a current Minecraft Tool result, prefer the current Tool result for live server state.",
             "Current Jev route hint: " + routing.category().name() + "."
         ));
+        lines.addAll(KoreanResponsePolicy.instructions());
 
         if (routing.fallbackActive()) {
             lines.add("");
