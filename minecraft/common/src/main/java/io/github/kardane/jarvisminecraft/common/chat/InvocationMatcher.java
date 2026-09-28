@@ -101,7 +101,6 @@ public final class InvocationMatcher {
                     message,
                     token,
                     start,
-                    end,
                     wakeWord,
                     config
                 );
@@ -499,7 +498,6 @@ public final class InvocationMatcher {
         }
 
         for (int row = 1; row < rows; row += 1) {
-            int rowMinimum = Integer.MAX_VALUE;
             for (int col = 1; col < cols; col += 1) {
                 int cost =
                     left.charAt(row - 1)
@@ -528,10 +526,6 @@ public final class InvocationMatcher {
                     );
                 }
                 distance[row][col] = value;
-                rowMinimum = Math.min(
-                    rowMinimum,
-                    value
-                );
             }
         }
         return distance[rows - 1][cols - 1];
