@@ -113,11 +113,22 @@ val promptContentVerification by tasks.registering(JavaExec::class) {
     )
 }
 
+val conversationArchiveVerification by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "Runs bounded conversation archive persistence and privacy verification."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set(
+        "io.github.kardane.jarvisminecraft.common.brain.ConversationArchiveVerificationMain"
+    )
+}
+
 tasks.named("check") {
     dependsOn(embeddedBrainVerification)
     dependsOn(embeddedBrainParityVerification)
     dependsOn(jarvisConfigVerification)
     dependsOn(promptContentVerification)
+    dependsOn(conversationArchiveVerification)
 }
 
 val embeddedBrainLiveVerification by tasks.registering(JavaExec::class) {
