@@ -48,7 +48,8 @@ jarvis:
 
   response:
     # Legacy Minecraft ampersand codes and <#RRGGBB> hex colors are supported
-    # in the prefix only.
+    # in configured presentation fields such as prefix and metrics.icon.
+    # Model-generated response body text is never parsed as formatting.
     # Examples: "&5[JARVIS]&r " or "<#FF00FF>[JARVIS]&r "
     prefix: "[JARVIS] "
     waiting-message:
