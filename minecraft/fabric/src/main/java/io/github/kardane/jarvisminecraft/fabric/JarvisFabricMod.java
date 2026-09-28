@@ -34,6 +34,8 @@ import net.fabricmc.fabric.api.message.v1.ServerMessageEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.command.CommandManager;
+import net.minecraft.text.MutableText;
+import net.minecraft.text.Style;
 import net.minecraft.text.Text;
 
 import java.nio.file.Path;
@@ -65,11 +67,11 @@ public final class JarvisFabricMod implements ModInitializer {
                                         );
                                         return 0;
                                     }
-                                    JarvisStatusFormatter.lines(
+                                    JarvisStatusFormatter.styledLines(
                                         current.brain().status()
                                     ).forEach(line ->
                                         context.getSource().sendFeedback(
-                                            () -> Text.literal(line),
+                                            () -> renderStatusLine(line),
                                             false
                                         )
                                     );
@@ -149,6 +151,53 @@ public final class JarvisFabricMod implements ModInitializer {
                 current.chat().sweepSessions();
             }
         });
+    }
+
+    private Text renderStatusLine(
+        JarvisStatusFormatter.StatusLine line
+    ) {
+        return switch (line.kind()) {
+            case TITLE -> Text.literal(
+                    "━━ " + line.label() + " ━━"
+                )
+                .setStyle(
+                    Style.EMPTY
+                        .withColor(
+                            JarvisStatusFormatter.TITLE_RGB
+                        )
+                        .withBold(true)
+                );
+            case SECTION -> Text.literal(
+                    "  " + line.label()
+                )
+                .setStyle(
+                    Style.EMPTY
+                        .withColor(
+                            JarvisStatusFormatter.SECTION_RGB
+                        )
+                        .withBold(true)
+                );
+            case FIELD -> {
+                MutableText output = Text.literal("  ");
+                output.append(
+                    Text.literal(line.label() + ": ")
+                        .setStyle(
+                            Style.EMPTY.withColor(
+                                JarvisStatusFormatter.KEY_RGB
+                            )
+                        )
+                );
+                output.append(
+                    Text.literal(line.value())
+                        .setStyle(
+                            Style.EMPTY.withColor(
+                                line.valueRgb()
+                            )
+                        )
+                );
+                yield output;
+            }
+        };
     }
 
     private void logReloadSuccess(
