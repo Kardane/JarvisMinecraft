@@ -93,9 +93,8 @@ public final class PaperChatListener implements Listener {
             case PUBLIC_ESCAPE ->
                 event.message(Component.text(decision.text()));
             case FOLLOW_UP_CANDIDATE ->
-                brain.considerFollowUp(
-                    requesterUuid,
-                    player.getName(),
+                observeFollowUpCandidate(
+                    identity,
                     decision.sessionId(),
                     decision.text()
                 );
@@ -142,6 +141,26 @@ public final class PaperChatListener implements Listener {
             requesterUuid,
             CancelReason.CLIENT_DISCONNECTED
         );
+    }
+
+    private void observeFollowUpCandidate(
+        PlayerIdentity identity,
+        UUID sessionId,
+        String text
+    ) {
+        try {
+            scheduler.submit(() -> {
+                brain.considerFollowUp(
+                    identity.uuid(),
+                    identity.name(),
+                    sessionId,
+                    text
+                );
+                return CompletableFuture.completedFuture(null);
+            });
+        } catch (RuntimeException ignored) {
+            // Normal chat remains unaffected if the server is stopping.
+        }
     }
 
     private void observeProactive(
