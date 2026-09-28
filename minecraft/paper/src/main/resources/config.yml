@@ -14,11 +14,20 @@ jarvis:
       - "자비스"
       - "jarvis"
       - "재비스"
+    wake-word:
+      # Match configured wake words anywhere in the message, not only at the start.
+      anywhere: true
+      # Allow one bounded typo in a wake word. Exact matches always win.
+      fuzzy-enabled: true
+      # Safety bound: 0 or 1 only.
+      max-edit-distance: 1
     # Fixed window from the initial JARVIS invocation.
     # Wake-word-free messages inside this window are evaluated by Jev. Only
     # clear continuations of the active JARVIS conversation receive a response.
     # Candidate messages do not extend this timer.
     follow-up-seconds: 30
+    # Minimum Jev RESPOND confidence for a wake-word-free follow-up.
+    follow-up-confidence-threshold: 0.70
 
     audience:
       mode: OP
