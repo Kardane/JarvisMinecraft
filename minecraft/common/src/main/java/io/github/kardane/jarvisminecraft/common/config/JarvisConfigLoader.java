@@ -25,6 +25,8 @@ public final class JarvisConfigLoader {
         JarvisConfig.Sound defaultSound = defaultResponse.sound();
         JarvisConfig.ResponseMetrics defaultMetrics =
             defaultResponse.metrics();
+        JarvisConfig.ConversationArchive defaultConversationArchive =
+            defaults.conversationArchive();
         JarvisConfig.Execution defaultExecution = defaults.execution();
         JarvisConfig.Scheduling defaultScheduling = defaults.scheduling();
         JarvisConfig.Logging defaultLogging = defaults.logging();
@@ -187,6 +189,25 @@ public final class JarvisConfigLoader {
             )
         );
 
+        JarvisConfig.ConversationArchive conversationArchive =
+            new JarvisConfig.ConversationArchive(
+                bool(
+                    source,
+                    "jarvis.conversation-archive.enabled",
+                    defaultConversationArchive.enabled()
+                ),
+                integer(
+                    source,
+                    "jarvis.conversation-archive.max-file-bytes",
+                    defaultConversationArchive.maxFileBytes()
+                ),
+                integer(
+                    source,
+                    "jarvis.conversation-archive.max-files",
+                    defaultConversationArchive.maxFiles()
+                )
+            );
+
         JarvisConfig.Execution execution = new JarvisConfig.Execution(
             enumValue(
                 source,
@@ -294,6 +315,7 @@ public final class JarvisConfigLoader {
             personality,
             knowledge,
             response,
+            conversationArchive,
             execution,
             scheduling,
             logging
