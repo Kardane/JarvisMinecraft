@@ -50,6 +50,14 @@ jarvis.response.sound.pitch=1.0
 jarvis.response.metrics.enabled=true
 jarvis.response.metrics.icon=<#7DD3FC>📊
 
+# Optional persistent archive of direct/follow-up USER and JARVIS messages.
+# Stored under config/jarvisminecraft/conversations/*.jsonl.
+# Proactive ambient-chat context, Tool results, reasoning, prompts, and secrets
+# are not archived.
+jarvis.conversation-archive.enabled=false
+jarvis.conversation-archive.max-file-bytes=1048576
+jarvis.conversation-archive.max-files=30
+
 # READ_TALK: read-only Tools only.
 # EXECUTE_LITE: read-only + explicitly allowed LOW-risk state-changing Tools.
 # EXECUTE: read-only + explicitly allowed state-changing Tools.
