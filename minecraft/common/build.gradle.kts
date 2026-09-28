@@ -123,12 +123,23 @@ val conversationArchiveVerification by tasks.registering(JavaExec::class) {
     )
 }
 
+val conversationMemoryVerification by tasks.registering(JavaExec::class) {
+    group = "verification"
+    description = "Runs requester-scoped conversation memory retrieval and bound checks."
+    dependsOn(tasks.testClasses)
+    classpath = sourceSets.test.get().runtimeClasspath
+    mainClass.set(
+        "io.github.kardane.jarvisminecraft.common.brain.ConversationMemoryVerificationMain"
+    )
+}
+
 tasks.named("check") {
     dependsOn(embeddedBrainVerification)
     dependsOn(embeddedBrainParityVerification)
     dependsOn(jarvisConfigVerification)
     dependsOn(promptContentVerification)
     dependsOn(conversationArchiveVerification)
+    dependsOn(conversationMemoryVerification)
 }
 
 val embeddedBrainLiveVerification by tasks.registering(JavaExec::class) {
