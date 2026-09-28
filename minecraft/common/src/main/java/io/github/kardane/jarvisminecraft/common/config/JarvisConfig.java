@@ -127,6 +127,7 @@ public record JarvisConfig(
             Knowledge.defaults(),
             response,
             ConversationArchive.defaults(),
+            ConversationMemory.defaults(),
             execution,
             scheduling,
             Logging.defaults()
