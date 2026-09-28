@@ -140,7 +140,6 @@ public record JarvisConfig(
                 InteractionMode.PASSIVE,
                 List.of("자비스", "jarvis", "재비스"),
                 30,
-                1,
                 new Audience(AudienceMode.OP, List.of(), List.of()),
                 new Proactive(12, 15, 0.75)
             ),
@@ -234,27 +233,9 @@ public record JarvisConfig(
         InteractionMode mode,
         List<String> wakeWords,
         int followUpSeconds,
-        int followUpMaxMessages,
         Audience audience,
         Proactive proactive
     ) {
-        public Interaction(
-            InteractionMode mode,
-            List<String> wakeWords,
-            int followUpSeconds,
-            Audience audience,
-            Proactive proactive
-        ) {
-            this(
-                mode,
-                wakeWords,
-                followUpSeconds,
-                1,
-                audience,
-                proactive
-            );
-        }
-
         public Interaction {
             Objects.requireNonNull(mode, "interaction.mode");
             wakeWords = normalizedList(
@@ -269,12 +250,6 @@ public record JarvisConfig(
                 1,
                 600,
                 "interaction.followUpSeconds"
-            );
-            requireRange(
-                followUpMaxMessages,
-                0,
-                16,
-                "interaction.followUpMaxMessages"
             );
             Objects.requireNonNull(audience, "interaction.audience");
             Objects.requireNonNull(proactive, "interaction.proactive");
