@@ -360,6 +360,14 @@ public final class JarvisConfigVerificationMain {
             "Default waiting-message variation count must be 16."
         );
         require(
+            response.waitingMessage().messages().stream()
+                .allMatch(message ->
+                    message.contains("<#")
+                        && message.endsWith("&r")
+                ),
+            "Default waiting messages must carry bounded Minecraft color formatting."
+        );
+        require(
             response.metrics().enabled(),
             "Response metrics hover must default to enabled."
         );
