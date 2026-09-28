@@ -36,7 +36,7 @@ jarvis:
       fallback: MEDIUM
 
   # User prompt content remains disabled by default for backward compatibility.
-  # Phase P3 will wire these validated settings into Luna prompt composition.
+  # When enabled, validated content is included in Luna prompt composition.
   personality:
     enabled: false
 
