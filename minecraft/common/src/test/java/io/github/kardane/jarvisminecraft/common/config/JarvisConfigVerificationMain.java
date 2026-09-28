@@ -15,6 +15,7 @@ public final class JarvisConfigVerificationMain {
         verifyDefaults();
         verifyPropertiesOverride();
         verifyInvalidConfigRejected();
+        verifyFollowUpBoundsRejected();
         verifyPromptContentBoundsRejected();
         verifyConversationArchiveBounds();
         verifyConversationMemoryBounds();
@@ -38,6 +39,11 @@ public final class JarvisConfigVerificationMain {
             config.interaction().audience().mode()
                 == JarvisConfig.AudienceMode.OP,
             "Default audience must remain OP."
+        );
+        require(
+            config.interaction().followUpSeconds() == 30
+                && config.interaction().followUpMaxMessages() == 1,
+            "Follow-up defaults changed unexpectedly."
         );
         require(
             "gpt-6-luna".equals(config.model().name()),
@@ -99,6 +105,10 @@ public final class JarvisConfigVerificationMain {
         properties.setProperty(
             "jarvis.interaction.follow-up-seconds",
             "90"
+        );
+        properties.setProperty(
+            "jarvis.interaction.follow-up-max-messages",
+            "3"
         );
         properties.setProperty(
             "jarvis.personality.enabled",
@@ -170,8 +180,9 @@ public final class JarvisConfigVerificationMain {
             "Properties list parsing failed."
         );
         require(
-            config.interaction().followUpSeconds() == 90,
-            "Properties integer override failed."
+            config.interaction().followUpSeconds() == 90
+                && config.interaction().followUpMaxMessages() == 3,
+            "Follow-up properties override failed."
         );
         require(
             config.response().sound().enabled(),
@@ -223,6 +234,27 @@ public final class JarvisConfigVerificationMain {
             rejected = true;
         }
         require(rejected, "Invalid config must fail validation.");
+    }
+
+    private static void verifyFollowUpBoundsRejected() {
+        Properties invalid = new Properties();
+        invalid.setProperty(
+            "jarvis.interaction.follow-up-max-messages",
+            "17"
+        );
+
+        boolean rejected = false;
+        try {
+            JarvisConfigLoader.load(
+                PropertiesJarvisConfigSource.from(invalid)
+            );
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        require(
+            rejected,
+            "Follow-up message quota must be validated."
+        );
     }
 
     private static void verifyPromptContentBoundsRejected() {
