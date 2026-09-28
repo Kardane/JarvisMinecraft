@@ -70,8 +70,8 @@ public final class JarvisStatusFormatter {
         ));
         lines.add(StatusLine.field(
             "Proactive in-flight",
-            Integer.toString(status.proactiveInFlight()),
-            status.proactiveInFlight() == 0 ? MUTED_RGB : VALUE_RGB
+            status.proactiveInFlight() ? "yes" : "no",
+            status.proactiveInFlight() ? VALUE_RGB : MUTED_RGB
         ));
 
         BrainGateway.AuditHealth audit = status.audit();
