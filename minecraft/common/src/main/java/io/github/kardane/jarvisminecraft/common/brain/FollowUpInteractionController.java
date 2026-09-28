@@ -21,6 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
 import java.util.function.BooleanSupplier;
 
 import static io.github.kardane.jarvisminecraft.common.brain.BrainAsync.unwrap;
@@ -29,6 +30,7 @@ import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ErrorCo
 final class FollowUpInteractionController {
     static final double MIN_ENGAGEMENT_CONFIDENCE = 0.70;
     private static final long MAX_CLASSIFICATION_MILLIS = 1500L;
+    private static final int MAX_IN_FLIGHT = 4;
 
     private final EmbeddedBrain brain;
     private final ChatSessionManager sessions;
@@ -41,6 +43,8 @@ final class FollowUpInteractionController {
     private final ChatSubmitter submitter;
     private final Set<UUID> inFlightActors =
         ConcurrentHashMap.newKeySet();
+    private final Semaphore inFlight =
+        new Semaphore(MAX_IN_FLIGHT);
 
     FollowUpInteractionController(
         EmbeddedBrain brain,
@@ -129,6 +133,16 @@ final class FollowUpInteractionController {
             );
             return CompletableFuture.completedFuture(false);
         }
+        if (!inFlight.tryAcquire()) {
+            inFlightActors.remove(requesterUuid);
+            logIgnored(
+                requesterUuid,
+                sessionId,
+                "GLOBAL_IN_FLIGHT_LIMIT",
+                null
+            );
+            return CompletableFuture.completedFuture(false);
+        }
 
         log.debug(
             JarvisEvents.FOLLOW_UP_CANDIDATE,
@@ -149,7 +163,7 @@ final class FollowUpInteractionController {
                 deadline
             );
         } catch (RuntimeException failure) {
-            inFlightActors.remove(requesterUuid);
+            release(requesterUuid);
             logFailure(
                 requesterUuid,
                 sessionId,
@@ -162,7 +176,7 @@ final class FollowUpInteractionController {
             new CompletableFuture<>();
         classification.whenComplete((decision, failure) -> {
             if (failure != null) {
-                inFlightActors.remove(requesterUuid);
+                release(requesterUuid);
                 logFailure(
                     requesterUuid,
                     sessionId,
@@ -177,7 +191,7 @@ final class FollowUpInteractionController {
                         decision.model()
                     )
             ) {
-                inFlightActors.remove(requesterUuid);
+                release(requesterUuid);
                 logFailure(
                     requesterUuid,
                     sessionId,
@@ -192,7 +206,7 @@ final class FollowUpInteractionController {
                     || decision.engagementConfidence()
                         < MIN_ENGAGEMENT_CONFIDENCE
             ) {
-                inFlightActors.remove(requesterUuid);
+                release(requesterUuid);
                 logIgnored(
                     requesterUuid,
                     sessionId,
@@ -236,7 +250,7 @@ final class FollowUpInteractionController {
                     confidence
                 )
             ).whenComplete((accepted, failure) -> {
-                inFlightActors.remove(requesterUuid);
+                release(requesterUuid);
                 if (failure != null) {
                     logFailure(
                         requesterUuid,
@@ -251,7 +265,7 @@ final class FollowUpInteractionController {
                 }
             });
         } catch (RuntimeException failure) {
-            inFlightActors.remove(requesterUuid);
+            release(requesterUuid);
             logFailure(
                 requesterUuid,
                 sessionId,
@@ -304,6 +318,12 @@ final class FollowUpInteractionController {
             "FOLLOW_UP",
             text
         );
+    }
+
+    private void release(UUID requesterUuid) {
+        if (inFlightActors.remove(requesterUuid)) {
+            inFlight.release();
+        }
     }
 
     private void logIgnored(
