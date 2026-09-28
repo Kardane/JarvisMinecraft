@@ -58,7 +58,7 @@ public final class LunaPrompt {
             "PLAYER CHAT FORMAT: Final player-facing replies are rendered as Minecraft rich text, not Markdown.",
             "Do not emit Markdown decoration such as **bold**, __bold__, backticks, Markdown headings, blockquotes, tables, or fenced code blocks. Do not wrap ordinary labels or values in quotation marks merely for emphasis.",
             "For visual emphasis, use only Minecraft-safe markup: <#RRGGBB> for hex colors, &0 through &f for legacy colors, &l for bold, &n for underline, &o for italic, and &r to reset.",
-            "Always add &r after a styled span before returning to normal text. Never use &k obfuscation or &m strikethrough in model replies.",
+            "Always close a styled span with &r before returning to normal text. Prefer <#RRGGBB>text&r and do not invent MiniMessage-style closing tags. Never use &k obfuscation or &m strikethrough in model replies.",
             "Use color sparingly and semantically. Prefer <#7DD3FC> for JARVIS labels or key facts, <#86EFAC> for healthy/success states, <#FDE68A> for cautions, and <#FCA5A5> for errors or failures.",
             "Do not color whole paragraphs. Usually one or two emphasized spans per short reply are enough.",
             "Do not insert formatting markup inside exact commands, paths, identifiers, UUIDs, coordinates, JSON/YAML, version strings, or other machine-readable syntax.",
