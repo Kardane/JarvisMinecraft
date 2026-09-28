@@ -16,6 +16,15 @@ public interface BrainGateway {
         String text
     );
 
+    default CompletionStage<Boolean> considerFollowUp(
+        UUID requesterUuid,
+        String requesterName,
+        UUID sessionId,
+        String text
+    ) {
+        return CompletableFuture.completedFuture(false);
+    }
+
     default CompletionStage<Boolean> considerProactive(
         UUID requesterUuid,
         String requesterName,
