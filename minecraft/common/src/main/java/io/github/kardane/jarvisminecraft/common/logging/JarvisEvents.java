@@ -44,6 +44,15 @@ public final class JarvisEvents {
     public static final String SCHEDULE_CANCELLED = "schedule.cancelled";
     public static final String SCHEDULE_ABORTED = "schedule.aborted";
 
+    public static final String FOLLOW_UP_CANDIDATE =
+        "follow_up.candidate";
+    public static final String FOLLOW_UP_ACCEPTED =
+        "follow_up.accepted";
+    public static final String FOLLOW_UP_IGNORED =
+        "follow_up.ignored";
+    public static final String FOLLOW_UP_FAILED =
+        "follow_up.failed";
+
     public static final String PROACTIVE_CANDIDATE = "proactive.candidate";
     public static final String PROACTIVE_ACCEPTED = "proactive.accepted";
     public static final String PROACTIVE_IGNORED = "proactive.ignored";
