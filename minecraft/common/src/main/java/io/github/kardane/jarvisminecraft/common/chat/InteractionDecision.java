@@ -14,6 +14,7 @@ public record InteractionDecision(
     public enum Kind {
         PUBLIC_CHAT,
         PUBLIC_ESCAPE,
+        FOLLOW_UP_CANDIDATE,
         FORWARD,
         END
     }
@@ -45,6 +46,22 @@ public record InteractionDecision(
             false,
             false,
             0
+        );
+    }
+
+    static InteractionDecision followUpCandidate(
+        UUID sessionId,
+        String text,
+        int followUpSeconds
+    ) {
+        return new InteractionDecision(
+            Kind.FOLLOW_UP_CANDIDATE,
+            sessionId,
+            "FOLLOW_UP_CANDIDATE",
+            text,
+            false,
+            false,
+            followUpSeconds
         );
     }
 
