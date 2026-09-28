@@ -28,7 +28,6 @@ import static io.github.kardane.jarvisminecraft.common.brain.BrainAsync.unwrap;
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ErrorCode;
 
 final class FollowUpInteractionController {
-    static final double MIN_ENGAGEMENT_CONFIDENCE = 0.70;
     private static final long MAX_CLASSIFICATION_MILLIS = 1500L;
     private static final int MAX_IN_FLIGHT = 4;
 
@@ -129,7 +128,11 @@ final class FollowUpInteractionController {
                 requesterUuid,
                 sessionId,
                 "CLASSIFICATION_IN_FLIGHT",
-                null
+                null,
+                interactions.configManager()
+                    .current()
+                    .interaction()
+                    .followUpConfidenceThreshold()
             );
             return CompletableFuture.completedFuture(false);
         }
@@ -139,7 +142,11 @@ final class FollowUpInteractionController {
                 requesterUuid,
                 sessionId,
                 "GLOBAL_IN_FLIGHT_LIMIT",
-                null
+                null,
+                interactions.configManager()
+                    .current()
+                    .interaction()
+                    .followUpConfidenceThreshold()
             );
             return CompletableFuture.completedFuture(false);
         }
@@ -152,6 +159,11 @@ final class FollowUpInteractionController {
             )
         );
 
+        double confidenceThreshold =
+            interactions.configManager()
+                .current()
+                .interaction()
+                .followUpConfidenceThreshold();
         Instant deadline = clock.instant()
             .plusMillis(MAX_CLASSIFICATION_MILLIS);
         final CompletionStage<JevClassification> classification;
@@ -204,7 +216,7 @@ final class FollowUpInteractionController {
                 decision.engagement()
                     != JevEngagement.RESPOND
                     || decision.engagementConfidence()
-                        < MIN_ENGAGEMENT_CONFIDENCE
+                        < confidenceThreshold
             ) {
                 release(requesterUuid);
                 logIgnored(
@@ -214,7 +226,8 @@ final class FollowUpInteractionController {
                         == JevEngagement.RESPOND
                             ? "CONFIDENCE_BELOW_THRESHOLD"
                             : "JEV_IGNORE",
-                    decision.engagementConfidence()
+                    decision.engagementConfidence(),
+                    confidenceThreshold
                 );
                 result.complete(false);
                 return;
@@ -330,7 +343,8 @@ final class FollowUpInteractionController {
         UUID requesterUuid,
         UUID sessionId,
         String reason,
-        Double confidence
+        Double confidence,
+        double threshold
     ) {
         log.debug(
             JarvisEvents.FOLLOW_UP_IGNORED,
@@ -340,7 +354,7 @@ final class FollowUpInteractionController {
                 "reason", reason,
                 "confidence", confidence,
                 "threshold",
-                MIN_ENGAGEMENT_CONFIDENCE
+                threshold
             )
         );
     }
