@@ -315,6 +315,9 @@ public final class AsyncConversationArchive
                         parseArchiveRecord(line);
                     if (
                         record == null
+                            || !serverId.equals(
+                                record.serverId()
+                            )
                             || !requesterUuid.toString()
                                 .equals(record.requesterUuid())
                             || currentSessionId.toString()
@@ -492,6 +495,7 @@ public final class AsyncConversationArchive
                 record == null
                     || record.schemaVersion() != 1
                     || record.at() == null
+                    || record.serverId() == null
                     || record.requesterUuid() == null
                     || record.sessionId() == null
                     || record.requestId() == null
