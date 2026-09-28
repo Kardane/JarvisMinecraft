@@ -14,12 +14,11 @@ jarvis:
       - "자비스"
       - "jarvis"
       - "재비스"
-    # Fixed follow-up window from the initial JARVIS invocation.
-    # Normal follow-up messages do not extend this timer.
+    # Fixed window from the initial JARVIS invocation.
+    # Wake-word-free messages inside this window are evaluated by Jev. Only
+    # clear continuations of the active JARVIS conversation receive a response.
+    # Candidate messages do not extend this timer.
     follow-up-seconds: 30
-    # Maximum number of messages that may omit the wake word while the session
-    # is active. 0 disables implicit follow-up; the default allows one.
-    follow-up-max-messages: 1
 
     audience:
       mode: OP
