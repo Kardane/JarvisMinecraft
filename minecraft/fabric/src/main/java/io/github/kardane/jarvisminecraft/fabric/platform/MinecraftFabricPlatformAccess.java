@@ -380,18 +380,30 @@ public final class MinecraftFabricPlatformAccess implements FabricPlatformAccess
         }
         output.append(Text.literal(message.body()));
         for (StyledChatMessage.HoverSegment segment : message.suffix()) {
-            output.append(
-                Text.literal(segment.text())
-                    .setStyle(
-                        Style.EMPTY.withHoverEvent(
-                            new HoverEvent.ShowText(
-                                Text.literal(
-                                    segment.hoverText()
-                                )
-                            )
-                        )
+            MutableText suffix = Text.empty();
+            for (StyledChatMessage.Segment part : segment.segments()) {
+                Style style = Style.EMPTY;
+                if (part.rgb() != null) {
+                    style = style.withColor(part.rgb());
+                }
+                style = style
+                    .withObfuscated(part.obfuscated())
+                    .withBold(part.bold())
+                    .withStrikethrough(part.strikethrough())
+                    .withUnderline(part.underlined())
+                    .withItalic(part.italic());
+                suffix.append(
+                    Text.literal(part.text()).setStyle(style)
+                );
+            }
+            suffix.setStyle(
+                suffix.getStyle().withHoverEvent(
+                    new HoverEvent.ShowText(
+                        Text.literal(segment.hoverText())
                     )
+                )
             );
+            output.append(suffix);
         }
         return output;
     }
