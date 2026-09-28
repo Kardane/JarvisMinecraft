@@ -95,6 +95,25 @@ final class ModelConversationLoop {
             routing,
             reasoningLevel,
             promptContent,
+            ConversationMemorySnapshot.empty()
+        );
+    }
+
+    CompletionStage<EmbeddedBrain.Reply> run(
+        EmbeddedBrain.ChatRequest request,
+        RequestBudget budget,
+        DeterministicRoutePolicy.RoutingDecision routing,
+        ReasoningLevel reasoningLevel,
+        PromptContentSnapshot promptContent,
+        ConversationMemorySnapshot conversationMemory
+    ) {
+        return run(
+            request,
+            budget,
+            routing,
+            reasoningLevel,
+            promptContent,
+            conversationMemory,
             LunaStep.Usage.zero()
         );
     }
@@ -105,11 +124,16 @@ final class ModelConversationLoop {
         DeterministicRoutePolicy.RoutingDecision routing,
         ReasoningLevel reasoningLevel,
         PromptContentSnapshot promptContent,
+        ConversationMemorySnapshot conversationMemory,
         LunaStep.Usage accumulatedUsage
     ) {
         Objects.requireNonNull(
             promptContent,
             "promptContent"
+        );
+        Objects.requireNonNull(
+            conversationMemory,
+            "conversationMemory"
         );
         Objects.requireNonNull(
             accumulatedUsage,
@@ -142,6 +166,7 @@ final class ModelConversationLoop {
                 budget.remainingModelRounds(),
                 reasoningLevel,
                 promptContent,
+                conversationMemory,
                 budget.deadlineAt()
             );
 
@@ -162,6 +187,7 @@ final class ModelConversationLoop {
                         routing,
                         reasoningLevel,
                         promptContent,
+                        conversationMemory,
                         accumulatedUsage,
                         effectiveRouting,
                         round,
@@ -180,6 +206,7 @@ final class ModelConversationLoop {
         DeterministicRoutePolicy.RoutingDecision routing,
         ReasoningLevel reasoningLevel,
         PromptContentSnapshot promptContent,
+        ConversationMemorySnapshot conversationMemory,
         LunaStep.Usage accumulatedUsage,
         DeterministicRoutePolicy.RoutingDecision effectiveRouting,
         int round,
@@ -306,6 +333,7 @@ final class ModelConversationLoop {
                 routing,
                 reasoningLevel,
                 promptContent,
+                conversationMemory,
                 updatedUsage
             )
         );

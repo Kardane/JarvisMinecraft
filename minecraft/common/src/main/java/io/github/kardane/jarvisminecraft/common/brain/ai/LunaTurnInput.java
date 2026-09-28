@@ -2,6 +2,7 @@ package io.github.kardane.jarvisminecraft.common.brain.ai;
 
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
 import io.github.kardane.jarvisminecraft.common.brain.ConversationEntry;
+import io.github.kardane.jarvisminecraft.common.brain.ConversationMemorySnapshot;
 import io.github.kardane.jarvisminecraft.common.prompt.PromptContentSnapshot;
 
 import java.time.Instant;
@@ -22,6 +23,7 @@ public record LunaTurnInput(
     int remainingModelRounds,
     ReasoningLevel reasoningLevel,
     PromptContentSnapshot promptContent,
+    ConversationMemorySnapshot conversationMemory,
     Instant deadlineAt
 ) {
     public LunaTurnInput(
@@ -44,6 +46,34 @@ public record LunaTurnInput(
             remainingModelRounds,
             ReasoningLevel.MEDIUM,
             PromptContentSnapshot.empty(),
+            ConversationMemorySnapshot.empty(),
+            deadlineAt
+        );
+    }
+
+    public LunaTurnInput(
+        UUID requestId,
+        String requesterName,
+        List<ConversationEntry> history,
+        List<Capability> capabilities,
+        Set<ToolName> availableTools,
+        int remainingToolCalls,
+        int remainingModelRounds,
+        ReasoningLevel reasoningLevel,
+        PromptContentSnapshot promptContent,
+        Instant deadlineAt
+    ) {
+        this(
+            requestId,
+            requesterName,
+            history,
+            capabilities,
+            availableTools,
+            remainingToolCalls,
+            remainingModelRounds,
+            reasoningLevel,
+            promptContent,
+            ConversationMemorySnapshot.empty(),
             deadlineAt
         );
     }
@@ -69,6 +99,7 @@ public record LunaTurnInput(
             remainingModelRounds,
             reasoningLevel,
             PromptContentSnapshot.empty(),
+            ConversationMemorySnapshot.empty(),
             deadlineAt
         );
     }
@@ -101,6 +132,10 @@ public record LunaTurnInput(
         Objects.requireNonNull(
             promptContent,
             "promptContent"
+        );
+        Objects.requireNonNull(
+            conversationMemory,
+            "conversationMemory"
         );
         Objects.requireNonNull(deadlineAt, "deadlineAt");
         if (

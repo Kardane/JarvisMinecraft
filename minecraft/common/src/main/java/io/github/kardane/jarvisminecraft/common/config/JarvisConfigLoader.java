@@ -27,6 +27,8 @@ public final class JarvisConfigLoader {
             defaultResponse.metrics();
         JarvisConfig.ConversationArchive defaultConversationArchive =
             defaults.conversationArchive();
+        JarvisConfig.ConversationMemory defaultConversationMemory =
+            defaults.conversationMemory();
         JarvisConfig.Execution defaultExecution = defaults.execution();
         JarvisConfig.Scheduling defaultScheduling = defaults.scheduling();
         JarvisConfig.Logging defaultLogging = defaults.logging();
@@ -208,6 +210,35 @@ public final class JarvisConfigLoader {
                 )
             );
 
+        JarvisConfig.ConversationMemory conversationMemory =
+            new JarvisConfig.ConversationMemory(
+                bool(
+                    source,
+                    "jarvis.conversation-memory.enabled",
+                    defaultConversationMemory.enabled()
+                ),
+                integer(
+                    source,
+                    "jarvis.conversation-memory.lookback-days",
+                    defaultConversationMemory.lookbackDays()
+                ),
+                integer(
+                    source,
+                    "jarvis.conversation-memory.max-source-files",
+                    defaultConversationMemory.maxSourceFiles()
+                ),
+                integer(
+                    source,
+                    "jarvis.conversation-memory.max-turns",
+                    defaultConversationMemory.maxTurns()
+                ),
+                integer(
+                    source,
+                    "jarvis.conversation-memory.max-context-bytes",
+                    defaultConversationMemory.maxContextBytes()
+                )
+            );
+
         JarvisConfig.Execution execution = new JarvisConfig.Execution(
             enumValue(
                 source,
@@ -316,6 +347,7 @@ public final class JarvisConfigLoader {
             knowledge,
             response,
             conversationArchive,
+            conversationMemory,
             execution,
             scheduling,
             logging

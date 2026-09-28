@@ -17,6 +17,7 @@ public final class JarvisConfigVerificationMain {
         verifyInvalidConfigRejected();
         verifyPromptContentBoundsRejected();
         verifyConversationArchiveBounds();
+        verifyConversationMemoryBounds();
         verifyResponseUxDefaults();
         verifyReloadFailureKeepsPreviousSnapshot();
         verifyAtomicRuntimeReload();
@@ -62,6 +63,18 @@ public final class JarvisConfigVerificationMain {
         require(
             !config.conversationArchive().enabled(),
             "Conversation archive must default to disabled."
+        );
+        require(
+            !config.conversationMemory().enabled(),
+            "Conversation memory must default to disabled."
+        );
+        require(
+            config.conversationMemory().lookbackDays() == 30
+                && config.conversationMemory().maxSourceFiles() == 4
+                && config.conversationMemory().maxTurns() == 6
+                && config.conversationMemory().maxContextBytes()
+                    == 8 * 1024,
+            "Conversation memory defaults changed unexpectedly."
         );
         require(
             config.conversationArchive().maxFileBytes()
@@ -120,6 +133,26 @@ public final class JarvisConfigVerificationMain {
             "12"
         );
         properties.setProperty(
+            "jarvis.conversation-memory.enabled",
+            "true"
+        );
+        properties.setProperty(
+            "jarvis.conversation-memory.lookback-days",
+            "90"
+        );
+        properties.setProperty(
+            "jarvis.conversation-memory.max-source-files",
+            "6"
+        );
+        properties.setProperty(
+            "jarvis.conversation-memory.max-turns",
+            "5"
+        );
+        properties.setProperty(
+            "jarvis.conversation-memory.max-context-bytes",
+            "4096"
+        );
+        properties.setProperty(
             "jarvis.response.sound.enabled",
             "true"
         );
@@ -151,6 +184,15 @@ public final class JarvisConfigVerificationMain {
                 && config.conversationArchive().maxFiles()
                     == 12,
             "Conversation archive override failed."
+        );
+        require(
+            config.conversationMemory().enabled()
+                && config.conversationMemory().lookbackDays() == 90
+                && config.conversationMemory().maxSourceFiles() == 6
+                && config.conversationMemory().maxTurns() == 5
+                && config.conversationMemory().maxContextBytes()
+                    == 4096,
+            "Conversation memory override failed."
         );
         require(
             config.personality().enabled(),
@@ -263,6 +305,45 @@ public final class JarvisConfigVerificationMain {
         require(
             rejected,
             "Conversation archive retention count must be validated."
+        );
+    }
+
+    private static void verifyConversationMemoryBounds() {
+        Properties invalid = new Properties();
+        invalid.setProperty(
+            "jarvis.conversation-memory.max-context-bytes",
+            "512"
+        );
+
+        boolean rejected = false;
+        try {
+            JarvisConfigLoader.load(
+                PropertiesJarvisConfigSource.from(invalid)
+            );
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        require(
+            rejected,
+            "Conversation memory context bound must be validated."
+        );
+
+        invalid = new Properties();
+        invalid.setProperty(
+            "jarvis.conversation-memory.max-source-files",
+            "17"
+        );
+        rejected = false;
+        try {
+            JarvisConfigLoader.load(
+                PropertiesJarvisConfigSource.from(invalid)
+            );
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        require(
+            rejected,
+            "Conversation memory source-file bound must be validated."
         );
     }
 

@@ -59,6 +59,15 @@ jarvis.conversation-archive.enabled=false
 jarvis.conversation-archive.max-file-bytes=1048576
 jarvis.conversation-archive.max-files=30
 
+# Optional retrieval-backed long-term conversation memory.
+# Reads previous-session archive records for the same requester UUID only.
+# Enable conversation-archive as well to keep accumulating future memory.
+jarvis.conversation-memory.enabled=false
+jarvis.conversation-memory.lookback-days=30
+jarvis.conversation-memory.max-source-files=4
+jarvis.conversation-memory.max-turns=6
+jarvis.conversation-memory.max-context-bytes=8192
+
 # READ_TALK: read-only Tools only.
 # EXECUTE_LITE: read-only + explicitly allowed LOW-risk state-changing Tools.
 # EXECUTE: read-only + explicitly allowed state-changing Tools.

@@ -9,6 +9,10 @@ public final class JarvisEvents {
         "conversation_archive.failed";
     public static final String CONVERSATION_ARCHIVE_DROPPED =
         "conversation_archive.dropped";
+    public static final String CONVERSATION_MEMORY_RETRIEVED =
+        "conversation_memory.retrieved";
+    public static final String CONVERSATION_MEMORY_FAILED =
+        "conversation_memory.failed";
 
     public static final String REQUEST_ACCEPTED = "request.accepted";
     public static final String REQUEST_COMPLETED = "request.completed";

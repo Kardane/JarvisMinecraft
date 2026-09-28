@@ -11,6 +11,7 @@ public record JarvisConfigSummary(
     JarvisConfig.ExecutionActors executionActors,
     boolean schedulingEnabled,
     boolean conversationArchiveEnabled,
+    boolean conversationMemoryEnabled,
     int wakeWordCount
 ) {
     public JarvisConfigSummary {
@@ -36,6 +37,7 @@ public record JarvisConfigSummary(
             config.execution().actors(),
             config.scheduling().enabled(),
             config.conversationArchive().enabled(),
+            config.conversationMemory().enabled(),
             config.interaction().wakeWords().size()
         );
     }
@@ -57,6 +59,8 @@ public record JarvisConfigSummary(
             + (schedulingEnabled ? "ENABLED" : "DISABLED")
             + ", conversationArchive="
             + (conversationArchiveEnabled ? "ENABLED" : "DISABLED")
+            + ", conversationMemory="
+            + (conversationMemoryEnabled ? "ENABLED" : "DISABLED")
             + ", wakeWords="
             + wakeWordCount;
     }

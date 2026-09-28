@@ -18,6 +18,7 @@ public record JarvisConfig(
     Knowledge knowledge,
     Response response,
     ConversationArchive conversationArchive,
+    ConversationMemory conversationMemory,
     Execution execution,
     Scheduling scheduling,
     Logging logging
@@ -32,9 +33,38 @@ public record JarvisConfig(
             conversationArchive,
             "conversationArchive"
         );
+        Objects.requireNonNull(
+            conversationMemory,
+            "conversationMemory"
+        );
         Objects.requireNonNull(execution, "execution");
         Objects.requireNonNull(scheduling, "scheduling");
         Objects.requireNonNull(logging, "logging");
+    }
+
+    public JarvisConfig(
+        Interaction interaction,
+        Model model,
+        Personality personality,
+        Knowledge knowledge,
+        Response response,
+        ConversationArchive conversationArchive,
+        Execution execution,
+        Scheduling scheduling,
+        Logging logging
+    ) {
+        this(
+            interaction,
+            model,
+            personality,
+            knowledge,
+            response,
+            conversationArchive,
+            ConversationMemory.defaults(),
+            execution,
+            scheduling,
+            logging
+        );
     }
 
     public JarvisConfig(
@@ -54,6 +84,7 @@ public record JarvisConfig(
             knowledge,
             response,
             ConversationArchive.defaults(),
+            ConversationMemory.defaults(),
             execution,
             scheduling,
             logging
@@ -75,6 +106,7 @@ public record JarvisConfig(
             Knowledge.defaults(),
             response,
             ConversationArchive.defaults(),
+            ConversationMemory.defaults(),
             execution,
             scheduling,
             logging
@@ -95,6 +127,7 @@ public record JarvisConfig(
             Knowledge.defaults(),
             response,
             ConversationArchive.defaults(),
+            ConversationMemory.defaults(),
             execution,
             scheduling,
             Logging.defaults()
@@ -149,6 +182,7 @@ public record JarvisConfig(
                 ResponseMetrics.defaults()
             ),
             ConversationArchive.defaults(),
+            ConversationMemory.defaults(),
             new Execution(
                 ExecutionMode.READ_TALK,
                 ExecutionActors.OP,
@@ -461,6 +495,51 @@ public record JarvisConfig(
                 false,
                 1024 * 1024,
                 30
+            );
+        }
+    }
+
+    public record ConversationMemory(
+        boolean enabled,
+        int lookbackDays,
+        int maxSourceFiles,
+        int maxTurns,
+        int maxContextBytes
+    ) {
+        public ConversationMemory {
+            requireRange(
+                lookbackDays,
+                1,
+                3650,
+                "conversationMemory.lookbackDays"
+            );
+            requireRange(
+                maxSourceFiles,
+                1,
+                16,
+                "conversationMemory.maxSourceFiles"
+            );
+            requireRange(
+                maxTurns,
+                1,
+                12,
+                "conversationMemory.maxTurns"
+            );
+            requireRange(
+                maxContextBytes,
+                1024,
+                32 * 1024,
+                "conversationMemory.maxContextBytes"
+            );
+        }
+
+        public static ConversationMemory defaults() {
+            return new ConversationMemory(
+                false,
+                30,
+                4,
+                6,
+                8 * 1024
             );
         }
     }

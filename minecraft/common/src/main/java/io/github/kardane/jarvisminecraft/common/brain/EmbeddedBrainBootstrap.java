@@ -213,7 +213,8 @@ final class EmbeddedBrainBootstrap {
                 ),
                 clock,
                 log,
-                promptContent::current
+                promptContent::current,
+                conversationArchive
             );
             return new LiveRuntime(
                 brain,

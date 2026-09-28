@@ -9,6 +9,8 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
 import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
 import io.github.kardane.jarvisminecraft.common.chat.AmbientChatMessage;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisEvents;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisFields;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.NoOpJarvisLog;
 import io.github.kardane.jarvisminecraft.common.protocol.ProtocolException;
@@ -47,6 +49,7 @@ public final class EmbeddedBrain {
     private final ToolExecutionCoordinator toolExecution;
     private final ModelConversationLoop modelLoop;
     private final Supplier<PromptContentSnapshot> promptContent;
+    private final ConversationMemoryStore conversationMemory;
     private final Map<SessionKey, Set<UUID>> activeRequestIds =
         new HashMap<>();
 
@@ -211,6 +214,48 @@ public final class EmbeddedBrain {
         JarvisLog log,
         Supplier<PromptContentSnapshot> promptContent
     ) {
+        this(
+            serverId,
+            capabilities,
+            sessions,
+            history,
+            scheduler,
+            jev,
+            routePolicy,
+            luna,
+            reasoningPolicy,
+            executionPolicy,
+            schedulingPolicy,
+            scheduledActions,
+            audit,
+            toolRuntime,
+            clock,
+            log,
+            promptContent,
+            ConversationMemoryStore.disabled()
+        );
+    }
+
+    public EmbeddedBrain(
+        String serverId,
+        List<Capability> capabilities,
+        ChatSessionManager sessions,
+        ConversationHistoryStore history,
+        AiRequestScheduler scheduler,
+        JevClassifier jev,
+        DeterministicRoutePolicy routePolicy,
+        LunaClient luna,
+        ReasoningPolicy reasoningPolicy,
+        ExecutionPolicy executionPolicy,
+        SchedulingPolicy schedulingPolicy,
+        ScheduledActionService scheduledActions,
+        AuditSink audit,
+        CommonRuntime.ExecutionRuntime toolRuntime,
+        Clock clock,
+        JarvisLog log,
+        Supplier<PromptContentSnapshot> promptContent,
+        ConversationMemoryStore conversationMemory
+    ) {
         if (serverId == null || serverId.isBlank()) {
             throw new IllegalArgumentException(
                 "serverId must not be blank."
@@ -267,6 +312,10 @@ public final class EmbeddedBrain {
         this.promptContent = Objects.requireNonNull(
             promptContent,
             "promptContent"
+        );
+        this.conversationMemory = Objects.requireNonNull(
+            conversationMemory,
+            "conversationMemory"
         );
 
         this.guard = new BrainRuntimeGuard(
@@ -453,38 +502,100 @@ public final class EmbeddedBrain {
                     "promptContent snapshot"
                 );
 
-            history.append(
-                request.requesterUuid(),
-                request.sessionId(),
-                new ConversationEntry.UserMessage(
-                    request.text(),
-                    request.requestId(),
-                    clock.instant(),
-                    request.mode()
-                )
-            );
-
-            return planner.plan(
-                request,
-                budget,
-                history.history(
-                    request.requesterUuid(),
-                    request.sessionId()
-                ),
-                currentCapabilities(),
-                toolExecution.activeTools()
-            ).thenCompose(
-                plan -> modelLoop.run(
+            CompletionStage<ConversationMemorySnapshot>
+                memoryStage = retrieveMemory(
                     request,
-                    budget,
-                    plan.routing(),
-                    plan.reasoningLevel(),
-                    requestPromptContent
-                )
+                    budget
+                );
+
+            return memoryStage.thenCompose(
+                requestMemory -> {
+                    guard.assertRunning();
+                    guard.assertSession(
+                        request.requesterUuid(),
+                        request.sessionId()
+                    );
+                    budget.assertLive(clock.instant());
+
+                    history.append(
+                        request.requesterUuid(),
+                        request.sessionId(),
+                        new ConversationEntry.UserMessage(
+                            request.text(),
+                            request.requestId(),
+                            clock.instant(),
+                            request.mode()
+                        )
+                    );
+
+                    return planner.plan(
+                        request,
+                        budget,
+                        history.history(
+                            request.requesterUuid(),
+                            request.sessionId()
+                        ),
+                        currentCapabilities(),
+                        toolExecution.activeTools()
+                    ).thenCompose(
+                        plan -> modelLoop.run(
+                            request,
+                            budget,
+                            plan.routing(),
+                            plan.reasoningLevel(),
+                            requestPromptContent,
+                            requestMemory
+                        )
+                    );
+                }
             );
         } catch (RuntimeException failure) {
             return CompletableFuture.failedFuture(failure);
         }
+    }
+
+    private CompletionStage<ConversationMemorySnapshot>
+        retrieveMemory(
+            ChatRequest request,
+            RequestBudget budget
+        ) {
+        Instant deadline = BrainAsync.earlier(
+            budget.deadlineAt(),
+            clock.instant().plusMillis(350L)
+        );
+
+        CompletionStage<ConversationMemorySnapshot> stage;
+        try {
+            stage = conversationMemory.retrieve(
+                request.requesterUuid(),
+                request.sessionId(),
+                request.requestId(),
+                request.text()
+            );
+        } catch (RuntimeException failure) {
+            return CompletableFuture.completedFuture(
+                ConversationMemorySnapshot.empty()
+            );
+        }
+
+        return BrainAsync.withDeadline(
+            stage,
+            deadline,
+            ErrorCode.TIMEOUT,
+            "Conversation memory retrieval timed out.",
+            clock
+        ).exceptionally(failure -> {
+            log.debug(
+                JarvisEvents.CONVERSATION_MEMORY_FAILED,
+                JarvisFields.of(
+                    "requestId", request.requestId(),
+                    "reason", BrainAsync.unwrap(failure)
+                        .getClass()
+                        .getSimpleName()
+                )
+            );
+            return ConversationMemorySnapshot.empty();
+        });
     }
 
     private List<Capability> currentCapabilities() {

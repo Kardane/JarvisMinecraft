@@ -8,6 +8,7 @@ import io.github.kardane.jarvisminecraft.common.logging.JarvisEvents;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisFields;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 
+import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -15,12 +16,19 @@ import java.nio.file.LinkOption;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
@@ -32,11 +40,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Stream;
 
 public final class AsyncConversationArchive
-    implements AutoCloseable {
+    implements AutoCloseable, ConversationMemoryStore {
     public static final String DIRECTORY_NAME = "conversations";
     public static final String README_FILE = "README.md";
 
     private static final int QUEUE_CAPACITY = 512;
+    private static final int MAX_SCANNED_RECORDS = 8192;
+    private static final int MAX_MEMORY_TEXT_CHARS = 4096;
     private static final DateTimeFormatter FILE_TIME =
         DateTimeFormatter.ofPattern(
             "uuuuMMdd'T'HHmmss.SSS'Z'"
@@ -63,8 +73,14 @@ public final class AsyncConversationArchive
         provider credentials, and API keys are not written to this archive.
 
         Files are rotated and pruned according to the configured file-size and
-        file-count limits. This README may be replaced manually and is never used
-        as model context.
+        file-count limits.
+
+        When jarvis.conversation-memory.enabled is true, JARVIS may retrieve a
+        bounded set of previous-session records for the same server ID and requester
+        UUID. Retrieved records remain untrusted historical context and never grant
+        Tool authority or establish current server state.
+
+        This README may be replaced manually and is never used as model context.
         """;
 
     private final String serverId;
@@ -173,6 +189,478 @@ public final class AsyncConversationArchive
                 );
             }
         }
+    }
+
+    @Override
+    public CompletionStage<ConversationMemorySnapshot> retrieve(
+        UUID requesterUuid,
+        UUID currentSessionId,
+        UUID currentRequestId,
+        String query
+    ) {
+        Objects.requireNonNull(
+            requesterUuid,
+            "requesterUuid"
+        );
+        Objects.requireNonNull(
+            currentSessionId,
+            "currentSessionId"
+        );
+        Objects.requireNonNull(
+            currentRequestId,
+            "currentRequestId"
+        );
+        Objects.requireNonNull(query, "query");
+
+        JarvisConfig.ConversationMemory settings =
+            configManager.current().conversationMemory();
+        if (!settings.enabled() || closed.get()) {
+            return CompletableFuture.completedFuture(
+                ConversationMemorySnapshot.empty()
+            );
+        }
+
+        CompletableFuture<ConversationMemorySnapshot> result =
+            new CompletableFuture<>();
+        try {
+            executor.execute(() -> {
+                try {
+                    ConversationMemorySnapshot snapshot =
+                        retrieveMemory(
+                            settings,
+                            requesterUuid,
+                            currentSessionId,
+                            currentRequestId,
+                            query
+                        );
+                    log.debug(
+                        JarvisEvents.CONVERSATION_MEMORY_RETRIEVED,
+                        JarvisFields.of(
+                            "turnCount",
+                            snapshot.turnCount(),
+                            "contextBytes",
+                            snapshot.utf8Bytes()
+                        )
+                    );
+                    result.complete(snapshot);
+                } catch (RuntimeException | IOException failure) {
+                    log.warn(
+                        JarvisEvents.CONVERSATION_MEMORY_FAILED,
+                        JarvisFields.of(
+                            "reason",
+                            failure.getClass().getSimpleName()
+                        )
+                    );
+                    result.complete(
+                        ConversationMemorySnapshot.empty()
+                    );
+                }
+            });
+        } catch (RejectedExecutionException failure) {
+            result.complete(
+                ConversationMemorySnapshot.empty()
+            );
+        }
+        return result;
+    }
+
+    private ConversationMemorySnapshot retrieveMemory(
+        JarvisConfig.ConversationMemory settings,
+        UUID requesterUuid,
+        UUID currentSessionId,
+        UUID currentRequestId,
+        String query
+    ) throws IOException {
+        if (
+            !Files.isDirectory(
+                directory,
+                LinkOption.NOFOLLOW_LINKS
+            )
+        ) {
+            return ConversationMemorySnapshot.empty();
+        }
+        if (Files.isSymbolicLink(directory)) {
+            throw new IllegalStateException(
+                "Conversation archive directory must not be a symbolic link."
+            );
+        }
+
+        Set<String> queryTokens = tokenize(query);
+        boolean memoryIntent = isMemoryIntent(query);
+        if (queryTokens.isEmpty() && !memoryIntent) {
+            return ConversationMemorySnapshot.empty();
+        }
+
+        Instant oldestAllowed = clock.instant().minus(
+            Duration.ofDays(settings.lookbackDays())
+        );
+        Map<String, MemoryTurnBuilder> turns =
+            new HashMap<>();
+        int scanned = 0;
+
+        for (
+            Path file
+                : newestArchiveFiles(
+                    settings.maxSourceFiles()
+                )
+        ) {
+            try (
+                BufferedReader reader =
+                    Files.newBufferedReader(
+                        file,
+                        StandardCharsets.UTF_8
+                    )
+            ) {
+                String line;
+                while (
+                    scanned < MAX_SCANNED_RECORDS
+                        && (line = reader.readLine()) != null
+                ) {
+                    scanned += 1;
+                    ArchiveRecord record =
+                        parseArchiveRecord(line);
+                    if (
+                        record == null
+                            || !serverId.equals(
+                                record.serverId()
+                            )
+                            || !requesterUuid.toString()
+                                .equals(record.requesterUuid())
+                            || currentSessionId.toString()
+                                .equals(record.sessionId())
+                            || currentRequestId.toString()
+                                .equals(record.requestId())
+                            || isProactive(record.origin())
+                    ) {
+                        continue;
+                    }
+
+                    Instant at;
+                    try {
+                        at = Instant.parse(record.at());
+                    } catch (RuntimeException ignored) {
+                        continue;
+                    }
+                    if (at.isBefore(oldestAllowed)) {
+                        continue;
+                    }
+
+                    turns.computeIfAbsent(
+                        record.requestId(),
+                        ignored -> new MemoryTurnBuilder()
+                    ).accept(record, at);
+                }
+            }
+            if (scanned >= MAX_SCANNED_RECORDS) {
+                break;
+            }
+        }
+
+        List<MemoryCandidate> ranked = turns.values()
+            .stream()
+            .map(MemoryTurnBuilder::build)
+            .filter(Objects::nonNull)
+            .map(turn ->
+                candidate(
+                    turn,
+                    query,
+                    queryTokens,
+                    memoryIntent
+                )
+            )
+            .filter(Objects::nonNull)
+            .sorted(
+                Comparator
+                    .comparingInt(
+                        MemoryCandidate::score
+                    )
+                    .reversed()
+                    .thenComparing(
+                        MemoryCandidate::at,
+                        Comparator.reverseOrder()
+                    )
+            )
+            .limit(settings.maxTurns())
+            .toList();
+
+        if (ranked.isEmpty()) {
+            return ConversationMemorySnapshot.empty();
+        }
+
+        List<MemoryCandidate> selected =
+            new ArrayList<>(ranked);
+        selected.sort(
+            Comparator.comparing(
+                MemoryCandidate::at
+            )
+        );
+
+        StringBuilder context = new StringBuilder();
+        int bytes = 0;
+        int included = 0;
+        for (MemoryCandidate candidate : selected) {
+            String block = renderMemory(candidate);
+            int remaining =
+                settings.maxContextBytes() - bytes;
+            if (remaining <= 0) {
+                break;
+            }
+            String bounded = truncateUtf8(
+                block,
+                remaining
+            );
+            if (bounded.isBlank()) {
+                break;
+            }
+            if (!context.isEmpty()) {
+                String separator = "\n";
+                int separatorBytes =
+                    separator.getBytes(
+                        StandardCharsets.UTF_8
+                    ).length;
+                if (
+                    bytes + separatorBytes
+                        >= settings.maxContextBytes()
+                ) {
+                    break;
+                }
+                context.append(separator);
+                bytes += separatorBytes;
+                remaining =
+                    settings.maxContextBytes() - bytes;
+                bounded = truncateUtf8(
+                    block,
+                    remaining
+                );
+                if (bounded.isBlank()) {
+                    break;
+                }
+            }
+            context.append(bounded);
+            bytes += bounded.getBytes(
+                StandardCharsets.UTF_8
+            ).length;
+            included += 1;
+        }
+
+        if (included == 0) {
+            return ConversationMemorySnapshot.empty();
+        }
+        return new ConversationMemorySnapshot(
+            context.toString(),
+            included
+        );
+    }
+
+    private List<Path> newestArchiveFiles(
+        int maxFiles
+    ) throws IOException {
+        try (Stream<Path> stream = Files.list(directory)) {
+            return stream
+                .filter(path ->
+                    Files.isRegularFile(
+                        path,
+                        LinkOption.NOFOLLOW_LINKS
+                    )
+                )
+                .filter(path ->
+                    !Files.isSymbolicLink(path)
+                )
+                .filter(path ->
+                    path.getFileName()
+                        .toString()
+                        .startsWith("conversation-")
+                )
+                .filter(path ->
+                    path.getFileName()
+                        .toString()
+                        .endsWith(".jsonl")
+                )
+                .sorted(
+                    Comparator.comparing(
+                        this::lastModifiedSafely
+                    ).reversed()
+                )
+                .limit(maxFiles)
+                .toList();
+        }
+    }
+
+    private ArchiveRecord parseArchiveRecord(
+        String line
+    ) {
+        if (line == null || line.isBlank()) {
+            return null;
+        }
+        try {
+            ArchiveRecord record = gson.fromJson(
+                line,
+                ArchiveRecord.class
+            );
+            if (
+                record == null
+                    || record.schemaVersion() != 1
+                    || record.at() == null
+                    || record.serverId() == null
+                    || record.requesterUuid() == null
+                    || record.sessionId() == null
+                    || record.requestId() == null
+                    || record.origin() == null
+                    || record.role() == null
+                    || record.text() == null
+            ) {
+                return null;
+            }
+            return record;
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    private MemoryCandidate candidate(
+        MemoryTurn turn,
+        String query,
+        Set<String> queryTokens,
+        boolean memoryIntent
+    ) {
+        String combined = (
+            turn.userText()
+                + " "
+                + turn.assistantText()
+        ).toLowerCase(Locale.ROOT);
+        Set<String> turnTokens = tokenize(combined);
+        int overlap = 0;
+        for (String token : queryTokens) {
+            if (turnTokens.contains(token)) {
+                overlap += 1;
+            }
+        }
+
+        String normalizedQuery =
+            compactText(query)
+                .toLowerCase(Locale.ROOT);
+        boolean phraseMatch =
+            normalizedQuery.length() >= 4
+                && combined.contains(normalizedQuery);
+        if (
+            overlap == 0
+                && !phraseMatch
+                && !memoryIntent
+        ) {
+            return null;
+        }
+
+        int score = overlap * 100
+            + (phraseMatch ? 50 : 0);
+        return new MemoryCandidate(
+            turn.at(),
+            turn.userText(),
+            turn.assistantText(),
+            score
+        );
+    }
+
+    private Set<String> tokenize(String text) {
+        Set<String> tokens = new HashSet<>();
+        for (
+            String token
+                : text.toLowerCase(Locale.ROOT)
+                    .split("[^\\p{L}\\p{N}_]+")
+        ) {
+            if (token.length() >= 2) {
+                tokens.add(token);
+            }
+        }
+        return tokens;
+    }
+
+    private boolean isMemoryIntent(String query) {
+        String value = query.toLowerCase(Locale.ROOT);
+        return value.contains("기억")
+            || value.contains("전에")
+            || value.contains("예전")
+            || value.contains("지난번")
+            || value.contains("아까")
+            || value.contains("말했")
+            || value.contains("얘기했")
+            || value.contains("취향")
+            || value.contains("remember")
+            || value.contains("previous")
+            || value.contains("earlier")
+            || value.contains("last time")
+            || value.contains("preference");
+    }
+
+    private String renderMemory(
+        MemoryCandidate candidate
+    ) {
+        StringBuilder output = new StringBuilder();
+        output.append("[")
+            .append(candidate.at())
+            .append("]\n");
+        if (!candidate.userText().isBlank()) {
+            output.append("USER: ")
+                .append(candidate.userText());
+        }
+        if (!candidate.assistantText().isBlank()) {
+            if (!candidate.userText().isBlank()) {
+                output.append("\n");
+            }
+            output.append("ASSISTANT: ")
+                .append(candidate.assistantText());
+        }
+        return output.toString();
+    }
+
+    private String compactText(String text) {
+        String compact = Objects.requireNonNull(
+            text,
+            "text"
+        ).replaceAll("\\s+", " ").trim();
+        if (compact.length() <= MAX_MEMORY_TEXT_CHARS) {
+            return compact;
+        }
+        return compact.substring(
+            0,
+            MAX_MEMORY_TEXT_CHARS
+        ) + "…";
+    }
+
+    private String truncateUtf8(
+        String value,
+        int maxBytes
+    ) {
+        if (maxBytes <= 0) {
+            return "";
+        }
+        if (
+            value.getBytes(StandardCharsets.UTF_8).length
+                <= maxBytes
+        ) {
+            return value;
+        }
+
+        StringBuilder output = new StringBuilder();
+        int bytes = 0;
+        for (
+            int offset = 0;
+            offset < value.length();
+        ) {
+            int codePoint = value.codePointAt(offset);
+            String part = new String(
+                Character.toChars(codePoint)
+            );
+            int partBytes = part.getBytes(
+                StandardCharsets.UTF_8
+            ).length;
+            if (bytes + partBytes > maxBytes) {
+                break;
+            }
+            output.append(part);
+            bytes += partBytes;
+            offset += Character.charCount(codePoint);
+        }
+        return output.toString();
     }
 
     public CompletionStage<Void> flushAsync() {
@@ -424,6 +912,80 @@ public final class AsyncConversationArchive
         if (closed.compareAndSet(false, true)) {
             executor.shutdown();
         }
+    }
+
+    private static final class MemoryTurnBuilder {
+        private Instant at;
+        private String userText = "";
+        private String assistantText = "";
+
+        void accept(
+            ArchiveRecord record,
+            Instant recordAt
+        ) {
+            if (
+                at == null
+                    || recordAt.isAfter(at)
+            ) {
+                at = recordAt;
+            }
+            if ("USER".equals(record.role())) {
+                userText = compact(record.text());
+            } else if (
+                "ASSISTANT".equals(record.role())
+            ) {
+                assistantText =
+                    compact(record.text());
+            }
+        }
+
+        MemoryTurn build() {
+            if (
+                at == null
+                    || (
+                        userText.isBlank()
+                            && assistantText.isBlank()
+                    )
+            ) {
+                return null;
+            }
+            return new MemoryTurn(
+                at,
+                userText,
+                assistantText
+            );
+        }
+
+        private static String compact(String text) {
+            String compact = text
+                .replaceAll("\\s+", " ")
+                .trim();
+            if (
+                compact.length()
+                    <= MAX_MEMORY_TEXT_CHARS
+            ) {
+                return compact;
+            }
+            return compact.substring(
+                0,
+                MAX_MEMORY_TEXT_CHARS
+            ) + "…";
+        }
+    }
+
+    private record MemoryTurn(
+        Instant at,
+        String userText,
+        String assistantText
+    ) {
+    }
+
+    private record MemoryCandidate(
+        Instant at,
+        String userText,
+        String assistantText,
+        int score
+    ) {
     }
 
     private record ArchiveRecord(
