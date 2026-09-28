@@ -644,6 +644,14 @@ public final class EmbeddedBrainVerificationMain {
         require(
             unrelated.accept(
                 player,
+                "자비심이 필요해요"
+            ).kind()
+                == InteractionDecision.Kind.PUBLIC_CHAT,
+            "Korean fuzzy matching confused 자비심 with the wake word."
+        );
+        require(
+            unrelated.accept(
+                player,
                 "자비스라는 이름이 좋아요"
             ).kind()
                 == InteractionDecision.Kind.PUBLIC_CHAT,
