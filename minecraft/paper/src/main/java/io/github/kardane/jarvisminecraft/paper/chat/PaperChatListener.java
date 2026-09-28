@@ -92,6 +92,13 @@ public final class PaperChatListener implements Listener {
             }
             case PUBLIC_ESCAPE ->
                 event.message(Component.text(decision.text()));
+            case FOLLOW_UP_CANDIDATE ->
+                brain.considerFollowUp(
+                    requesterUuid,
+                    player.getName(),
+                    decision.sessionId(),
+                    decision.text()
+                );
             case END -> {
                 brain.cancelSession(
                     requesterUuid,
