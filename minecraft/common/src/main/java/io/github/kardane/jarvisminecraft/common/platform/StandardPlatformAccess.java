@@ -3,6 +3,7 @@ package io.github.kardane.jarvisminecraft.common.platform;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WeatherType;
 
 import java.util.List;
+import java.util.Set;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletionStage;
@@ -21,6 +22,10 @@ public interface StandardPlatformAccess extends AdapterPlatformAccess {
     List<NearbyPlayerSnapshot> nearbyPlayers(LocationSnapshot center, double radius, int limit);
 
     CompletionStage<TeleportSnapshot> teleportRequesterTo(UUID requesterUuid, UUID targetPlayerUuid);
+
+    Set<String> commandRoots();
+
+    CommandExecutionSnapshot executeConsoleCommand(String command);
 
     default Optional<WeatherMutationSnapshot> setWeather(
         String worldId,
@@ -85,6 +90,11 @@ public interface StandardPlatformAccess extends AdapterPlatformAccess {
     record TimeMutationSnapshot(
         String worldId,
         int timeOfDay,
+        boolean completed
+    ) {}
+
+    record CommandExecutionSnapshot(
+        int resultCode,
         boolean completed
     ) {}
 }

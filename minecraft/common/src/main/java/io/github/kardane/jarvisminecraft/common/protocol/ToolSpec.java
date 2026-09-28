@@ -204,6 +204,21 @@ public final class ToolSpec {
         );
 
         register(
+            ToolName.RUN_COMMAND,
+            variant(
+                ToolName.RUN_COMMAND.wireName(),
+                ToolName.RUN_COMMAND,
+                "Execute one server command as console only when its command root is enabled in actions.properties. Use only for an explicit user-requested server action. Do not include a leading slash.",
+                shape(
+                    values -> new CommandArguments(
+                        values.get("command")
+                    ),
+                    field("command", stringRule(1, 2_048))
+                )
+            )
+        );
+
+        register(
             ToolName.SCHEDULE_ACTION,
             scheduleVariant(
                 "schedule_teleport_staff",

@@ -56,6 +56,8 @@ public final class Protocol {
         WEATHER_SET("weather_set", "world.weather.set", true, Risk.LOW),
         @SerializedName("time_set")
         TIME_SET("time_set", "world.time.set", true, Risk.LOW),
+        @SerializedName("run_command")
+        RUN_COMMAND("run_command", "command.execute", true, Risk.CRITICAL),
         @SerializedName("schedule_action")
         SCHEDULE_ACTION("schedule_action", "action.schedule", true, Risk.LOW),
         @SerializedName("cancel_scheduled_action")

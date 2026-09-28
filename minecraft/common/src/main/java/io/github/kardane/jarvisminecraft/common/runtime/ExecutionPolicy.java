@@ -112,6 +112,10 @@ public final class ExecutionPolicy {
             );
         }
 
+        if (tool == ToolName.RUN_COMMAND) {
+            return Decision.allowed(config.mode());
+        }
+
         if (tool == ToolName.SCHEDULE_ACTION) {
             if (
                 config.mode()

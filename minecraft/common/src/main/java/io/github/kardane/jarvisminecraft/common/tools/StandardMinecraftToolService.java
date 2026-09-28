@@ -2,6 +2,8 @@ package io.github.kardane.jarvisminecraft.common.tools;
 
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.BuildPermissionArguments;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.CommandArguments;
+import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.CommandData;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.GetPlayerByNameArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.GetPlayerByUuidArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.Location;
@@ -27,6 +29,7 @@ import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolArgument
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WorldInfoArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WorldInfoData;
+import io.github.kardane.jarvisminecraft.common.runtime.CommandActionPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 import io.github.kardane.jarvisminecraft.common.platform.StandardPlatformAccess;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry.ToolExecutionContext;
@@ -52,6 +55,7 @@ public final class StandardMinecraftToolService {
     private final String source;
     private final String tpsSource;
     private final Long tpsWindowMs;
+    private final CommandActionPolicy commandActions;
 
     public StandardMinecraftToolService(
         StandardPlatformAccess platform,
@@ -60,11 +64,33 @@ public final class StandardMinecraftToolService {
         String tpsSource,
         Long tpsWindowMs
     ) {
+        this(
+            platform,
+            clock,
+            source,
+            tpsSource,
+            tpsWindowMs,
+            null
+        );
+    }
+
+    public StandardMinecraftToolService(
+        StandardPlatformAccess platform,
+        Clock clock,
+        String source,
+        String tpsSource,
+        Long tpsWindowMs,
+        CommandActionPolicy commandActions
+    ) {
         this.platform = platform;
         this.clock = clock;
         this.source = source;
         this.tpsSource = tpsSource;
         this.tpsWindowMs = tpsWindowMs;
+        this.commandActions = commandActions;
+        if (commandActions != null) {
+            commandActions.sync(platform.commandRoots());
+        }
     }
 
     public void register(ToolRegistry registry) {
@@ -117,6 +143,15 @@ public final class StandardMinecraftToolService {
                 timeSet(context, arguments)
             )
         );
+        if (commandActions != null) {
+            registry.register(
+                ToolName.RUN_COMMAND,
+                CommandArguments.class,
+                (context, arguments) -> completed(
+                    runCommand(context, arguments)
+                )
+            );
+        }
     }
 
     private ToolResult serverStatus() {
@@ -393,6 +428,93 @@ public final class StandardMinecraftToolService {
             new TimeSetData(
                 value.worldId(),
                 value.timeOfDay(),
+                true
+            ),
+            null,
+            observedAt,
+            false
+        );
+    }
+
+    private ToolResult runCommand(
+        ToolExecutionContext context,
+        CommandArguments arguments
+    ) {
+        if (!platform.isOnlineOperator(context.requesterUuid())) {
+            return error(
+                ErrorCode.UNAUTHORIZED,
+                "Requester is no longer an online operator.",
+                false
+            );
+        }
+        if (commandActions == null) {
+            return error(
+                ErrorCode.UNSUPPORTED,
+                "Command execution is not configured.",
+                false
+            );
+        }
+
+        final CommandActionPolicy.Decision decision;
+        try {
+            commandActions.sync(platform.commandRoots());
+            decision = commandActions.authorize(
+                arguments.command()
+            );
+        } catch (IllegalArgumentException failure) {
+            return error(
+                ErrorCode.INVALID_ARGUMENT,
+                failure.getMessage(),
+                false
+            );
+        } catch (IllegalStateException failure) {
+            return error(
+                ErrorCode.INTERNAL,
+                "Command action configuration could not be loaded.",
+                false
+            );
+        }
+
+        if (!decision.allowed()) {
+            return error(
+                ErrorCode.UNAUTHORIZED,
+                decision.reason(),
+                false
+            );
+        }
+
+        String command = arguments.command().strip();
+        if (command.startsWith("/")) {
+            command = command.substring(1).stripLeading();
+        }
+
+        final StandardPlatformAccess.CommandExecutionSnapshot execution;
+        try {
+            execution = platform.executeConsoleCommand(
+                command
+            );
+        } catch (RuntimeException failure) {
+            return error(
+                ErrorCode.INTERNAL,
+                source + " command execution failed.",
+                false
+            );
+        }
+
+        if (!execution.completed()) {
+            return error(
+                ErrorCode.CANCELLED,
+                source + " command was rejected or failed.",
+                false
+            );
+        }
+
+        Instant observedAt = clock.instant();
+        return result(
+            ResultStatus.OK,
+            new CommandData(
+                decision.root(),
+                execution.resultCode(),
                 true
             ),
             null,

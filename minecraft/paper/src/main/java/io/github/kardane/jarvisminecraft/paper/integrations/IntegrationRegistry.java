@@ -9,6 +9,7 @@ import org.bukkit.plugin.Plugin;
 
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.nio.file.Path;
 import java.time.Clock;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -71,13 +72,34 @@ public final class IntegrationRegistry implements AutoCloseable {
         Clock clock,
         Logger logger
     ) {
+        return create(
+            server,
+            platform,
+            clock,
+            Path.of("plugins", "JarvisMinecraft"),
+            logger
+        );
+    }
+
+    public static IntegrationRegistry create(
+        Server server,
+        PaperPlatformAccess platform,
+        Clock clock,
+        Path dataDirectory,
+        Logger logger
+    ) {
         Objects.requireNonNull(server, "server");
         Objects.requireNonNull(platform, "platform");
         Objects.requireNonNull(clock, "clock");
+        Objects.requireNonNull(dataDirectory, "dataDirectory");
         Objects.requireNonNull(logger, "logger");
 
         ToolRegistry registry = new ToolRegistry();
-        new PaperToolService(platform, clock).register(registry);
+        new PaperToolService(
+            platform,
+            clock,
+            dataDirectory
+        ).register(registry);
 
         Set<String> installed = new LinkedHashSet<>();
         Set<String> enabled = new LinkedHashSet<>();

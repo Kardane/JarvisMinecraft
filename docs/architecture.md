@@ -147,6 +147,10 @@ execution mode explicitly allowlists them. Both are rechecked by
 `ExecutionPolicy`, pre-execution audit, `CommonRuntime`, current online OP
 authority, and the platform loaded-world lookup before mutation.
 
+A separate `CommandActionPolicy` governs the generic `run_command` mutation Tool. It is intentionally not represented as another `jarvis.execution.*` allowlist: the server's actual dispatcher roots are synchronized to `actions.properties`, every new root defaults to `false`, and the operator's per-root boolean is the final command authority. The Tool still passes normal requester authority, proactive-mutation blocking, pre-execution audit, action deduplication, deadline, and server-thread execution. `execute ... run` and `return run` recursively validate the nested command root, and vanilla `minecraft:` aliases normalize to the same root.
+
+Platform Adapters expose only two generic command primitives to common code: enumerate current command roots and dispatch one console command. Paper uses the Bukkit/Paper command map; Fabric and NeoForge use their server Brigadier dispatchers. The policy file is re-read at execution time so boolean edits apply without rebuilding the Brain runtime.
+
 Phase 7 wires `jarvis.scheduling.*` through Brain-level scheduling controls.
 `schedule_action` can defer or repeat only `teleport_staff`,
 `weather_set`, and `time_set`. Delay is bounded by the configured maximum

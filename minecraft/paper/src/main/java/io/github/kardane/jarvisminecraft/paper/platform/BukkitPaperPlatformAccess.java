@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -220,6 +221,31 @@ public final class BukkitPaperPlatformAccess implements PaperPlatformAccess {
                         Boolean.TRUE.equals(completed)
                     )
             );
+    }
+
+    @Override
+    public Set<String> commandRoots() {
+        requireServerThread();
+        return Set.copyOf(
+            server.getCommandMap()
+                .getKnownCommands()
+                .keySet()
+        );
+    }
+
+    @Override
+    public CommandExecutionSnapshot executeConsoleCommand(
+        String command
+    ) {
+        requireServerThread();
+        boolean completed = server.dispatchCommand(
+            server.getConsoleSender(),
+            command
+        );
+        return new CommandExecutionSnapshot(
+            completed ? 1 : 0,
+            completed
+        );
     }
 
     @Override

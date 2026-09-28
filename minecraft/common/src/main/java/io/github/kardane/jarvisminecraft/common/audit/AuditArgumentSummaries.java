@@ -51,6 +51,25 @@ public final class AuditArgumentSummaries {
                 "timeOfDay", value.timeOfDay()
             );
         }
+        if (arguments instanceof CommandArguments value) {
+            String command = value.command().strip();
+            if (command.startsWith("/")) {
+                command = command.substring(1).stripLeading();
+            }
+            int separator = 0;
+            while (
+                separator < command.length()
+                    && !Character.isWhitespace(
+                        command.charAt(separator)
+                    )
+            ) {
+                separator += 1;
+            }
+            String root = separator == 0
+                ? ""
+                : command.substring(0, separator);
+            return map("commandRoot", root);
+        }
         if (arguments instanceof ScheduleActionArguments value) {
             return map(
                 "tool", value.tool().wireName(),

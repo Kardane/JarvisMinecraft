@@ -191,7 +191,7 @@ public record JarvisConfig(
                 new ToolFilter(List.of(), List.of()),
                 new ToolFilter(List.of(), List.of())
             ),
-            new Scheduling(false, 60, 60),
+            new Scheduling(true, 60, 60),
             Logging.defaults()
         );
     }
@@ -392,7 +392,7 @@ public record JarvisConfig(
         boolean enabled
     ) {
         public static Personality defaults() {
-            return new Personality(false);
+            return new Personality(true);
         }
     }
 
@@ -430,7 +430,7 @@ public record JarvisConfig(
 
         public static Knowledge defaults() {
             return new Knowledge(
-                false,
+                true,
                 PromptContentLoader.Limits.DEFAULT_KNOWLEDGE_MAX_FILES,
                 PromptContentLoader.Limits.DEFAULT_KNOWLEDGE_MAX_FILE_BYTES,
                 PromptContentLoader.Limits.DEFAULT_KNOWLEDGE_MAX_TOTAL_BYTES
@@ -545,7 +545,7 @@ public record JarvisConfig(
 
         public static ConversationArchive defaults() {
             return new ConversationArchive(
-                false,
+                true,
                 1024 * 1024,
                 30
             );
@@ -588,7 +588,7 @@ public record JarvisConfig(
 
         public static ConversationMemory defaults() {
             return new ConversationMemory(
-                false,
+                true,
                 30,
                 4,
                 6,

@@ -52,6 +52,7 @@ public final class DeterministicRoutePolicy {
                 ToolName.TELEPORT_STAFF,
                 ToolName.WEATHER_SET,
                 ToolName.TIME_SET,
+                ToolName.RUN_COMMAND,
                 ToolName.SCHEDULE_ACTION,
                 ToolName.CANCEL_SCHEDULED_ACTION
             )

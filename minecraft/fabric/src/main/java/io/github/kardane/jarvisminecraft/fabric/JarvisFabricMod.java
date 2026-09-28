@@ -291,7 +291,11 @@ public final class JarvisFabricMod implements ModInitializer {
         ServerScheduler serverScheduler = new FabricServerScheduler(server);
 
         ToolRegistry registry = new ToolRegistry();
-        new FabricToolService(platform, clock).register(registry);
+        new FabricToolService(
+            platform,
+            clock,
+            dataDirectory
+        ).register(registry);
         ToolReferenceWriter.writeAsync(
             dataDirectory,
             registry.tools()

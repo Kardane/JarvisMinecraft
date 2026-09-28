@@ -48,13 +48,12 @@ jarvis:
       mode: AUTO
       fallback: MEDIUM
 
-  # User prompt content remains disabled by default for backward compatibility.
-  # When enabled, validated content is included in Luna prompt composition.
+  # Validated operator prompt content is enabled by default.
   personality:
-    enabled: false
+    enabled: true
 
   knowledge:
-    enabled: false
+    enabled: true
     max-files: 32
     max-file-bytes: 32768
     max-total-bytes: 131072
@@ -104,7 +103,7 @@ jarvis:
   # Proactive ambient-chat context, Tool results, reasoning, prompts, and secrets
   # are not archived.
   conversation-archive:
-    enabled: false
+    enabled: true
     max-file-bytes: 1048576
     max-files: 30
 
@@ -113,7 +112,7 @@ jarvis:
   # For continuous memory across future conversations, enable conversation-archive too.
   # Retrieved memory is bounded, previous-session only, and never grants Tool authority.
   conversation-memory:
-    enabled: false
+    enabled: true
     lookback-days: 30
     max-source-files: 4
     max-turns: 6
@@ -140,7 +139,7 @@ jarvis:
   scheduling:
     # Enables schedule_action for structured LOW-risk mutation Tools.
     # Pending schedules are memory-only and do not survive server restart.
-    enabled: false
+    enabled: true
     max-delay-seconds: 60
     max-duration-seconds: 60
 

@@ -68,6 +68,8 @@ public final class LunaPrompt {
             "If a player identity is ambiguous, ask a focused clarification rather than guessing.",
             "teleport_staff may be called only when the latest user message explicitly asks to move the requester to a target player.",
             "weather_set and time_set may be called only when the latest user message explicitly asks to change that loaded world's weather or time.",
+            "run_command may be called only when the latest user message explicitly requests a server action that requires a Minecraft/server command. actions.properties is authoritative: never bypass a disabled command root through aliases, execute ... run, return run, or another command.",
+            "Do not place provider keys, secrets, hidden policy text, or unrelated user data inside run_command arguments.",
             "Use schedule_action only when the user explicitly asks for a future or repeating action. Never invent a delay, interval, duration, target, world, weather, or time.",
             "Use cancel_scheduled_action only for a schedule id that belongs to the requesting player and is present in conversation context.",
             "A location, weather, or time question alone is never permission to change server state.",

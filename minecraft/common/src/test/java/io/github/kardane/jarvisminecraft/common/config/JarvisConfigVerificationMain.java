@@ -65,24 +65,24 @@ public final class JarvisConfigVerificationMain {
             "Execution actors must remain OP in Phase 1."
         );
         require(
-            !config.scheduling().enabled(),
-            "Scheduling must default to disabled."
+            config.scheduling().enabled(),
+            "Scheduling must default to enabled."
         );
         require(
-            !config.personality().enabled(),
-            "Custom personality must default to disabled."
+            config.personality().enabled(),
+            "Custom personality must default to enabled."
         );
         require(
-            !config.knowledge().enabled(),
-            "Custom knowledge must default to disabled."
+            config.knowledge().enabled(),
+            "Custom knowledge must default to enabled."
         );
         require(
-            !config.conversationArchive().enabled(),
-            "Conversation archive must default to disabled."
+            config.conversationArchive().enabled(),
+            "Conversation archive must default to enabled."
         );
         require(
-            !config.conversationMemory().enabled(),
-            "Conversation memory must default to disabled."
+            config.conversationMemory().enabled(),
+            "Conversation memory must default to enabled."
         );
         require(
             config.conversationMemory().lookbackDays() == 30

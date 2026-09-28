@@ -19,7 +19,8 @@ public final class StandardMinecraftTools {
             ToolName.GET_WORLD_INFO,
             ToolName.TELEPORT_STAFF,
             ToolName.WEATHER_SET,
-            ToolName.TIME_SET
+            ToolName.TIME_SET,
+            ToolName.RUN_COMMAND
         )
     );
 
@@ -39,7 +40,8 @@ public final class StandardMinecraftTools {
             capability("world.info", source, version),
             capability("staff.self_teleport", source, version),
             capability("world.weather.set", source, version),
-            capability("world.time.set", source, version)
+            capability("world.time.set", source, version),
+            capability("command.execute", source, version)
         );
     }
 

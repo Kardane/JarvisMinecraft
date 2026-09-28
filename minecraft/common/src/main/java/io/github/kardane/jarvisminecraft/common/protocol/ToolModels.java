@@ -18,7 +18,7 @@ public final class ToolModels {
     public sealed interface ToolArguments permits
         NoArguments, PagingArguments, GetPlayerByUuidArguments, GetPlayerByNameArguments,
         PlayerUuidArguments, NearbyArguments, WorldInfoArguments, TeleportArguments,
-        WeatherSetArguments, TimeSetArguments, ScheduleActionArguments,
+        WeatherSetArguments, TimeSetArguments, CommandArguments, ScheduleActionArguments,
         CancelScheduledActionArguments, AreaHistoryArguments, PlayerHistoryArguments,
         RegionsAtLocationArguments, RegionInfoArguments, BuildPermissionArguments {
     }
@@ -26,7 +26,7 @@ public final class ToolModels {
     public sealed interface ToolData permits
         ServerStatusData, OnlinePlayersData, PlayerData, PlayerLocationData,
         NearbyPlayersData, WorldInfoData, TeleportData, WeatherSetData, TimeSetData,
-        ScheduledActionData, CancelScheduledActionData, HistoryData,
+        CommandData, ScheduledActionData, CancelScheduledActionData, HistoryData,
         RegionsAtLocationData, RegionInfoData, BuildPermissionData, CmiPlayerInfoData {
     }
 
@@ -70,6 +70,11 @@ public final class ToolModels {
     public record TimeSetArguments(
         String worldId,
         int timeOfDay
+    ) implements ToolArguments {
+    }
+
+    public record CommandArguments(
+        String command
     ) implements ToolArguments {
     }
 
@@ -196,6 +201,13 @@ public final class ToolModels {
     public record TimeSetData(
         String worldId,
         int timeOfDay,
+        boolean completed
+    ) implements ToolData {
+    }
+
+    public record CommandData(
+        String commandRoot,
+        int resultCode,
         boolean completed
     ) implements ToolData {
     }
