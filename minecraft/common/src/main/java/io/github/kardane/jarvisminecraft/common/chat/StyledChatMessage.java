@@ -1,6 +1,8 @@
 package io.github.kardane.jarvisminecraft.common.chat;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 
@@ -168,6 +170,8 @@ public record StyledChatMessage(
         List<Segment> segments = new ArrayList<>();
         StringBuilder text = new StringBuilder();
         StyleState style = new StyleState();
+        Deque<StyleState> styleStack =
+            new ArrayDeque<>();
 
         for (int index = 0; index < value.length(); index += 1) {
             if (
@@ -212,12 +216,48 @@ public record StyledChatMessage(
                 }
             }
 
+            int closingColorLength =
+                closingColorTagLengthAt(
+                    value,
+                    index
+                );
+            if (
+                modelBody
+                    && closingColorLength > 0
+            ) {
+                flush(segments, text, style);
+                style = styleStack.isEmpty()
+                    ? new StyleState()
+                    : styleStack.pop();
+                index += closingColorLength - 1;
+                continue;
+            }
+
+            int resetTagLength =
+                resetTagLengthAt(
+                    value,
+                    index
+                );
+            if (
+                modelBody
+                    && resetTagLength > 0
+            ) {
+                flush(segments, text, style);
+                style = new StyleState();
+                styleStack.clear();
+                index += resetTagLength - 1;
+                continue;
+            }
+
             if (isHexColorAt(value, index)) {
                 flush(segments, text, style);
                 int rgb = Integer.parseInt(
                     value.substring(index + 2, index + 8),
                     16
                 );
+                if (modelBody) {
+                    styleStack.push(style);
+                }
                 style = style.applyRgb(rgb);
                 index += 8;
                 continue;
@@ -253,6 +293,9 @@ public record StyledChatMessage(
 
             flush(segments, text, style);
             style = style.apply(code);
+            if (code == 'r') {
+                styleStack.clear();
+            }
             index += 1;
         }
 
@@ -292,9 +335,6 @@ public record StyledChatMessage(
                 line = "• " + trimmed.substring(2);
             }
 
-            line = convertStrongMarkdown(line);
-            line = line.replace("\u0060", "");
-
             if (!output.isEmpty()) {
                 output.append('\n');
             }
@@ -320,6 +360,69 @@ public record StyledChatMessage(
                 && value.charAt(hashes) == ' '
         ) {
             return hashes + 1;
+        }
+        return 0;
+    }
+
+    private static int closingColorTagLengthAt(
+        String value,
+        int index
+    ) {
+        if (
+            !value.startsWith("</#", index)
+        ) {
+            if (
+                value.startsWith(
+                    "</color>",
+                    index
+                )
+            ) {
+                return "</color>".length();
+            }
+            return 0;
+        }
+
+        int close = value.indexOf(
+            '>',
+            index + 3
+        );
+        if (
+            close < 0
+                || close - index > 10
+        ) {
+            return 0;
+        }
+
+        int hexLength = close - (index + 3);
+        if (hexLength != 6) {
+            return 0;
+        }
+        for (
+            int cursor = index + 3;
+            cursor < close;
+            cursor += 1
+        ) {
+            if (
+                Character.digit(
+                    value.charAt(cursor),
+                    16
+                ) < 0
+            ) {
+                return 0;
+            }
+        }
+        return close - index + 1;
+    }
+
+    private static int resetTagLengthAt(
+        String value,
+        int index
+    ) {
+        if (value.startsWith("<reset>", index)) {
+            return "<reset>".length();
+        }
+        if (value.startsWith("</reset>", index)) {
+            return "</reset>".length();
         }
         return 0;
     }
