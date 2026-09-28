@@ -139,7 +139,9 @@ public record JarvisConfig(
             new Interaction(
                 InteractionMode.PASSIVE,
                 List.of("자비스", "jarvis", "재비스"),
+                WakeWordMatching.defaults(),
                 30,
+                0.70,
                 new Audience(AudienceMode.OP, List.of(), List.of()),
                 new Proactive(12, 15, 0.75)
             ),
@@ -232,10 +234,30 @@ public record JarvisConfig(
     public record Interaction(
         InteractionMode mode,
         List<String> wakeWords,
+        WakeWordMatching wakeWordMatching,
         int followUpSeconds,
+        double followUpConfidenceThreshold,
         Audience audience,
         Proactive proactive
     ) {
+        public Interaction(
+            InteractionMode mode,
+            List<String> wakeWords,
+            int followUpSeconds,
+            Audience audience,
+            Proactive proactive
+        ) {
+            this(
+                mode,
+                wakeWords,
+                WakeWordMatching.defaults(),
+                followUpSeconds,
+                0.70,
+                audience,
+                proactive
+            );
+        }
+
         public Interaction {
             Objects.requireNonNull(mode, "interaction.mode");
             wakeWords = normalizedList(
@@ -245,14 +267,45 @@ public record JarvisConfig(
                 32,
                 64
             );
+            Objects.requireNonNull(
+                wakeWordMatching,
+                "interaction.wakeWordMatching"
+            );
             requireRange(
                 followUpSeconds,
                 1,
                 600,
                 "interaction.followUpSeconds"
             );
+            requireProbability(
+                followUpConfidenceThreshold,
+                "interaction.followUpConfidenceThreshold"
+            );
             Objects.requireNonNull(audience, "interaction.audience");
             Objects.requireNonNull(proactive, "interaction.proactive");
+        }
+    }
+
+    public record WakeWordMatching(
+        boolean anywhere,
+        boolean fuzzyEnabled,
+        int maxEditDistance
+    ) {
+        public WakeWordMatching {
+            requireRange(
+                maxEditDistance,
+                0,
+                1,
+                "interaction.wakeWordMatching.maxEditDistance"
+            );
+        }
+
+        public static WakeWordMatching defaults() {
+            return new WakeWordMatching(
+                true,
+                true,
+                1
+            );
         }
     }
 
