@@ -70,8 +70,10 @@ Response configuration under `jarvis.response.*` includes:
 - `sound.enabled/id/volume/pitch`: after a final/error response, play the
   configured sound only to the requester.
 - `metrics.enabled/icon`: append only the configured icon to final/error
-  replies. Hovering the icon shows aggregate Luna input/output/total token
-  usage when available plus end-to-end request processing time.
+  replies. The icon supports the same legacy `&` formatting and
+  `<#RRGGBB>` hex colors as the prefix. Hovering the icon shows aggregate
+  Luna input/output/total token usage when available plus end-to-end request
+  processing time.
 
 Starting a follow-up session no longer emits the old public "120 seconds"
 session-rules announcement. The configured follow-up TTL itself is unchanged.
@@ -233,6 +235,24 @@ Knowledge loading is non-recursive and UTF-8 only. Non-Markdown files,
 subdirectories, and `knowledge/README.md` are ignored. Symlink/path escapes outside
 the platform JARVIS directory are rejected. Knowledge files are ordered
 deterministically by normalized filename.
+
+## Default JARVIS voice
+
+The compiled baseline voice is calm, precise, discreet, lightly formal, and
+service-oriented, with restrained dry wit only in relaxed situations. It avoids
+theatrical roleplay, flattery, exaggerated emotion, and humor during failures,
+ambiguity, permission limits, or safety-sensitive actions.
+
+New installations receive a matching `persona.md` template. Existing
+operator-edited persona files are never overwritten, and configured persona
+content remains subordinate to built-in authority and Tool policy.
+
+## Status presentation
+
+`/jm status` uses a structured three-section layout for Runtime, AI, and Audit
+instead of a flat white-text list. In-game output uses distinct title, section,
+label, healthy, warning, error, and muted colors while retaining readable plain
+text semantics for console output.
 
 ## Generated Tool reference
 
