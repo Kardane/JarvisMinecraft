@@ -70,7 +70,9 @@ Response configuration under `jarvis.response.*` includes:
   are not accepted.
 - `waiting-message.enabled/threshold-ms/messages`: show at most one delayed
   public progress message while a request is still running. The built-in
-  default now provides 16 message variations.
+  default provides 16 variations. Each message supports the same safe
+  `<#RRGGBB>` and lowercase Minecraft `&` color/emphasis markup used by
+  rich reply bodies, so operators can style each connector independently.
 - `sound.enabled/id/volume/pitch`: after a final/error response, play the
   configured sound only to the requester.
 - `metrics.enabled/icon`: append only the configured icon to final/error
@@ -78,6 +80,16 @@ Response configuration under `jarvis.response.*` includes:
   `<#RRGGBB>` hex colors as the prefix. Hovering the icon shows aggregate
   Luna input/output/total token usage when available plus end-to-end request
   processing time.
+
+Korean player-facing prose is governed by a compiled `KoreanResponsePolicy`
+inserted into Luna Core Policy before operator persona/knowledge. It keeps the runtime
+prompt bounded while enforcing the source policy's main invariants: natural Korean
+zero-anaphora and object omission, translationese reduction, consistent register and
+sentence rhythm, precise operation-specific technical verbs, evidence-matched
+verification verbs, standard technical-term preservation, syntax-driven punctuation,
+and byte-faithful preservation of exact commands/paths/identifiers/machine-readable
+text. Persona, knowledge, and retrieved conversation memory remain lower-priority and
+cannot relax these response-quality or authority boundaries.
 
 Model-facing chat formatting policy forbids Markdown decoration for final player
 replies and asks Luna to use color sparingly: cyan for JARVIS labels/key facts, green
