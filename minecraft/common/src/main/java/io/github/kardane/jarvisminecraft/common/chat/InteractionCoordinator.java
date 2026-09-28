@@ -69,7 +69,11 @@ public final class InteractionCoordinator {
         Duration ttl = Duration.ofSeconds(config.followUpSeconds());
 
         if (invocationMatcher.matches(message, config.wakeWords())) {
-            UUID sessionId = sessions.start(player.uuid(), ttl);
+            UUID sessionId = sessions.start(
+                player.uuid(),
+                ttl,
+                config.followUpMaxMessages()
+            );
             return InteractionDecision.forward(
                 sessionId,
                 "DIRECT",
@@ -99,8 +103,16 @@ public final class InteractionCoordinator {
             return InteractionDecision.publicEscape(sessionId, escaped);
         }
 
-        if (!sessions.refresh(player.uuid(), sessionId, ttl)) {
-            return InteractionDecision.publicChat(message, false);
+        if (
+            !sessions.consumeFollowUp(
+                player.uuid(),
+                sessionId
+            )
+        ) {
+            return InteractionDecision.publicChat(
+                message,
+                false
+            );
         }
 
         return InteractionDecision.forward(
