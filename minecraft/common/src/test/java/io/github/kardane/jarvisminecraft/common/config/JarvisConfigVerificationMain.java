@@ -44,6 +44,18 @@ public final class JarvisConfigVerificationMain {
             "Default follow-up window must be 30 seconds."
         );
         require(
+            config.interaction().wakeWordMatching().anywhere()
+                && config.interaction().wakeWordMatching().fuzzyEnabled()
+                && config.interaction().wakeWordMatching().maxEditDistance()
+                    == 1,
+            "Wake-word matching defaults changed unexpectedly."
+        );
+        require(
+            config.interaction().followUpConfidenceThreshold()
+                == 0.70,
+            "Default follow-up confidence threshold must be 0.70."
+        );
+        require(
             "gpt-6-luna".equals(config.model().name()),
             "Model must remain pinned to gpt-6-luna."
         );
@@ -103,6 +115,22 @@ public final class JarvisConfigVerificationMain {
         properties.setProperty(
             "jarvis.interaction.follow-up-seconds",
             "90"
+        );
+        properties.setProperty(
+            "jarvis.interaction.wake-word.anywhere",
+            "false"
+        );
+        properties.setProperty(
+            "jarvis.interaction.wake-word.fuzzy-enabled",
+            "false"
+        );
+        properties.setProperty(
+            "jarvis.interaction.wake-word.max-edit-distance",
+            "0"
+        );
+        properties.setProperty(
+            "jarvis.interaction.follow-up-confidence-threshold",
+            "0.85"
         );
         properties.setProperty(
             "jarvis.personality.enabled",
@@ -178,6 +206,18 @@ public final class JarvisConfigVerificationMain {
             "Follow-up window override failed."
         );
         require(
+            !config.interaction().wakeWordMatching().anywhere()
+                && !config.interaction().wakeWordMatching().fuzzyEnabled()
+                && config.interaction().wakeWordMatching().maxEditDistance()
+                    == 0,
+            "Wake-word matching override failed."
+        );
+        require(
+            config.interaction().followUpConfidenceThreshold()
+                == 0.85,
+            "Follow-up confidence threshold override failed."
+        );
+        require(
             config.response().sound().enabled(),
             "Properties boolean override failed."
         );
@@ -227,6 +267,47 @@ public final class JarvisConfigVerificationMain {
             rejected = true;
         }
         require(rejected, "Invalid config must fail validation.");
+
+        Properties invalidWakeDistance = new Properties();
+        invalidWakeDistance.setProperty(
+            "jarvis.interaction.wake-word.max-edit-distance",
+            "2"
+        );
+        rejected = false;
+        try {
+            JarvisConfigLoader.load(
+                PropertiesJarvisConfigSource.from(
+                    invalidWakeDistance
+                )
+            );
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        require(
+            rejected,
+            "Wake-word edit distance must remain bounded to 0..1."
+        );
+
+        Properties invalidFollowUpConfidence =
+            new Properties();
+        invalidFollowUpConfidence.setProperty(
+            "jarvis.interaction.follow-up-confidence-threshold",
+            "1.1"
+        );
+        rejected = false;
+        try {
+            JarvisConfigLoader.load(
+                PropertiesJarvisConfigSource.from(
+                    invalidFollowUpConfidence
+                )
+            );
+        } catch (IllegalArgumentException expected) {
+            rejected = true;
+        }
+        require(
+            rejected,
+            "Follow-up confidence threshold must remain within probability bounds."
+        );
     }
 
     private static void verifyPromptContentBoundsRejected() {
