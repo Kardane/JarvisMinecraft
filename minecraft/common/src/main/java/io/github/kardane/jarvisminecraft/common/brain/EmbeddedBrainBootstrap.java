@@ -166,6 +166,19 @@ final class EmbeddedBrainBootstrap {
                 auditDirectory,
                 clock
             );
+        AsyncConversationArchive conversationArchive =
+            new AsyncConversationArchive(
+                serverId,
+                promptContentRoot(auditDirectory),
+                configManager,
+                clock,
+                log
+            );
+        ConversationHistoryStore history =
+            new ArchivingConversationHistoryStore(
+                new InMemoryConversationHistoryStore(),
+                conversationArchive
+            );
         LunaClient luna = new OpenAiLunaClient(
             openAiApiKey,
             new ToolArgumentCodec()
@@ -176,7 +189,7 @@ final class EmbeddedBrainBootstrap {
                 serverId,
                 capabilities,
                 sessions,
-                new InMemoryConversationHistoryStore(),
+                history,
                 new AiRequestScheduler(aiExecutor),
                 new JdkJevClassifier(
                     typesafeApiKey,
@@ -206,11 +219,13 @@ final class EmbeddedBrainBootstrap {
                 brain,
                 luna,
                 promptContent,
+                conversationArchive,
                 audit,
                 aiExecutor
             );
         } catch (RuntimeException failure) {
             luna.close();
+            conversationArchive.close();
             aiExecutor.shutdownNow();
             audit.closeAsync();
             throw failure;
@@ -257,6 +272,7 @@ final class EmbeddedBrainBootstrap {
         EmbeddedBrain brain,
         LunaClient luna,
         PromptContentManager promptContent,
+        AsyncConversationArchive conversationArchive,
         AsyncJsonlAuditSink audit,
         ExecutorService aiExecutor
     ) {
@@ -267,6 +283,10 @@ final class EmbeddedBrainBootstrap {
                 promptContent,
                 "promptContent"
             );
+            Objects.requireNonNull(
+                conversationArchive,
+                "conversationArchive"
+            );
             Objects.requireNonNull(audit, "audit");
             Objects.requireNonNull(
                 aiExecutor,
@@ -276,6 +296,7 @@ final class EmbeddedBrainBootstrap {
 
         void closeOwnedResources() {
             luna.close();
+            conversationArchive.close();
             aiExecutor.shutdownNow();
             audit.closeAsync();
         }
