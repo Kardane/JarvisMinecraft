@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -171,6 +173,27 @@ public final class AsyncConversationArchive
                 );
             }
         }
+    }
+
+    public CompletionStage<Void> flushAsync() {
+        if (closed.get()) {
+            return CompletableFuture.failedFuture(
+                new IllegalStateException(
+                    "Conversation archive is closed."
+                )
+            );
+        }
+
+        CompletableFuture<Void> flushed =
+            new CompletableFuture<>();
+        try {
+            executor.execute(() ->
+                flushed.complete(null)
+            );
+        } catch (RejectedExecutionException failure) {
+            flushed.completeExceptionally(failure);
+        }
+        return flushed;
     }
 
     private ArchiveRecord toArchiveRecord(
@@ -362,15 +385,16 @@ public final class AsyncConversationArchive
                 .toList();
         }
 
-        int removeCount = files.size() - maxFiles;
-        for (
-            int index = 0;
-            index < removeCount;
-            index += 1
-        ) {
-            Path candidate = files.get(index);
-            if (!candidate.equals(activeFile)) {
-                Files.deleteIfExists(candidate);
+        int remaining = files.size();
+        for (Path candidate : files) {
+            if (remaining <= maxFiles) {
+                break;
+            }
+            if (candidate.equals(activeFile)) {
+                continue;
+            }
+            if (Files.deleteIfExists(candidate)) {
+                remaining -= 1;
             }
         }
     }
