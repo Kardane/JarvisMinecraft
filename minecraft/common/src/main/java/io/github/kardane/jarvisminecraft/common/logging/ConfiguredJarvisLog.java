@@ -85,6 +85,7 @@ public final class ConfiguredJarvisLog implements JarvisLog {
         }
         if (
             event.startsWith("jev.")
+                || event.startsWith("follow_up.")
                 || event.startsWith("routing.")
                 || event.startsWith("reasoning.")
         ) {
