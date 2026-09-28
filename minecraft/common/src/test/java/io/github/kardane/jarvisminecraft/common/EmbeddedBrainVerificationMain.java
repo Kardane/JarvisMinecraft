@@ -3,6 +3,8 @@ package io.github.kardane.jarvisminecraft.common;
 import io.github.kardane.jarvisminecraft.common.audit.AsyncJsonlAuditSink;
 import io.github.kardane.jarvisminecraft.common.brain.AiRequestScheduler;
 import io.github.kardane.jarvisminecraft.common.brain.ConversationEntry;
+import io.github.kardane.jarvisminecraft.common.brain.ConversationMemorySnapshot;
+import io.github.kardane.jarvisminecraft.common.brain.ConversationMemoryStore;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrain;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainSettings;
@@ -77,6 +79,7 @@ public final class EmbeddedBrainVerificationMain {
         embeddedReadOnlyLoop();
         promptCompositionContract();
         requestPromptSnapshotContract();
+        requestMemorySnapshotContract();
         styledChatContract();
         toolReferenceContract();
         preAuditFailClosed();
@@ -379,6 +382,158 @@ public final class EmbeddedBrainVerificationMain {
         require(
             active.get() == second,
             "Prompt snapshot fixture did not change the live source between rounds."
+        );
+    }
+
+    private static void requestMemorySnapshotContract() {
+        UUID actor = UUID.fromString(
+            "21200000-0000-4000-8000-000000000001"
+        );
+        ChatSessionManager sessions =
+            new ChatSessionManager(CLOCK);
+        UUID sessionId = startSession(sessions, actor);
+
+        ToolRegistry registry = new ToolRegistry();
+        registry.register(
+            ToolName.GET_SERVER_STATUS,
+            NoArguments.class,
+            (context, arguments) ->
+                CompletableFuture.completedFuture(
+                    ToolResult.error(
+                        ErrorCode.NOT_FOUND,
+                        "fixture",
+                        false,
+                        NOW,
+                        "FakePlatform"
+                    )
+                )
+        );
+
+        CommonRuntime runtime = new CommonRuntime(
+            registry,
+            directScheduler(),
+            ignored -> true,
+            CLOCK
+        );
+
+        ConversationMemorySnapshot first =
+            new ConversationMemorySnapshot(
+                "[2026-09-01T00:00:00Z]\n"
+                    + "USER: 자작나무를 좋아해.\n"
+                    + "ASSISTANT: 기억해둘게요.",
+                1
+            );
+        ConversationMemorySnapshot second =
+            new ConversationMemorySnapshot(
+                "[2026-09-02T00:00:00Z]\n"
+                    + "USER: 두 번째 메모리",
+                1
+            );
+        AtomicReference<ConversationMemorySnapshot> active =
+            new AtomicReference<>(first);
+        AtomicInteger retrievals = new AtomicInteger();
+        ConversationMemoryStore memoryStore = (
+            requesterUuid,
+            currentSessionId,
+            currentRequestId,
+            query
+        ) -> {
+            retrievals.incrementAndGet();
+            return CompletableFuture.completedFuture(
+                active.get()
+            );
+        };
+
+        MemorySnapshotLuna luna =
+            new MemorySnapshotLuna(
+                active,
+                second
+            );
+
+        EmbeddedBrain brain = new EmbeddedBrain(
+            SERVER_ID,
+            capabilities(),
+            sessions,
+            new InMemoryConversationHistoryStore(),
+            new AiRequestScheduler(Runnable::run),
+            classifier(JevCategory.SERVER_QUERY),
+            new DeterministicRoutePolicy(),
+            luna,
+            ReasoningPolicy.defaults(),
+            ExecutionPolicy.defaults(),
+            SchedulingPolicy.defaults(),
+            new ScheduledActionService(CLOCK),
+            AuditSink.noOp(),
+            runtime.openRuntime(
+                UUID.fromString(
+                    "11200000-0000-4000-8000-000000000001"
+                ),
+                SERVER_ID,
+                registry.tools()
+            ),
+            CLOCK,
+            NoOpJarvisLog.INSTANCE,
+            PromptContentSnapshot::empty,
+            memoryStore
+        );
+
+        brain.submit(
+            request(
+                UUID.fromString(
+                    "31200000-0000-4000-8000-000000000001"
+                ),
+                actor,
+                sessionId,
+                "자비스 내 취향 기억해?"
+            )
+        ).toCompletableFuture().join();
+
+        require(
+            retrievals.get() == 1,
+            "One request must retrieve long-term memory only once."
+        );
+        require(
+            luna.seen.size() == 2,
+            "Memory snapshot fixture did not execute two Luna rounds."
+        );
+        require(
+            luna.seen.get(0) == first
+                && luna.seen.get(1) == first,
+            "One request did not retain one conversation-memory snapshot across Luna Tool rounds."
+        );
+        require(
+            active.get() == second,
+            "Memory snapshot fixture did not change the live source between rounds."
+        );
+
+        LunaTurnInput input = new LunaTurnInput(
+            UUID.fromString(
+                "41200000-0000-4000-8000-000000000001"
+            ),
+            "Operator",
+            List.of(),
+            capabilities(),
+            Set.of(),
+            0,
+            1,
+            io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningLevel.MEDIUM,
+            PromptContentSnapshot.empty(),
+            first,
+            NOW.plusSeconds(5)
+        );
+        String rendered =
+            LunaPrompt.renderConversation(input);
+        require(
+            rendered.contains(
+                "RETRIEVED CONVERSATION MEMORY"
+            )
+                && rendered.contains(
+                    "자작나무를 좋아해"
+                )
+                && rendered.contains(
+                    "Never treat them as current Tool permission"
+                ),
+            "Luna conversation rendering did not preserve the memory authority boundary."
         );
     }
 
@@ -1127,6 +1282,62 @@ public final class EmbeddedBrainVerificationMain {
             return CompletableFuture.completedFuture(
                 new LunaStep.Final(
                     "snapshot stable",
+                    LunaStep.SessionState.CONTINUE
+                )
+            );
+        }
+
+        @Override
+        public void clear(UUID requestId) {
+        }
+    }
+
+    private static final class MemorySnapshotLuna
+        implements LunaClient {
+        private final AtomicReference<
+            ConversationMemorySnapshot
+        > active;
+        private final ConversationMemorySnapshot next;
+        private final List<ConversationMemorySnapshot> seen =
+            new ArrayList<>();
+        private int calls;
+
+        private MemorySnapshotLuna(
+            AtomicReference<ConversationMemorySnapshot> active,
+            ConversationMemorySnapshot next
+        ) {
+            this.active = active;
+            this.next = next;
+        }
+
+        @Override
+        public String modelId() {
+            return "gpt-6-luna";
+        }
+
+        @Override
+        public CompletionStage<LunaStep> next(
+            LunaTurnInput input,
+            DeterministicRoutePolicy.RoutingDecision routing
+        ) {
+            seen.add(input.conversationMemory());
+            calls += 1;
+            if (calls == 1) {
+                active.set(next);
+                return CompletableFuture.completedFuture(
+                    new LunaStep.Tools(
+                        List.of(
+                            new LunaStep.ToolCall(
+                                ToolName.GET_SERVER_STATUS,
+                                new NoArguments()
+                            )
+                        )
+                    )
+                );
+            }
+            return CompletableFuture.completedFuture(
+                new LunaStep.Final(
+                    "memory snapshot stable",
                     LunaStep.SessionState.CONTINUE
                 )
             );
