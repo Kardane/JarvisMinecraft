@@ -7,10 +7,10 @@
 # PASSIVE: wake-word/session only. ACTIVE: may initiate from allowed public chat.
 jarvis.interaction.mode=PASSIVE
 jarvis.interaction.wake-words=자비스|jarvis|재비스
-# Fixed window from the initial invocation; follow-up messages do not extend it.
+# Fixed window from the initial invocation; follow-up candidates do not extend it.
+# Wake-word-free messages inside this window are evaluated by Jev. Only clear
+# continuations of the active JARVIS conversation receive a JARVIS response.
 jarvis.interaction.follow-up-seconds=30
-# 0 disables implicit follow-up. Default: one message without the wake word.
-jarvis.interaction.follow-up-max-messages=1
 
 jarvis.interaction.audience.mode=OP
 jarvis.interaction.audience.whitelist=
