@@ -288,6 +288,27 @@ public final class EmbeddedBrainVerificationMain {
             "Luna prompt is missing the prompt-content authority boundary."
         );
         require(
+            instructions.contains(
+                "KOREAN RESPONSE POLICY"
+            )
+                && instructions.contains(
+                    "Write idiomatic Korean"
+                )
+                && instructions.contains(
+                    "Never use the colloquial technical verb 박다"
+                )
+                && instructions.contains(
+                    "Use 확인했다 only for directly observed evidence"
+                )
+                && instructions.contains(
+                    "Do not use ·, /, or + as generic prose delimiters"
+                )
+                && instructions.contains(
+                    "Exact syntax is exempt from prose normalization"
+                ),
+            "Luna prompt is missing compiled Korean response policy invariants."
+        );
+        require(
             instructions.indexOf("[rules.md]")
                 < instructions.indexOf("[server.md]"),
             "Luna prompt did not preserve deterministic knowledge order."
@@ -735,6 +756,30 @@ public final class EmbeddedBrainVerificationMain {
                 && !richBody.plainBody().contains("**정상**")
                 && !richBody.plainBody().contains("`"),
             "Presentation markup leaked into plain model text."
+        );
+
+        StyledChatMessage waiting =
+            StyledChatMessage.fromConfiguredPrefix(
+                "[JARVIS] ",
+                "<#7DD3FC>확인해볼게요.&r"
+            );
+        require(
+            waiting.bodySegments().stream()
+                .anyMatch(segment ->
+                    Integer.valueOf(0x7DD3FC).equals(
+                        segment.rgb()
+                    )
+                        && segment.text().contains(
+                            "확인해볼게요."
+                        )
+                ),
+            "Waiting-message body hex color was not parsed."
+        );
+        require(
+            "확인해볼게요.".equals(
+                waiting.plainBody()
+            ),
+            "Waiting-message presentation markup leaked into visible plain text."
         );
 
         LunaStep.Usage usage =
