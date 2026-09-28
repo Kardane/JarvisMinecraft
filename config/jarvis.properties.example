@@ -45,9 +45,10 @@ jarvis.response.sound.id=minecraft:block.note_block.pling
 jarvis.response.sound.volume=1.0
 jarvis.response.sound.pitch=1.0
 
-# Hover-only final/error response metrics.
+# Hover-only final/error response metrics. The icon supports & formatting and
+# <#RRGGBB> hex colors.
 jarvis.response.metrics.enabled=true
-jarvis.response.metrics.icon=📊
+jarvis.response.metrics.icon=<#7DD3FC>📊
 
 # READ_TALK: read-only Tools only.
 # EXECUTE_LITE: read-only + explicitly allowed LOW-risk state-changing Tools.

@@ -30,6 +30,8 @@ import io.github.kardane.jarvisminecraft.neoforge.tools.NeoForgeToolService;
 import net.minecraft.SharedConstants;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.api.distmarker.Dist;
@@ -84,11 +86,11 @@ public final class JarvisNeoForgeMod {
                                 );
                                 return 0;
                             }
-                            JarvisStatusFormatter.lines(
+                            JarvisStatusFormatter.styledLines(
                                 current.brain().status()
                             ).forEach(line ->
                                 context.getSource().sendSuccess(
-                                    () -> Component.literal(line),
+                                    () -> renderStatusLine(line),
                                     false
                                 )
                             );
@@ -141,6 +143,55 @@ public final class JarvisNeoForgeMod {
                         })
                 )
         );
+    }
+
+    private Component renderStatusLine(
+        JarvisStatusFormatter.StatusLine line
+    ) {
+        return switch (line.kind()) {
+            case TITLE -> Component.literal(
+                    "━━ " + line.label() + " ━━"
+                )
+                .setStyle(
+                    Style.EMPTY
+                        .withColor(
+                            JarvisStatusFormatter.TITLE_RGB
+                        )
+                        .withBold(true)
+                );
+            case SECTION -> Component.literal(
+                    "  " + line.label()
+                )
+                .setStyle(
+                    Style.EMPTY
+                        .withColor(
+                            JarvisStatusFormatter.SECTION_RGB
+                        )
+                        .withBold(true)
+                );
+            case FIELD -> {
+                MutableComponent output =
+                    Component.literal("  ");
+                output.append(
+                    Component.literal(
+                        line.label() + ": "
+                    ).setStyle(
+                        Style.EMPTY.withColor(
+                            JarvisStatusFormatter.KEY_RGB
+                        )
+                    )
+                );
+                output.append(
+                    Component.literal(line.value())
+                        .setStyle(
+                            Style.EMPTY.withColor(
+                                line.valueRgb()
+                            )
+                        )
+                );
+                yield output;
+            }
+        };
     }
 
     private void logReloadSuccess(

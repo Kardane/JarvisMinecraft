@@ -79,10 +79,11 @@ jarvis:
       pitch: 1.0
 
     # Appends only this icon to final/error replies. Hover it to view Luna
-    # token usage and total request processing time.
+    # token usage and total request processing time. The icon supports the same
+    # & formatting and <#RRGGBB> hex colors as response.prefix.
     metrics:
       enabled: true
-      icon: "📊"
+      icon: "<#7DD3FC>📊"
 
   execution:
     # READ_TALK: read-only Tools only.
