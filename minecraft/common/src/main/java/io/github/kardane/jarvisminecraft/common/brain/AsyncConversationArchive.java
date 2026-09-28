@@ -277,7 +277,6 @@ public final class AsyncConversationArchive
                 target,
                 line,
                 StandardCharsets.UTF_8,
-                StandardOpenOption.CREATE,
                 StandardOpenOption.APPEND,
                 StandardOpenOption.WRITE
             );
@@ -342,16 +341,28 @@ public final class AsyncConversationArchive
             return activeFile;
         }
 
-        activeFile = directory.resolve(
-            "conversation-"
-                + FILE_TIME.format(clock.instant())
-                + "-"
-                + UUID.randomUUID()
-                    .toString()
-                    .substring(0, 8)
-                + ".jsonl"
+        for (int attempt = 0; attempt < 8; attempt += 1) {
+            Path candidate = directory.resolve(
+                "conversation-"
+                    + FILE_TIME.format(clock.instant())
+                    + "-"
+                    + UUID.randomUUID()
+                        .toString()
+                        .substring(0, 8)
+                    + ".jsonl"
+            );
+            try {
+                activeFile = Files.createFile(candidate);
+                return activeFile;
+            } catch (
+                java.nio.file.FileAlreadyExistsException ignored
+            ) {
+                // Generate a fresh unpredictable filename.
+            }
+        }
+        throw new IOException(
+            "Could not allocate a unique conversation archive file."
         );
-        return activeFile;
     }
 
     private void prune(int maxFiles) throws IOException {
