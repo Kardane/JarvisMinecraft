@@ -618,6 +618,24 @@ public final class EmbeddedBrainVerificationMain {
         requireDirectInvocation(
             config,
             player,
+            "TPS 알려줘 jarvs",
+            "TPS 알려줘"
+        );
+        requireDirectInvocation(
+            config,
+            player,
+            "자비스? TPS 알려줘",
+            "TPS 알려줘"
+        );
+        requireDirectInvocation(
+            config,
+            player,
+            "TPS 알려줘, 자비스",
+            "TPS 알려줘"
+        );
+        requireDirectInvocation(
+            config,
+            player,
             "자비수 TPS 알려줘",
             "TPS 알려줘"
         );
