@@ -86,7 +86,7 @@ public final class EmbeddedBrainVerificationMain {
         promptCompositionContract();
         requestPromptSnapshotContract();
         requestMemorySnapshotContract();
-        boundedFollowUpContract();
+        jevFollowUpCandidateContract();
         styledChatContract();
         toolReferenceContract();
         preAuditFailClosed();
@@ -544,16 +544,12 @@ public final class EmbeddedBrainVerificationMain {
         );
     }
 
-    private static void boundedFollowUpContract() {
+    private static void jevFollowUpCandidateContract() {
         MutableClock clock = new MutableClock(NOW);
         Properties properties = new Properties();
         properties.setProperty(
             "jarvis.interaction.follow-up-seconds",
             "30"
-        );
-        properties.setProperty(
-            "jarvis.interaction.follow-up-max-messages",
-            "1"
         );
         ConfigManager config = new ConfigManager(() ->
             JarvisConfigLoader.load(
@@ -593,37 +589,70 @@ public final class EmbeddedBrainVerificationMain {
         );
 
         clock.advanceSeconds(20);
-        InteractionDecision followUp =
+        InteractionDecision firstCandidate =
             interactions.accept(
                 player,
                 "그럼 지금 TPS는?"
             );
         require(
-            followUp.kind()
-                == InteractionDecision.Kind.FORWARD
-                && "FOLLOW_UP".equals(followUp.mode()),
-            "The configured implicit follow-up was not forwarded."
+            firstCandidate.kind()
+                == InteractionDecision.Kind.FOLLOW_UP_CANDIDATE
+                && "FOLLOW_UP_CANDIDATE".equals(
+                    firstCandidate.mode()
+                ),
+            "Active-session chat was not routed to Jev as a follow-up candidate."
         );
 
-        InteractionDecision normalChat =
+        InteractionDecision secondCandidate =
             interactions.accept(
                 player,
                 "다들 어디 있어?"
             );
         require(
-            normalChat.kind()
-                == InteractionDecision.Kind.PUBLIC_CHAT,
-            "Follow-up quota exhaustion did not restore public chat."
-        );
-        require(
-            sessions.activeSession(actor).isPresent(),
-            "Quota exhaustion must not invalidate a session before its last reply can be delivered."
+            secondCandidate.kind()
+                == InteractionDecision.Kind.FOLLOW_UP_CANDIDATE,
+            "Follow-up admission must be decided by Jev rather than a message-count quota."
         );
 
         clock.advanceSeconds(11);
         require(
             sessions.activeSession(actor).isEmpty(),
-            "Implicit follow-up incorrectly extended the fixed session TTL."
+            "Follow-up candidates incorrectly extended the fixed session TTL."
+        );
+
+        JevInput input = JevInput.fromFollowUpCandidate(
+            List.of(
+                new ConversationEntry.UserMessage(
+                    "서버 상태 알려줘",
+                    UUID.fromString(
+                        "31300000-0000-4000-8000-000000000001"
+                    ),
+                    NOW,
+                    "DIRECT"
+                ),
+                new ConversationEntry.AssistantMessage(
+                    "TPS는 20입니다.",
+                    UUID.fromString(
+                        "31300000-0000-4000-8000-000000000001"
+                    ),
+                    NOW.plusSeconds(1),
+                    "DIRECT"
+                )
+            ),
+            "그럼 MSPT는?",
+            capabilities()
+        );
+        require(
+            "FOLLOW_UP_CANDIDATE".equals(
+                input.interactionOrigin()
+            )
+                && "그럼 MSPT는?".equals(
+                    input.latestMessage()
+                )
+                && input.shortTopic().contains(
+                    "TPS는 20입니다."
+                ),
+            "Jev follow-up candidate input did not preserve prior conversation context."
         );
     }
 
