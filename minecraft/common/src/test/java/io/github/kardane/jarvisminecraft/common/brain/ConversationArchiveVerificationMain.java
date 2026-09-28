@@ -5,7 +5,6 @@ import io.github.kardane.jarvisminecraft.common.config.JarvisConfig;
 import io.github.kardane.jarvisminecraft.common.config.JarvisConfigLoader;
 import io.github.kardane.jarvisminecraft.common.config.PropertiesJarvisConfigSource;
 import io.github.kardane.jarvisminecraft.common.logging.NoOpJarvisLog;
-import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.NoArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 
 import java.nio.charset.StandardCharsets;
