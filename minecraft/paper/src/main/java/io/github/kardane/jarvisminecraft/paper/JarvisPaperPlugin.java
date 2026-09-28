@@ -26,6 +26,9 @@ import io.github.kardane.jarvisminecraft.paper.platform.PaperPlatformAccess;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperServerScheduler;
 import io.github.kardane.jarvisminecraft.paper.integrations.IntegrationRegistry;
 import io.github.kardane.jarvisminecraft.paper.logging.PaperJarvisLog;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.TextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.command.CommandSender;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -173,8 +176,13 @@ public final class JarvisPaperPlugin extends JavaPlugin {
                     return true;
                 }
                 if ("status".equalsIgnoreCase(args[0])) {
-                    JarvisStatusFormatter.lines(brain.status())
-                        .forEach(sender::sendMessage);
+                    JarvisStatusFormatter.styledLines(
+                        brain.status()
+                    ).forEach(line ->
+                        sender.sendMessage(
+                            renderStatusLine(line)
+                        )
+                    );
                     return true;
                 }
                 if ("reload".equalsIgnoreCase(args[0])) {
@@ -258,6 +266,48 @@ public final class JarvisPaperPlugin extends JavaPlugin {
         }
         configManager = null;
         runtimeConfiguration = null;
+    }
+
+    private Component renderStatusLine(
+        JarvisStatusFormatter.StatusLine line
+    ) {
+        return switch (line.kind()) {
+            case TITLE -> Component.text(
+                    "━━ " + line.label() + " ━━"
+                )
+                .color(
+                    TextColor.color(
+                        JarvisStatusFormatter.TITLE_RGB
+                    )
+                )
+                .decorate(TextDecoration.BOLD);
+            case SECTION -> Component.text(
+                    "  " + line.label()
+                )
+                .color(
+                    TextColor.color(
+                        JarvisStatusFormatter.SECTION_RGB
+                    )
+                )
+                .decorate(TextDecoration.BOLD);
+            case FIELD -> Component.text("  ")
+                .append(
+                    Component.text(line.label() + ": ")
+                        .color(
+                            TextColor.color(
+                                JarvisStatusFormatter.KEY_RGB
+                            )
+                        )
+                )
+                .append(
+                    Component.text(line.value())
+                        .color(
+                            TextColor.color(
+                                line.valueRgb()
+                            )
+                        )
+                );
+        };
     }
 
     private void finishReload(
