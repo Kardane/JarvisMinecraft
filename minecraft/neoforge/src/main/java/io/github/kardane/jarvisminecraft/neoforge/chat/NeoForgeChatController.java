@@ -121,6 +121,13 @@ public final class NeoForgeChatController {
             }
             case PUBLIC_ESCAPE ->
                 event.setMessage(Component.literal(decision.text()));
+            case FOLLOW_UP_CANDIDATE ->
+                brain.considerFollowUp(
+                    requesterUuid,
+                    sender.getGameProfile().getName(),
+                    decision.sessionId(),
+                    decision.text()
+                );
             case END -> {
                 brain.cancelSession(
                     requesterUuid,
