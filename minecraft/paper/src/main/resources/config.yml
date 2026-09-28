@@ -95,6 +95,17 @@ jarvis:
     max-file-bytes: 1048576
     max-files: 30
 
+  # Optional retrieval-backed long-term conversation memory.
+  # Reads prior USER/JARVIS JSONL records for the same requester UUID only.
+  # For continuous memory across future conversations, enable conversation-archive too.
+  # Retrieved memory is bounded, previous-session only, and never grants Tool authority.
+  conversation-memory:
+    enabled: false
+    lookback-days: 30
+    max-source-files: 4
+    max-turns: 6
+    max-context-bytes: 8192
+
   execution:
     # READ_TALK: read-only Tools only.
     # EXECUTE_LITE: read-only + explicitly allowed LOW-risk state-changing Tools.
