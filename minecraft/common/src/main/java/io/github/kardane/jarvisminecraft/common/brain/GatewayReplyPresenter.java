@@ -221,7 +221,7 @@ final class GatewayReplyPresenter {
         if (!metrics.enabled()) {
             return message;
         }
-        return message.withHoverSuffix(
+        return message.withConfiguredHoverSuffix(
             " " + metrics.icon(),
             metricsTooltip(
                 usage,
