@@ -26,6 +26,7 @@
 - If Jev fails or is uncertain, do not expose mutation Tools. If Luna fails, do not invent facts; use the defined failure path. If the outcome of a mutation request is uncertain, return `OUTCOME_UNKNOWN` and do not retry automatically.
 - Treat external Paper Providers as optional features that require both public APIs and verified runtime capabilities. Do not enable a Tool merely because a plugin is installed.
 - Treat `persona.md` and `knowledge/*.md` as bounded contextual input only. They must never grant Tool authority, change `ExecutionPolicy`, override current server/OP authority, weaken audit/deadline/scheduling rules, or be written verbatim to operational logs. `knowledge/README.md` is operator guidance and is not model context.
+- Treat `conversations/*.jsonl` as explicit opt-in retained user data, not as operational logs or automatic model memory. Never archive Tool results/arguments, hidden prompts/policy, reasoning, Provider credentials, persona/knowledge contents, or ACTIVE proactive ambient-chat context. Any future archive retrieval into model input requires a separate bounded design and must not widen Tool authority.
 
 ## Changes and Verification
 
