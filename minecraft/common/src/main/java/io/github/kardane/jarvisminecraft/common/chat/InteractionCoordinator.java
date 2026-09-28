@@ -71,8 +71,7 @@ public final class InteractionCoordinator {
         if (invocationMatcher.matches(message, config.wakeWords())) {
             UUID sessionId = sessions.start(
                 player.uuid(),
-                ttl,
-                config.followUpMaxMessages()
+                ttl
             );
             return InteractionDecision.forward(
                 sessionId,
@@ -103,23 +102,9 @@ public final class InteractionCoordinator {
             return InteractionDecision.publicEscape(sessionId, escaped);
         }
 
-        if (
-            !sessions.consumeFollowUp(
-                player.uuid(),
-                sessionId
-            )
-        ) {
-            return InteractionDecision.publicChat(
-                message,
-                false
-            );
-        }
-
-        return InteractionDecision.forward(
+        return InteractionDecision.followUpCandidate(
             sessionId,
-            "FOLLOW_UP",
             message,
-            false,
             config.followUpSeconds()
         );
     }
