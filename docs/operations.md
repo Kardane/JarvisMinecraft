@@ -288,14 +288,47 @@ content, provider credentials, and API keys are not written. ACTIVE-mode proacti
 ambient-chat context and proactive responses are intentionally excluded because that
 context can contain messages from multiple public-chat participants.
 
-The archive is not automatically injected back into Luna and is not persistent model
-memory. It is a future-facing data source for explicit operator-controlled workflows
-such as offline search, summaries, RAG, or user-scoped memory if those features are
-designed later.
+The archive itself remains independent from the model. Retrieval is enabled separately
+with `jarvis.conversation-memory.*`. This allows operators to retain records without
+using them as model context, or to stop new archival writes while still querying
+existing records.
 
-`/jm reload` applies archive enablement and retention changes to subsequent
-messages without a server restart. Already queued writes may finish using the limits
-captured when they were accepted.
+Conversation-memory configuration:
+
+```text
+jarvis.conversation-memory.enabled
+jarvis.conversation-memory.lookback-days
+jarvis.conversation-memory.max-source-files
+jarvis.conversation-memory.max-turns
+jarvis.conversation-memory.max-context-bytes
+```
+
+Defaults:
+
+- enabled: `false`
+- lookback: 30 days
+- newest source files scanned: 4
+- retrieved turns: 6
+- final UTF-8 context budget: 8192 bytes
+
+For each request, retrieval is limited to the same logical server ID and requester UUID,
+excludes the current session/request, and runs on the archive executor. Relevant past
+turns are selected using deterministic lexical overlap. Queries that explicitly ask for
+memory (for example "전에", "기억", "지난번", "remember", or "last time") may fall
+back to the most recent previous-session turns when lexical overlap is weak.
+
+Retrieval has a 350 ms request-local deadline and fails open to no memory if storage is
+slow or unavailable. The selected digest is captured once and remains stable across all
+Tool/model rounds for that request. It is added as untrusted historical context and can
+never authorize a Tool or establish current server state. Current live Tool evidence and
+the latest request take precedence.
+
+There is no separate model call to build or maintain a permanent user profile. The
+normal Luna response synthesizes the small retrieved excerpt set when relevant.
+
+`/jm reload` applies archive and memory settings to subsequent messages without a
+server restart. Already queued archive writes may finish using the limits captured when
+they were accepted.
 
 ## Default JARVIS voice
 
