@@ -209,7 +209,9 @@ public final class JarvisConfigVerificationMain {
             "Response metrics hover must default to enabled."
         );
         require(
-            "📊".equals(response.metrics().icon()),
+            "<#7DD3FC>📊".equals(
+                response.metrics().icon()
+            ),
             "Response metrics default icon changed unexpectedly."
         );
 
