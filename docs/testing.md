@@ -110,9 +110,11 @@ Core scenarios:
 - final/error reply metrics icon hover shows token usage/time only when enabled
 - disabling `response.metrics.enabled` removes the hover suffix
 - no public follow-up-session TTL announcement is emitted
-- default follow-up window is 30 seconds and normal follow-up messages do not refresh it
-- default follow-up quota forwards one implicit message, then restores ordinary public chat
-- quota exhaustion keeps the session alive long enough for an already-running final reply to pass delivery re-check
+- default follow-up window is 30 seconds and candidate messages do not refresh it
+- wake-word-free active-session messages remain visible as public chat while Jev evaluates continuation
+- Jev `RESPOND` at confidence >= 0.70 promotes the candidate to FOLLOW_UP
+- Jev `IGNORE`, low confidence, timeout, or failure produces no JARVIS response
+- unrelated public chat during an active session is not automatically treated as a follow-up
 - generated `tools.md` reflects registered, unavailable-provider, and Brain-control Tools
 - conversation archive disabled by default creates no archive files
 - enabling conversation archive writes DIRECT/FOLLOW_UP USER and ASSISTANT JSONL records
