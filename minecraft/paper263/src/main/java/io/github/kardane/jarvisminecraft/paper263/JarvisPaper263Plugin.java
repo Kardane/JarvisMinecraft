@@ -137,7 +137,7 @@ public final class JarvisPaper263Plugin extends JavaPlugin {
         ToolRegistry registry = integrations.toolRegistry();
         ToolReferenceWriter.writeAsync(
             getDataFolder().toPath(),
-            registry.tools()
+            registry.registeredTools()
         ).exceptionally(failure -> {
             getLogger().warning(
                 "Could not write generated JARVIS Tool reference."

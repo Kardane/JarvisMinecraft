@@ -1,6 +1,6 @@
 package io.github.kardane.jarvisminecraft.paper.tools;
 
-import io.github.kardane.jarvisminecraft.common.runtime.CommandActionPolicy;
+import io.github.kardane.jarvisminecraft.common.runtime.ToolPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftToolService;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperPlatformAccess;
@@ -28,15 +28,25 @@ public final class PaperToolService {
         Clock clock,
         Path dataDirectory
     ) {
+        this(
+            platform,
+            clock,
+            ToolPolicy.inDirectory(dataDirectory)
+        );
+    }
+
+    public PaperToolService(
+        PaperPlatformAccess platform,
+        Clock clock,
+        ToolPolicy toolPolicy
+    ) {
         this.delegate = new StandardMinecraftToolService(
             platform,
             clock,
             SOURCE,
             SOURCE,
             60_000L,
-            new CommandActionPolicy(
-                dataDirectory.resolve("actions.properties")
-            )
+            toolPolicy
         );
     }
 

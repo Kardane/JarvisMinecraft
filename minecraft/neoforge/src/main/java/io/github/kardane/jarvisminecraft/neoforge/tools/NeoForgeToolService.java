@@ -1,6 +1,6 @@
 package io.github.kardane.jarvisminecraft.neoforge.tools;
 
-import io.github.kardane.jarvisminecraft.common.runtime.CommandActionPolicy;
+import io.github.kardane.jarvisminecraft.common.runtime.ToolPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftToolService;
 import io.github.kardane.jarvisminecraft.neoforge.platform.NeoForgePlatformAccess;
@@ -28,15 +28,25 @@ public final class NeoForgeToolService {
         Clock clock,
         Path dataDirectory
     ) {
+        this(
+            platform,
+            clock,
+            ToolPolicy.inDirectory(dataDirectory)
+        );
+    }
+
+    public NeoForgeToolService(
+        NeoForgePlatformAccess platform,
+        Clock clock,
+        ToolPolicy toolPolicy
+    ) {
         this.delegate = new StandardMinecraftToolService(
             platform,
             clock,
             SOURCE,
             "NeoForgeTickSampler",
             null,
-            new CommandActionPolicy(
-                dataDirectory.resolve("actions.properties")
-            )
+            toolPolicy
         );
     }
 

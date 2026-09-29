@@ -67,8 +67,6 @@ final class RequestPlanner {
         EnumSet<ToolName> candidates =
             EnumSet.noneOf(ToolName.class);
         candidates.addAll(runtimeTools);
-        candidates.add(ToolName.SCHEDULE_ACTION);
-        candidates.add(ToolName.CANCEL_SCHEDULED_ACTION);
 
         Set<ToolName> activeTools = executionPolicy.filter(
             candidates,

@@ -15,6 +15,7 @@ import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
 import io.github.kardane.jarvisminecraft.common.config.PropertiesJarvisConfigSource;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
+import io.github.kardane.jarvisminecraft.common.runtime.ToolPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolReferenceWriter;
 import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftTools;
@@ -290,15 +291,16 @@ public final class JarvisFabricMod implements ModInitializer {
             new MinecraftFabricPlatformAccess(server);
         ServerScheduler serverScheduler = new FabricServerScheduler(server);
 
-        ToolRegistry registry = new ToolRegistry();
+        ToolPolicy toolPolicy = ToolPolicy.inDirectory(dataDirectory);
+        ToolRegistry registry = new ToolRegistry(toolPolicy);
         new FabricToolService(
             platform,
             clock,
-            dataDirectory
+            toolPolicy
         ).register(registry);
         ToolReferenceWriter.writeAsync(
             dataDirectory,
-            registry.tools()
+            registry.registeredTools()
         ).exceptionally(failure -> {
             LOGGER.warning(
                 "Could not write generated JARVIS Tool reference."

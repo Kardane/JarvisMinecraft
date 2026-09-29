@@ -15,6 +15,15 @@ import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolNam
 
 public final class ToolRegistry {
     private final Map<ToolName, Entry<?>> entries = new EnumMap<>(ToolName.class);
+    private final ToolPolicy policy;
+
+    public ToolRegistry() {
+        this(null);
+    }
+
+    public ToolRegistry(ToolPolicy policy) {
+        this.policy = policy;
+    }
 
     public <A extends ToolArguments> void register(
         ToolName tool,
@@ -24,9 +33,13 @@ public final class ToolRegistry {
         Objects.requireNonNull(tool, "tool");
         Objects.requireNonNull(argumentType, "argumentType");
         Objects.requireNonNull(handler, "handler");
-        if (entries.putIfAbsent(tool, new Entry<>(argumentType, handler)) != null) {
+        if (entries.containsKey(tool)) {
             throw new IllegalStateException("Tool already registered: " + tool.wireName());
         }
+        if (policy != null) {
+            policy.syncTools(Set.of(tool));
+        }
+        entries.put(tool, new Entry<>(argumentType, handler));
     }
 
     public boolean contains(ToolName tool) {
@@ -46,11 +59,40 @@ public final class ToolRegistry {
                 throw new IllegalStateException("Tool already registered: " + tool.wireName());
             }
         }
+        if (policy != null) {
+            policy.syncTools(stagedRegistry.entries.keySet());
+        }
         entries.putAll(stagedRegistry.entries);
     }
 
-    public Set<ToolName> tools() {
+    public void declarePolicyTools(Set<ToolName> tools) {
+        Objects.requireNonNull(tools, "tools");
+        if (policy != null) {
+            policy.syncTools(tools);
+        }
+    }
+
+    public boolean isEnabled(ToolName tool) {
+        Objects.requireNonNull(tool, "tool");
+        return policy == null || policy.isToolEnabled(tool);
+    }
+
+    public Set<ToolName> registeredTools() {
         return Set.copyOf(entries.keySet());
+    }
+
+    public Set<ToolName> tools() {
+        if (policy == null) {
+            return registeredTools();
+        }
+        java.util.EnumSet<ToolName> enabled =
+            java.util.EnumSet.noneOf(ToolName.class);
+        for (ToolName tool : entries.keySet()) {
+            if (policy.isToolEnabled(tool)) {
+                enabled.add(tool);
+            }
+        }
+        return Set.copyOf(enabled);
     }
 
     public CompletionStage<ToolResult> execute(
@@ -61,6 +103,9 @@ public final class ToolRegistry {
         Entry<?> raw = entries.get(tool);
         if (raw == null) {
             throw new ProtocolException(ErrorCode.UNSUPPORTED, "Tool is not registered.");
+        }
+        if (!isEnabled(tool)) {
+            throw new ProtocolException(ErrorCode.UNSUPPORTED, "Tool is disabled in tools.properties.");
         }
         return raw.execute(context, arguments);
     }

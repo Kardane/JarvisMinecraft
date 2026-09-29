@@ -1,5 +1,6 @@
 package io.github.kardane.jarvisminecraft.paper.integrations;
 
+import io.github.kardane.jarvisminecraft.common.runtime.ToolPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 import io.github.kardane.jarvisminecraft.common.brain.Capability;
 import io.github.kardane.jarvisminecraft.paper.platform.PaperPlatformAccess;
@@ -94,11 +95,12 @@ public final class IntegrationRegistry implements AutoCloseable {
         Objects.requireNonNull(dataDirectory, "dataDirectory");
         Objects.requireNonNull(logger, "logger");
 
-        ToolRegistry registry = new ToolRegistry();
+        ToolPolicy toolPolicy = ToolPolicy.inDirectory(dataDirectory);
+        ToolRegistry registry = new ToolRegistry(toolPolicy);
         new PaperToolService(
             platform,
             clock,
-            dataDirectory
+            toolPolicy
         ).register(registry);
 
         Set<String> installed = new LinkedHashSet<>();
