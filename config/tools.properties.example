@@ -1,0 +1,39 @@
+# JarvisMinecraft Tool policy example.
+#
+# The runtime creates tools.properties beside the main JARVIS config.
+# Registered read-only Tools default to true.
+# State-changing Tools and command roots default to false.
+# Existing values are preserved and changes are read at runtime.
+#
+# Paper:
+#   plugins/JarvisMinecraft/tools.properties
+# Fabric / NeoForge:
+#   config/jarvisminecraft/tools.properties
+
+get_server_status=true
+get_online_players=true
+get_player=true
+get_player_location=true
+get_nearby_players=true
+get_world_info=true
+web_search=true
+
+teleport_staff=false
+weather_set=false
+time_set=false
+run_command=false
+schedule_action=false
+cancel_scheduled_action=false
+
+lookup_area_history=true
+lookup_player_history=true
+get_regions_at_location=true
+get_region_info=true
+check_build_permission=true
+get_cmi_player_info=true
+
+command.give=false
+command.gamemode=false
+command.teleport=false
+command.execute=false
+command.essentials:home=false

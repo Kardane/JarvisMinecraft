@@ -29,7 +29,7 @@ import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolArgument
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WorldInfoArguments;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WorldInfoData;
-import io.github.kardane.jarvisminecraft.common.runtime.CommandActionPolicy;
+import io.github.kardane.jarvisminecraft.common.runtime.ToolPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 import io.github.kardane.jarvisminecraft.common.platform.StandardPlatformAccess;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry.ToolExecutionContext;
@@ -55,7 +55,7 @@ public final class StandardMinecraftToolService {
     private final String source;
     private final String tpsSource;
     private final Long tpsWindowMs;
-    private final CommandActionPolicy commandActions;
+    private final ToolPolicy toolPolicy;
 
     public StandardMinecraftToolService(
         StandardPlatformAccess platform,
@@ -80,16 +80,16 @@ public final class StandardMinecraftToolService {
         String source,
         String tpsSource,
         Long tpsWindowMs,
-        CommandActionPolicy commandActions
+        ToolPolicy toolPolicy
     ) {
         this.platform = platform;
         this.clock = clock;
         this.source = source;
         this.tpsSource = tpsSource;
         this.tpsWindowMs = tpsWindowMs;
-        this.commandActions = commandActions;
-        if (commandActions != null) {
-            commandActions.sync(platform.commandRoots());
+        this.toolPolicy = toolPolicy;
+        if (toolPolicy != null) {
+            toolPolicy.syncCommandRoots(platform.commandRoots());
         }
     }
 
@@ -143,7 +143,7 @@ public final class StandardMinecraftToolService {
                 timeSet(context, arguments)
             )
         );
-        if (commandActions != null) {
+        if (toolPolicy != null) {
             registry.register(
                 ToolName.RUN_COMMAND,
                 CommandArguments.class,
@@ -447,7 +447,7 @@ public final class StandardMinecraftToolService {
                 false
             );
         }
-        if (commandActions == null) {
+        if (toolPolicy == null) {
             return error(
                 ErrorCode.UNSUPPORTED,
                 "Command execution is not configured.",
@@ -455,10 +455,10 @@ public final class StandardMinecraftToolService {
             );
         }
 
-        final CommandActionPolicy.Decision decision;
+        final ToolPolicy.Decision decision;
         try {
-            commandActions.sync(platform.commandRoots());
-            decision = commandActions.authorize(
+            toolPolicy.syncCommandRoots(platform.commandRoots());
+            decision = toolPolicy.authorizeCommand(
                 arguments.command()
             );
         } catch (IllegalArgumentException failure) {
@@ -470,7 +470,7 @@ public final class StandardMinecraftToolService {
         } catch (IllegalStateException failure) {
             return error(
                 ErrorCode.INTERNAL,
-                "Command action configuration could not be loaded.",
+                "Tool policy configuration could not be loaded.",
                 false
             );
         }

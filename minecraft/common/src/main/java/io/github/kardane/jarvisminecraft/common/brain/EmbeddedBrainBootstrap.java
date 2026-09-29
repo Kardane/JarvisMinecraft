@@ -13,6 +13,7 @@ import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationManag
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
 import io.github.kardane.jarvisminecraft.common.prompt.PromptContentLoader;
 import io.github.kardane.jarvisminecraft.common.prompt.PromptContentManager;
+import io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolArgumentCodec;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ExecutionPolicy;
@@ -23,6 +24,7 @@ import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 import java.net.http.HttpClient;
 import java.nio.file.Path;
 import java.time.Clock;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -185,6 +187,14 @@ final class EmbeddedBrainBootstrap {
         );
 
         try {
+            EnumSet<ToolName> runtimeTools =
+                EnumSet.noneOf(ToolName.class);
+            runtimeTools.addAll(registry.registeredTools());
+            runtimeTools.add(ToolName.SCHEDULE_ACTION);
+            runtimeTools.add(ToolName.CANCEL_SCHEDULED_ACTION);
+            runtimeTools.add(ToolName.WEB_SEARCH);
+            registry.declarePolicyTools(runtimeTools);
+
             EmbeddedBrain brain = new EmbeddedBrain(
                 serverId,
                 capabilities,
@@ -209,7 +219,7 @@ final class EmbeddedBrainBootstrap {
                 commonRuntime.openRuntime(
                     UUID.randomUUID(),
                     serverId,
-                    registry.tools()
+                    runtimeTools
                 ),
                 clock,
                 log,

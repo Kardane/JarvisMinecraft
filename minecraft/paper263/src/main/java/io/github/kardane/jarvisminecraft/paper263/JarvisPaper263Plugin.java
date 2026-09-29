@@ -1,4 +1,4 @@
-package io.github.kardane.jarvisminecraft.paper;
+package io.github.kardane.jarvisminecraft.paper263;
 
 import io.github.kardane.jarvisminecraft.common.brain.BrainGateway;
 import io.github.kardane.jarvisminecraft.common.brain.EmbeddedBrainGateway;
@@ -42,8 +42,8 @@ import java.util.logging.Level;
 
 import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.CancelReason;
 
-public final class JarvisPaperPlugin extends JavaPlugin {
-    private static final String SUPPORTED_MINECRAFT_VERSION = "1.21.8";
+public final class JarvisPaper263Plugin extends JavaPlugin {
+    private static final String SUPPORTED_MINECRAFT_VERSION = "26.3";
     private static final String ADAPTER_VERSION = "0.1.0-dev";
 
     private BrainGateway brain;

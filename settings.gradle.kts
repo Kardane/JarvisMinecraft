@@ -24,6 +24,7 @@ rootProject.name = "JarvisMinecraft"
 include(
     ":minecraft:common",
     ":minecraft:paper",
+    ":minecraft:paper263",
     ":minecraft:fabric",
     ":minecraft:neoforge",
 )

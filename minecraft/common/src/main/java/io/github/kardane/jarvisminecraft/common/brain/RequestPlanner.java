@@ -67,8 +67,6 @@ final class RequestPlanner {
         EnumSet<ToolName> candidates =
             EnumSet.noneOf(ToolName.class);
         candidates.addAll(runtimeTools);
-        candidates.add(ToolName.SCHEDULE_ACTION);
-        candidates.add(ToolName.CANCEL_SCHEDULED_ACTION);
 
         Set<ToolName> activeTools = executionPolicy.filter(
             candidates,
@@ -168,6 +166,10 @@ final class RequestPlanner {
                 "reasoning", classification.reasoning(),
                 "engagement", classification.engagement(),
                 "confidence", classification.confidence(),
+                "engagementConfidence",
+                classification.engagementConfidence(),
+                "reasoningConfidence",
+                classification.reasoningConfidence(),
                 "latencyMs", latency
             )
         );

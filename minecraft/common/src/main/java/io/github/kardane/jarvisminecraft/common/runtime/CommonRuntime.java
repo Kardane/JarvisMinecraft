@@ -115,7 +115,17 @@ public final class CommonRuntime {
         }
 
         public Set<ToolName> activeTools() {
-            return activeTools;
+            if (activeTools.isEmpty()) {
+                return Set.of();
+            }
+            EnumSet<ToolName> enabled =
+                EnumSet.noneOf(ToolName.class);
+            for (ToolName tool : activeTools) {
+                if (registry.isEnabled(tool)) {
+                    enabled.add(tool);
+                }
+            }
+            return Set.copyOf(enabled);
         }
 
         public CompletionStage<ToolResult> execute(ToolInvocation invocation) {
@@ -123,7 +133,7 @@ public final class CommonRuntime {
                 validate(invocation);
 
                 ToolName tool = invocation.tool();
-                if (!activeTools.contains(tool) || !registry.contains(tool)) {
+                if (!activeTools().contains(tool) || !registry.contains(tool)) {
                     throw new ProtocolException(
                         ErrorCode.UNSUPPORTED,
                         "Tool is not active on this server."

@@ -1,6 +1,7 @@
 package io.github.kardane.jarvisminecraft.common.brain;
 
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
+import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningLevel;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
 import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
@@ -127,6 +128,7 @@ final class GatewayReplyPresenter {
                     responseConfig,
                     reply.text(),
                     reply.usage(),
+                    reply.reasoningLevel(),
                     latencyMillis
                 )
             );
@@ -185,6 +187,7 @@ final class GatewayReplyPresenter {
                         responseConfig,
                         text,
                         LunaStep.Usage.unavailable(),
+                        null,
                         latencyMillis
                     )
                 );
@@ -210,6 +213,7 @@ final class GatewayReplyPresenter {
         JarvisConfig.Response responseConfig,
         String body,
         LunaStep.Usage usage,
+        ReasoningLevel reasoningLevel,
         long latencyMillis
     ) {
         StyledChatMessage message = styled(
@@ -225,6 +229,7 @@ final class GatewayReplyPresenter {
             " " + metrics.icon(),
             metricsTooltip(
                 usage,
+                reasoningLevel,
                 latencyMillis
             )
         );
@@ -232,9 +237,17 @@ final class GatewayReplyPresenter {
 
     private String metricsTooltip(
         LunaStep.Usage usage,
+        ReasoningLevel reasoningLevel,
         long latencyMillis
     ) {
         StringBuilder tooltip = new StringBuilder();
+        tooltip.append("추론 레벨: ")
+            .append(
+                reasoningLevel == null
+                    ? "확인 불가"
+                    : reasoningLevel.name()
+            )
+            .append("\n");
         if (usage.complete()) {
             tooltip.append("Luna 토큰: ")
                 .append(usage.totalTokens())

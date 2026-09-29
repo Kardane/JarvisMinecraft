@@ -256,7 +256,8 @@ final class ModelConversationLoop {
                 new EmbeddedBrain.Reply(
                     LUNA_FAILURE_TEXT,
                     LunaStep.SessionState.CONTINUE,
-                    accumulatedUsage
+                    accumulatedUsage,
+                    reasoningLevel
                 )
             );
         }
@@ -272,6 +273,7 @@ final class ModelConversationLoop {
                     "round", round,
                     "kind", "FINAL",
                     "toolCallCount", 0,
+                    "webSearchCallCount", step.webSearchCalls(),
                     "latencyMs", elapsedMillis(
                         lunaStarted,
                         clock
@@ -297,7 +299,8 @@ final class ModelConversationLoop {
                 new EmbeddedBrain.Reply(
                     finalStep.text(),
                     finalStep.sessionState(),
-                    updatedUsage
+                    updatedUsage,
+                    reasoningLevel
                 )
             );
         }
@@ -310,6 +313,7 @@ final class ModelConversationLoop {
                 "round", round,
                 "kind", "TOOL_CALLS",
                 "toolCallCount", toolStep.calls().size(),
+                "webSearchCallCount", step.webSearchCalls(),
                 "latencyMs", elapsedMillis(
                     lunaStarted,
                     clock

@@ -6,6 +6,7 @@ public enum JevCategory {
     WORLD_QUERY,
     HISTORY_QUERY,
     REGION_QUERY,
+    WEB_QUERY,
     ACTION_REQUEST,
     GENERAL,
     UNCERTAIN

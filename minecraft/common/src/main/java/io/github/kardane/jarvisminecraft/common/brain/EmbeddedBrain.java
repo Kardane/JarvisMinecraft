@@ -6,6 +6,7 @@ import io.github.kardane.jarvisminecraft.common.brain.ai.JevClassification;
 import io.github.kardane.jarvisminecraft.common.brain.ai.JevInput;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaClient;
 import io.github.kardane.jarvisminecraft.common.brain.ai.LunaStep;
+import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningLevel;
 import io.github.kardane.jarvisminecraft.common.brain.ai.ReasoningPolicy;
 import io.github.kardane.jarvisminecraft.common.chat.AmbientChatMessage;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
@@ -784,7 +785,8 @@ public final class EmbeddedBrain {
     public record Reply(
         String text,
         LunaStep.SessionState sessionState,
-        LunaStep.Usage usage
+        LunaStep.Usage usage,
+        ReasoningLevel reasoningLevel
     ) {
         public Reply(
             String text,
@@ -793,7 +795,21 @@ public final class EmbeddedBrain {
             this(
                 text,
                 sessionState,
-                LunaStep.Usage.unavailable()
+                LunaStep.Usage.unavailable(),
+                ReasoningLevel.MEDIUM
+            );
+        }
+
+        public Reply(
+            String text,
+            LunaStep.SessionState sessionState,
+            LunaStep.Usage usage
+        ) {
+            this(
+                text,
+                sessionState,
+                usage,
+                ReasoningLevel.MEDIUM
             );
         }
 
@@ -804,6 +820,10 @@ public final class EmbeddedBrain {
                 "sessionState"
             );
             Objects.requireNonNull(usage, "usage");
+            Objects.requireNonNull(
+                reasoningLevel,
+                "reasoningLevel"
+            );
         }
     }
 

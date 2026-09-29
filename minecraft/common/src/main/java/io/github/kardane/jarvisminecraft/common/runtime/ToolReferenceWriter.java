@@ -151,7 +151,10 @@ public final class ToolReferenceWriter {
             "registered means the platform/provider registered the Tool on this "
         );
         output.append(
-            "server. brain-control means it is handled by the Embedded Brain and "
+            "server. openai-built-in means it is executed by the OpenAI Responses "
+        );
+        output.append(
+            "API. brain-control means it is handled by the Embedded Brain and "
         );
         output.append(
             "is still policy-gated. not-registered means the required platform or "
@@ -166,6 +169,9 @@ public final class ToolReferenceWriter {
         ToolName tool,
         Set<ToolName> registered
     ) {
+        if (tool == ToolName.WEB_SEARCH) {
+            return "openai-built-in";
+        }
         if (
             tool == ToolName.SCHEDULE_ACTION
                 || tool == ToolName.CANCEL_SCHEDULED_ACTION

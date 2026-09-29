@@ -121,6 +121,21 @@ final class ToolExecutionCoordinator {
         );
         budget.assertLive(support.now());
 
+        if (!support.activeTools().contains(call.tool())) {
+            support.logToolDenied(
+                request,
+                call.tool(),
+                ExecutionPolicy.DenialReason.TOOL_INACTIVE,
+                null
+            );
+            return CompletableFuture.failedFuture(
+                new ProtocolException(
+                    ErrorCode.UNSUPPORTED,
+                    "Tool is disabled by the current Tool policy."
+                )
+            );
+        }
+
         ExecutionPolicy.Decision initialDecision =
             executionPolicy.evaluate(
                 call.tool(),
@@ -191,6 +206,21 @@ final class ToolExecutionCoordinator {
                 request.requesterUuid(),
                 request.sessionId()
             );
+
+            if (!support.activeTools().contains(call.tool())) {
+                support.logToolDenied(
+                    request,
+                    call.tool(),
+                    ExecutionPolicy.DenialReason.TOOL_INACTIVE,
+                    null
+                );
+                return CompletableFuture.failedFuture(
+                    new ProtocolException(
+                        ErrorCode.UNSUPPORTED,
+                        "Tool was disabled by the current Tool policy before execution."
+                    )
+                );
+            }
 
             ExecutionPolicy.Decision currentDecision =
                 executionPolicy.evaluate(

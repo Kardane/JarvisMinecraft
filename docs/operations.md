@@ -38,28 +38,42 @@ The runtime-policy snapshot and operator prompt content are deliberately separat
 - `jarvis.interaction.follow-up-confidence-threshold`
 - `jarvis.interaction.audience.*`
 
-## Command action configuration
+## Tool policy configuration
 
-JARVIS maintains a separate command-action policy next to its normal runtime config:
+JARVIS maintains a separate Tool policy next to its normal runtime config:
 
-- Paper: `plugins/JarvisMinecraft/actions.properties`
-- Fabric / NeoForge: `config/jarvisminecraft/actions.properties`
+- Paper: `plugins/JarvisMinecraft/tools.properties`
+- Fabric / NeoForge: `config/jarvisminecraft/tools.properties`
 
-The file is generated from the command roots actually registered in the running server, so it covers vanilla commands plus plugin/mod commands. Missing roots are added automatically as `false`; existing operator choices are preserved. The only supported value is `true` or `false`.
+The file contains the Tools available on that server plus command roots used by `run_command`. Registered read-only Tools default to `true`; state-changing Tools default to `false`. Command roots are written as `command.<root>` and always default to `false`. Existing operator choices are preserved, and newly registered Tools or command roots are appended automatically.
 
 Example:
 
 ~~~properties
-give=false
-gamemode=false
-teleport=true
-execute=false
-essentials:home=false
+get_server_status=true
+get_player_location=true
+web_search=true
+teleport_staff=false
+lookup_area_history=true
+get_region_info=true
+run_command=false
+schedule_action=false
+cancel_scheduled_action=false
+
+command.give=false
+command.gamemode=false
+command.teleport=true
+command.execute=false
+command.essentials:home=false
 ~~~
 
-`run_command` executes as server console only for a current online OP and only when the root is enabled. Command policy is checked again immediately before dispatch. For `execute ... run` and `return run`, the nested command root must also be enabled. Vanilla `minecraft:` aliases are normalized to the same root. Changes are read at execution time and do not require `/jm reload`.
+A Tool must be enabled in `tools.properties` before it is exposed to the model or executed. This is a hard gate in addition to the normal execution-mode `allow-tools` / `deny-tools` policy. Changes are read at runtime and do not require `/jm reload`.
 
-Because plugin roots may expose many subcommands, one `true` grants that entire root. Likewise, `function` or other datapack-invoking roots may execute additional datapack commands; leave them `false` unless that transitive authority is intended. All generated entries default to `false`.
+`run_command` has two gates: `run_command=true` enables the Tool, then the matching `command.<root>=true` authorizes the command root. It executes as server console only for a current online OP. For `execute ... run` and `return run`, every nested command root must also be enabled. Vanilla `minecraft:` aliases are normalized to the same root.
+
+On first startup after upgrading, if `tools.properties` does not exist but the legacy `actions.properties` does, JARVIS migrates those root values to `command.<root>` entries and keeps `run_command` enabled so existing command behavior is preserved. After migration, `tools.properties` is authoritative.
+
+Because plugin roots may expose many subcommands, one `command.<root>=true` grants that entire root. Likewise, `function` or other datapack-invoking roots may execute additional datapack commands; leave them `false` unless that transitive authority is intended.
 
 The generic command Tool remains unavailable to proactive turns, requires fail-closed pre-execution audit, and records only the command root in its argument audit summary.
 
@@ -106,9 +120,9 @@ Response configuration under `jarvis.response.*` includes:
   configured sound only to the requester.
 - `metrics.enabled/icon`: append only the configured icon to final/error
   replies. The icon supports the same legacy `&` formatting and
-  `<#RRGGBB>` hex colors as the prefix. Hovering the icon shows aggregate
-  Luna input/output/total token usage when available plus end-to-end request
-  processing time.
+  `<#RRGGBB>` hex colors as the prefix. Hovering the icon shows the resolved
+  Luna reasoning level, aggregate Luna input/output/total token usage when
+  available, and end-to-end request processing time.
 
 Korean player-facing prose is governed by a compiled `KoreanResponsePolicy`
 inserted into Luna Core Policy before operator persona/knowledge. It keeps the runtime
@@ -233,6 +247,18 @@ response/status/logging paths. Invalid reload candidates never partially replace
 active config or prompt content.
 
 ### Paper
+
+Paper 1.21.8 remains available from `:minecraft:paper` as
+`jarvisminecraft-paper.jar`.
+
+Paper 26.3 is built separately from `:minecraft:paper263` as
+`jarvisminecraft-paper-26.3.jar`. This adapter is pinned to
+`paper-api:26.3.build.49-alpha`, targets Java 25, and refuses to enable on a
+Minecraft version other than exactly `26.3`. Its Bukkit descriptor uses
+`api-version: '26.2'` because that is the currently documented maximum plugin API
+version while running on the 26.3 server API. The module reuses the Paper adapter
+implementation and retains the optional CoreProtect, WorldEdit/WorldGuard, and CMI
+integration classes.
 
 Paper's generated `config.yml` contains the existing provider-key
 fallbacks plus the non-secret `jarvis.*` runtime-policy tree.
@@ -453,6 +479,13 @@ A Tool appearing as registered does not grant authority. Actual exposure still
 depends on current OP authority, Jev route, execution policy, scheduling policy,
 and provider availability.
 
+`web_search` is a read-only virtual Tool backed by OpenAI Responses built-in
+web search rather than a Minecraft-side function handler. It is generated in
+`tools.properties` like other Tools and defaults to `true`. Jev routes
+current/external-information requests to `WEB_QUERY`; if enabled, Luna receives
+the built-in web search Tool with live external access. Web answers append up to
+five cited source titles/URLs to the Minecraft response.
+
 ## Startup
 
 At platform startup JARVIS:
@@ -513,7 +546,17 @@ Post-execution audit failure never triggers a Tool retry.
 
 Operational console logging is separate from the JSONL Audit.
 
-Default categories cover request lifecycle, Jev/Luna, Tool lifecycle, scheduling, ACTIVE proactive decisions, and Audit health transitions. Raw player chat, raw prompts/responses, provider keys, Authorization headers, and complete environment/config dumps are not operational log fields. Response hover metrics expose token counts and duration only; they do not expose prompts, reasoning, Tool arguments, or secrets.
+Default categories cover request lifecycle, Jev/Luna, Tool lifecycle, scheduling, ACTIVE proactive decisions, and Audit health transitions. Raw player chat, raw prompts/responses, provider keys, Authorization headers, and complete environment/config dumps are not operational log fields. Response hover metrics expose the resolved reasoning level, token counts, and duration; they do not expose hidden reasoning, prompts, Tool arguments, or secrets.
+
+Runtime statistics are accumulated in memory from these structured events from
+server/JARVIS startup until shutdown. They include request success/failure,
+success rate, average latency, P95 latency over the most recent 4,096 completed
+or failed requests, Jev classification/failure/fallback counts, Jev-selected
+reasoning distribution and average reasoning confidence, final resolved Luna
+reasoning distribution, resolved route distribution, Luna token totals,
+round/latency/web-search counts, and Tool call/failure/denial counts. Statistics
+do not persist across server restarts and are collected independently of console
+log visibility filters.
 
 Common settings:
 
@@ -540,10 +583,17 @@ Paper/Fabric/NeoForge expose OP-only:
 
 ```text
 /jm status
+/jm stats
 /jm reload
 ```
 
 The status summary includes runtime state, interaction/audience/execution mode, scheduling state, AI queue/active counts, proactive in-flight state, and Audit health/queue/file summary. It never prints secrets or raw AI/chat content.
+
+`/jm stats` shows the in-memory runtime statistics described above, including
+the NONE/LOW/MEDIUM/HIGH reasoning distribution selected by Jev, the final
+reasoning distribution actually resolved for Luna after policy/fallback,
+resolved route distribution, request P95 latency, and the three most-used
+Minecraft function Tools. OpenAI built-in web searches are counted separately.
 
 `/jm reload` asynchronously reloads structured config, `persona.md`, and
 `knowledge/*.md`. Disk I/O runs on the dedicated `jarvis-config-reload`
