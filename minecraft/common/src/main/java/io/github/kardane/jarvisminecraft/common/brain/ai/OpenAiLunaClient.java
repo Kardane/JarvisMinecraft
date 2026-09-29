@@ -18,6 +18,8 @@ import com.openai.models.responses.ResponseFunctionToolCall;
 import com.openai.models.responses.ResponseIncludable;
 import com.openai.models.responses.ResponseInputItem;
 import com.openai.models.responses.ResponseOutputItem;
+import com.openai.models.responses.ResponseOutputText;
+import com.openai.models.responses.WebSearchTool;
 import io.github.kardane.jarvisminecraft.common.brain.ConversationEntry;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolArgumentCodec;
 
@@ -193,6 +195,24 @@ public final class OpenAiLunaClient implements LunaClient {
             toolSchemas.definitions(input.availableTools())) {
             builder.addTool(toFunctionTool(definition));
         }
+        if (input.availableTools().contains(ToolName.WEB_SEARCH)) {
+            builder.addTool(
+                WebSearchTool.builder()
+                    .type(WebSearchTool.Type.WEB_SEARCH)
+                    .externalWebAccess(true)
+                    .searchContextSize(
+                        WebSearchTool.SearchContextSize.MEDIUM
+                    )
+                    .userLocation(
+                        WebSearchTool.UserLocation.builder()
+                            .type(
+                                WebSearchTool.UserLocation.Type.APPROXIMATE
+                            )
+                            .build()
+                    )
+                    .build()
+            );
+        }
         return builder.build();
     }
 
@@ -234,12 +254,22 @@ public final class OpenAiLunaClient implements LunaClient {
     ) {
         List<PendingCall> pending = new ArrayList<>();
         List<LunaStep.ToolCall> calls = new ArrayList<>();
+        int webSearchCalls = 0;
 
         for (ResponseOutputItem item : response.output()) {
             if (item.isReasoning()) {
                 state.inputItems.add(
                     ResponseInputItem.ofReasoning(item.asReasoning())
                 );
+                continue;
+            }
+            if (item.isWebSearchCall()) {
+                state.inputItems.add(
+                    ResponseInputItem.ofWebSearchCall(
+                        item.asWebSearchCall()
+                    )
+                );
+                webSearchCalls += 1;
                 continue;
             }
             if (item.isFunctionCall()) {
@@ -273,7 +303,11 @@ public final class OpenAiLunaClient implements LunaClient {
 
         if (!calls.isEmpty()) {
             state.pendingCalls = List.copyOf(pending);
-            return new LunaStep.Tools(calls, usage);
+            return new LunaStep.Tools(
+                calls,
+                usage,
+                webSearchCalls
+            );
         }
 
         String text = extractOutputText(response).trim();
@@ -287,7 +321,8 @@ public final class OpenAiLunaClient implements LunaClient {
         return new LunaStep.Final(
             text,
             LunaStep.SessionState.CONTINUE,
-            usage
+            usage,
+            webSearchCalls
         );
     }
 
@@ -359,12 +394,61 @@ public final class OpenAiLunaClient implements LunaClient {
 
     private String extractOutputText(Response response) {
         StringBuilder output = new StringBuilder();
+        LinkedHashMap<String, String> sources =
+            new LinkedHashMap<>();
+
         for (ResponseOutputItem item : response.output()) {
-            item.message().ifPresent(message -> message.content().forEach(content ->
-                content.outputText().ifPresent(text -> output.append(text.text()))
-            ));
+            item.message().ifPresent(message ->
+                message.content().forEach(content ->
+                    content.outputText().ifPresent(text -> {
+                        output.append(text.text());
+                        collectWebSources(text, sources);
+                    })
+                )
+            );
+        }
+
+        if (!sources.isEmpty()) {
+            output.append("\n\n출처:");
+            int count = 0;
+            for (Map.Entry<String, String> source :
+                sources.entrySet()) {
+                if (count >= 5) {
+                    break;
+                }
+                output.append("\n- ");
+                String title = source.getValue();
+                if (title != null && !title.isBlank()) {
+                    output.append(title.trim()).append(": ");
+                }
+                output.append(source.getKey());
+                count += 1;
+            }
         }
         return output.toString();
+    }
+
+    private void collectWebSources(
+        ResponseOutputText text,
+        LinkedHashMap<String, String> sources
+    ) {
+        for (ResponseOutputText.Annotation annotation :
+            text.annotations()) {
+            if (!annotation.isUrlCitation()) {
+                continue;
+            }
+            ResponseOutputText.Annotation.UrlCitation citation =
+                annotation.asUrlCitation();
+            String url = citation.url();
+            if (
+                url == null
+                    || url.isBlank()
+                    || sources.containsKey(url)
+            ) {
+                continue;
+            }
+            sources.put(url, citation.title());
+        }
     }
 
     private static OpenAIClientAsync createClient(String apiKey) {

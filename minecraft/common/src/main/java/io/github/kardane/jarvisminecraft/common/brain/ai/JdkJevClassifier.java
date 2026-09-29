@@ -36,6 +36,8 @@ public final class JdkJevClassifier implements JevClassifier {
             "Historical block/player activity that requires a history provider.",
             JevCategory.REGION_QUERY,
             "Protected region, region flags, membership, ownership, or build protection.",
+            JevCategory.WEB_QUERY,
+            "Current or external information that requires searching the public web, such as recent Minecraft, Paper, plugin, outage, documentation, or other up-to-date facts.",
             JevCategory.ACTION_REQUEST,
             "The user explicitly asks JARVIS to perform a supported server-side action.",
             JevCategory.GENERAL,

@@ -10,10 +10,13 @@ import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolNam
 public sealed interface LunaStep permits LunaStep.Final, LunaStep.Tools {
     Usage usage();
 
+    int webSearchCalls();
+
     record Final(
         String text,
         SessionState sessionState,
-        Usage usage
+        Usage usage,
+        int webSearchCalls
     ) implements LunaStep {
         public Final(
             String text,
@@ -22,7 +25,8 @@ public sealed interface LunaStep permits LunaStep.Final, LunaStep.Tools {
             this(
                 text,
                 sessionState,
-                Usage.unavailable()
+                Usage.unavailable(),
+                0
             );
         }
 
@@ -30,15 +34,36 @@ public sealed interface LunaStep permits LunaStep.Final, LunaStep.Tools {
             text = Objects.requireNonNull(text, "text");
             Objects.requireNonNull(sessionState, "sessionState");
             Objects.requireNonNull(usage, "usage");
+            if (webSearchCalls < 0) {
+                throw new IllegalArgumentException(
+                    "webSearchCalls must be non-negative."
+                );
+            }
+        }
+
+        public Final(
+            String text,
+            SessionState sessionState,
+            Usage usage
+        ) {
+            this(text, sessionState, usage, 0);
         }
     }
 
     record Tools(
         List<ToolCall> calls,
-        Usage usage
+        Usage usage,
+        int webSearchCalls
     ) implements LunaStep {
         public Tools(List<ToolCall> calls) {
-            this(calls, Usage.unavailable());
+            this(calls, Usage.unavailable(), 0);
+        }
+
+        public Tools(
+            List<ToolCall> calls,
+            Usage usage
+        ) {
+            this(calls, usage, 0);
         }
 
         public Tools {
@@ -46,6 +71,11 @@ public sealed interface LunaStep permits LunaStep.Final, LunaStep.Tools {
             Objects.requireNonNull(usage, "usage");
             if (calls.isEmpty()) {
                 throw new IllegalArgumentException("Luna Tool step must contain calls.");
+            }
+            if (webSearchCalls < 0) {
+                throw new IllegalArgumentException(
+                    "webSearchCalls must be non-negative."
+                );
             }
         }
     }

@@ -166,6 +166,10 @@ final class RequestPlanner {
                 "reasoning", classification.reasoning(),
                 "engagement", classification.engagement(),
                 "confidence", classification.confidence(),
+                "engagementConfidence",
+                classification.engagementConfidence(),
+                "reasoningConfidence",
+                classification.reasoningConfidence(),
                 "latencyMs", latency
             )
         );

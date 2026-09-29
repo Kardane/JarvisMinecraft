@@ -208,7 +208,7 @@ public final class ToolSpec {
             variant(
                 ToolName.RUN_COMMAND.wireName(),
                 ToolName.RUN_COMMAND,
-                "Execute one server command as console only when its command root is enabled in actions.properties. Use only for an explicit user-requested server action. Do not include a leading slash.",
+                "Execute one server command as console only when run_command and its command.<root> entry are enabled in tools.properties. Use only for an explicit user-requested server action. Do not include a leading slash.",
                 shape(
                     values -> new CommandArguments(
                         values.get("command")
@@ -341,6 +341,16 @@ public final class ToolSpec {
             )
         );
 
+        register(
+            ToolName.WEB_SEARCH,
+            variant(
+                ToolName.WEB_SEARCH.wireName(),
+                ToolName.WEB_SEARCH,
+                "Search the public web using the OpenAI Responses built-in web search Tool.",
+                shape(values -> new NoArguments())
+            )
+        );
+
         if (VARIANTS.size() != ToolName.values().length) {
             throw new IllegalStateException(
                 "Every ToolName must have exactly one ToolSpec registration."
@@ -390,7 +400,10 @@ public final class ToolSpec {
         Objects.requireNonNull(activeTools, "activeTools");
         List<AiDefinition> output = new ArrayList<>();
         for (ToolName tool : ToolName.values()) {
-            if (activeTools.contains(tool)) {
+            if (
+                activeTools.contains(tool)
+                    && tool != ToolName.WEB_SEARCH
+            ) {
                 variants(tool).forEach(variant -> output.add(variant.definition()));
             }
         }

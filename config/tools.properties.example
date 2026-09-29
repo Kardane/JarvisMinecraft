@@ -16,6 +16,7 @@ get_player=true
 get_player_location=true
 get_nearby_players=true
 get_world_info=true
+web_search=true
 
 teleport_staff=false
 weather_set=false

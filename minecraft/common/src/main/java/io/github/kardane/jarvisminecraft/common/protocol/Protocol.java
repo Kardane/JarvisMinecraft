@@ -58,6 +58,8 @@ public final class Protocol {
         TIME_SET("time_set", "world.time.set", true, Risk.LOW),
         @SerializedName("run_command")
         RUN_COMMAND("run_command", "command.execute", true, Risk.CRITICAL),
+        @SerializedName("web_search")
+        WEB_SEARCH("web_search", "web.search", false, Risk.READ_ONLY),
         @SerializedName("schedule_action")
         SCHEDULE_ACTION("schedule_action", "action.schedule", true, Risk.LOW),
         @SerializedName("cancel_scheduled_action")

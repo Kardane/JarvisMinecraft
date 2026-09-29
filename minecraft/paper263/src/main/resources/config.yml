@@ -91,8 +91,9 @@ jarvis:
       volume: 1.0
       pitch: 1.0
 
-    # Appends only this icon to final/error replies. Hover it to view Luna
-    # token usage and total request processing time. The icon supports the same
+    # Appends only this icon to final/error replies. Hover it to view the
+    # resolved Luna reasoning level, token usage, and total request processing
+    # time. The icon supports the same
     # & formatting and <#RRGGBB> hex colors as response.prefix.
     metrics:
       enabled: true

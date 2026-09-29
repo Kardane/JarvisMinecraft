@@ -8,8 +8,8 @@ softdepend: [CMILib, CMI, CoreProtect, WorldEdit, WorldGuard]
 
 commands:
   jm:
-    description: Shows JARVIS status or reloads runtime configuration.
-    usage: /jm <status|reload>
+    description: Shows JARVIS status/statistics or reloads runtime configuration.
+    usage: /jm <status|stats|reload>
     permission: jarvisminecraft.status
 
 permissions:

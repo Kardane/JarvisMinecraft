@@ -11,7 +11,10 @@ import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationManag
 import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationReloadService;
 import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisStatsFormatter;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
+import io.github.kardane.jarvisminecraft.common.logging.RuntimeStatistics;
+import io.github.kardane.jarvisminecraft.common.logging.StatisticsJarvisLog;
 import io.github.kardane.jarvisminecraft.common.config.PropertiesJarvisConfigSource;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
@@ -70,6 +73,27 @@ public final class JarvisFabricMod implements ModInitializer {
                                     }
                                     JarvisStatusFormatter.styledLines(
                                         current.brain().status()
+                                    ).forEach(line ->
+                                        context.getSource().sendFeedback(
+                                            () -> renderStatusLine(line),
+                                            false
+                                        )
+                                    );
+                                    return 1;
+                                })
+                        )
+                        .then(
+                            CommandManager.literal("stats")
+                                .executes(context -> {
+                                    RuntimeState current = runtime;
+                                    if (current == null) {
+                                        context.getSource().sendError(
+                                            Text.literal("JARVIS runtime is not running.")
+                                        );
+                                        return 0;
+                                    }
+                                    JarvisStatsFormatter.styledLines(
+                                        current.statistics().snapshot()
                                     ).forEach(line ->
                                         context.getSource().sendFeedback(
                                             () -> renderStatusLine(line),
@@ -282,11 +306,16 @@ public final class JarvisFabricMod implements ModInitializer {
             return;
         }
 
-        JarvisLog operationalLog = new ConfiguredJarvisLog(
-            configManager,
-            new FabricJarvisLog(LOGGER)
-        );
         Clock clock = Clock.systemUTC();
+        RuntimeStatistics statistics =
+            new RuntimeStatistics(clock.instant());
+        JarvisLog operationalLog = new StatisticsJarvisLog(
+            statistics,
+            new ConfiguredJarvisLog(
+                configManager,
+                new FabricJarvisLog(LOGGER)
+            )
+        );
         FabricPlatformAccess platform =
             new MinecraftFabricPlatformAccess(server);
         ServerScheduler serverScheduler = new FabricServerScheduler(server);
@@ -359,6 +388,7 @@ public final class JarvisFabricMod implements ModInitializer {
             brain,
             chat,
             runtimeConfiguration,
+            statistics,
             new RuntimeConfigurationReloadService(
                 runtimeConfiguration
             ),
@@ -409,6 +439,7 @@ public final class JarvisFabricMod implements ModInitializer {
         BrainGateway brain,
         FabricChatController chat,
         RuntimeConfigurationManager runtimeConfiguration,
+        RuntimeStatistics statistics,
         RuntimeConfigurationReloadService reloadService,
         ConfigManager configManager
     ) {

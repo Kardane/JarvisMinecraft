@@ -11,7 +11,10 @@ import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationManag
 import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationReloadService;
 import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisStatsFormatter;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
+import io.github.kardane.jarvisminecraft.common.logging.RuntimeStatistics;
+import io.github.kardane.jarvisminecraft.common.logging.StatisticsJarvisLog;
 import io.github.kardane.jarvisminecraft.common.config.PropertiesJarvisConfigSource;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
@@ -89,6 +92,27 @@ public final class JarvisNeoForgeMod {
                             }
                             JarvisStatusFormatter.styledLines(
                                 current.brain().status()
+                            ).forEach(line ->
+                                context.getSource().sendSuccess(
+                                    () -> renderStatusLine(line),
+                                    false
+                                )
+                            );
+                            return 1;
+                        })
+                )
+                .then(
+                    Commands.literal("stats")
+                        .executes(context -> {
+                            RuntimeState current = runtime;
+                            if (current == null) {
+                                context.getSource().sendFailure(
+                                    Component.literal("JARVIS runtime is not running.")
+                                );
+                                return 0;
+                            }
+                            JarvisStatsFormatter.styledLines(
+                                current.statistics().snapshot()
                             ).forEach(line ->
                                 context.getSource().sendSuccess(
                                     () -> renderStatusLine(line),
@@ -286,11 +310,16 @@ public final class JarvisNeoForgeMod {
             return;
         }
 
-        JarvisLog operationalLog = new ConfiguredJarvisLog(
-            configManager,
-            new NeoForgeJarvisLog(LOGGER)
-        );
         Clock clock = Clock.systemUTC();
+        RuntimeStatistics statistics =
+            new RuntimeStatistics(clock.instant());
+        JarvisLog operationalLog = new StatisticsJarvisLog(
+            statistics,
+            new ConfiguredJarvisLog(
+                configManager,
+                new NeoForgeJarvisLog(LOGGER)
+            )
+        );
         NeoForgeTickSampler tickSampler = new NeoForgeTickSampler();
         NeoForgePlatformAccess platform =
             new MinecraftNeoForgePlatformAccess(server, tickSampler);
@@ -365,6 +394,7 @@ public final class JarvisNeoForgeMod {
             chat,
             tickSampler,
             runtimeConfiguration,
+            statistics,
             new RuntimeConfigurationReloadService(
                 runtimeConfiguration
             ),
@@ -469,6 +499,7 @@ public final class JarvisNeoForgeMod {
         NeoForgeChatController chat,
         NeoForgeTickSampler tickSampler,
         RuntimeConfigurationManager runtimeConfiguration,
+        RuntimeStatistics statistics,
         RuntimeConfigurationReloadService reloadService,
         ConfigManager configManager
     ) {

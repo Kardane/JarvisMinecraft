@@ -160,6 +160,11 @@ final class GatewayRequestCoordinator {
                         "sessionId", request.sessionId(),
                         "requesterUuid", request.requesterUuid(),
                         "origin", request.mode(),
+                        "reasoning", reply.reasoningLevel(),
+                        "usageComplete", reply.usage().complete(),
+                        "inputTokens", reply.usage().inputTokens(),
+                        "outputTokens", reply.usage().outputTokens(),
+                        "totalTokens", reply.usage().totalTokens(),
                         "latencyMs", latencyMillis
                     )
                 );

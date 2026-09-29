@@ -44,6 +44,10 @@ public final class DeterministicRoutePolicy {
             )
         );
         routes.put(
+            JevCategory.WEB_QUERY,
+            EnumSet.of(ToolName.WEB_SEARCH)
+        );
+        routes.put(
             JevCategory.ACTION_REQUEST,
             EnumSet.of(
                 ToolName.GET_PLAYER,

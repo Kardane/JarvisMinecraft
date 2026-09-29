@@ -12,7 +12,10 @@ import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationManag
 import io.github.kardane.jarvisminecraft.common.config.RuntimeConfigurationReloadService;
 import io.github.kardane.jarvisminecraft.common.logging.ConfiguredJarvisLog;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLog;
+import io.github.kardane.jarvisminecraft.common.logging.JarvisStatsFormatter;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisStatusFormatter;
+import io.github.kardane.jarvisminecraft.common.logging.RuntimeStatistics;
+import io.github.kardane.jarvisminecraft.common.logging.StatisticsJarvisLog;
 import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
@@ -51,6 +54,7 @@ public final class JarvisPaper263Plugin extends JavaPlugin {
     private InteractionCoordinator interactions;
     private PaperPlatformAccess platform;
     private IntegrationRegistry integrations;
+    private RuntimeStatistics statistics;
 
     @Override
     public void onEnable() {
@@ -118,12 +122,15 @@ public final class JarvisPaper263Plugin extends JavaPlugin {
                 runtimeConfiguration
             );
         configManager = loadedConfigManager;
-        JarvisLog operationalLog = new ConfiguredJarvisLog(
-            configManager,
-            new PaperJarvisLog(getLogger())
-        );
-
         Clock clock = Clock.systemUTC();
+        statistics = new RuntimeStatistics(clock.instant());
+        JarvisLog operationalLog = new StatisticsJarvisLog(
+            statistics,
+            new ConfiguredJarvisLog(
+                configManager,
+                new PaperJarvisLog(getLogger())
+            )
+        );
         platform = new BukkitPaperPlatformAccess(getServer());
         ServerScheduler serverScheduler = new PaperServerScheduler(this);
 
@@ -178,12 +185,22 @@ public final class JarvisPaper263Plugin extends JavaPlugin {
         if (statusCommand != null) {
             statusCommand.setExecutor((sender, command, label, args) -> {
                 if (args.length != 1) {
-                    sender.sendMessage("/jm <status|reload>");
+                    sender.sendMessage("/jm <status|stats|reload>");
                     return true;
                 }
                 if ("status".equalsIgnoreCase(args[0])) {
                     JarvisStatusFormatter.styledLines(
                         brain.status()
+                    ).forEach(line ->
+                        sender.sendMessage(
+                            renderStatusLine(line)
+                        )
+                    );
+                    return true;
+                }
+                if ("stats".equalsIgnoreCase(args[0])) {
+                    JarvisStatsFormatter.styledLines(
+                        statistics.snapshot()
                     ).forEach(line ->
                         sender.sendMessage(
                             renderStatusLine(line)
@@ -219,7 +236,7 @@ public final class JarvisPaper263Plugin extends JavaPlugin {
                         );
                     return true;
                 }
-                sender.sendMessage("/jm <status|reload>");
+                sender.sendMessage("/jm <status|stats|reload>");
                 return true;
             });
         }
@@ -272,6 +289,7 @@ public final class JarvisPaper263Plugin extends JavaPlugin {
         }
         configManager = null;
         runtimeConfiguration = null;
+        statistics = null;
     }
 
     private Component renderStatusLine(

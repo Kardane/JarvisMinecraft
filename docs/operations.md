@@ -52,6 +52,7 @@ Example:
 ~~~properties
 get_server_status=true
 get_player_location=true
+web_search=true
 teleport_staff=false
 lookup_area_history=true
 get_region_info=true
@@ -119,9 +120,9 @@ Response configuration under `jarvis.response.*` includes:
   configured sound only to the requester.
 - `metrics.enabled/icon`: append only the configured icon to final/error
   replies. The icon supports the same legacy `&` formatting and
-  `<#RRGGBB>` hex colors as the prefix. Hovering the icon shows aggregate
-  Luna input/output/total token usage when available plus end-to-end request
-  processing time.
+  `<#RRGGBB>` hex colors as the prefix. Hovering the icon shows the resolved
+  Luna reasoning level, aggregate Luna input/output/total token usage when
+  available, and end-to-end request processing time.
 
 Korean player-facing prose is governed by a compiled `KoreanResponsePolicy`
 inserted into Luna Core Policy before operator persona/knowledge. It keeps the runtime
@@ -478,6 +479,13 @@ A Tool appearing as registered does not grant authority. Actual exposure still
 depends on current OP authority, Jev route, execution policy, scheduling policy,
 and provider availability.
 
+`web_search` is a read-only virtual Tool backed by OpenAI Responses built-in
+web search rather than a Minecraft-side function handler. It is generated in
+`tools.properties` like other Tools and defaults to `true`. Jev routes
+current/external-information requests to `WEB_QUERY`; if enabled, Luna receives
+the built-in web search Tool with live external access. Web answers append up to
+five cited source titles/URLs to the Minecraft response.
+
 ## Startup
 
 At platform startup JARVIS:
@@ -538,7 +546,17 @@ Post-execution audit failure never triggers a Tool retry.
 
 Operational console logging is separate from the JSONL Audit.
 
-Default categories cover request lifecycle, Jev/Luna, Tool lifecycle, scheduling, ACTIVE proactive decisions, and Audit health transitions. Raw player chat, raw prompts/responses, provider keys, Authorization headers, and complete environment/config dumps are not operational log fields. Response hover metrics expose token counts and duration only; they do not expose prompts, reasoning, Tool arguments, or secrets.
+Default categories cover request lifecycle, Jev/Luna, Tool lifecycle, scheduling, ACTIVE proactive decisions, and Audit health transitions. Raw player chat, raw prompts/responses, provider keys, Authorization headers, and complete environment/config dumps are not operational log fields. Response hover metrics expose the resolved reasoning level, token counts, and duration; they do not expose hidden reasoning, prompts, Tool arguments, or secrets.
+
+Runtime statistics are accumulated in memory from these structured events from
+server/JARVIS startup until shutdown. They include request success/failure,
+success rate, average latency, P95 latency over the most recent 4,096 completed
+or failed requests, Jev classification/failure/fallback counts, Jev-selected
+reasoning distribution and average reasoning confidence, final resolved Luna
+reasoning distribution, resolved route distribution, Luna token totals,
+round/latency/web-search counts, and Tool call/failure/denial counts. Statistics
+do not persist across server restarts and are collected independently of console
+log visibility filters.
 
 Common settings:
 
@@ -565,10 +583,17 @@ Paper/Fabric/NeoForge expose OP-only:
 
 ```text
 /jm status
+/jm stats
 /jm reload
 ```
 
 The status summary includes runtime state, interaction/audience/execution mode, scheduling state, AI queue/active counts, proactive in-flight state, and Audit health/queue/file summary. It never prints secrets or raw AI/chat content.
+
+`/jm stats` shows the in-memory runtime statistics described above, including
+the NONE/LOW/MEDIUM/HIGH reasoning distribution selected by Jev, the final
+reasoning distribution actually resolved for Luna after policy/fallback,
+resolved route distribution, request P95 latency, and the three most-used
+Minecraft function Tools. OpenAI built-in web searches are counted separately.
 
 `/jm reload` asynchronously reloads structured config, `persona.md`, and
 `knowledge/*.md`. Disk I/O runs on the dedicated `jarvis-config-reload`

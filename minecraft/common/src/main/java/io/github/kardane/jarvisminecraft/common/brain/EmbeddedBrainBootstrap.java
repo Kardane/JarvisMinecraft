@@ -192,6 +192,7 @@ final class EmbeddedBrainBootstrap {
             runtimeTools.addAll(registry.registeredTools());
             runtimeTools.add(ToolName.SCHEDULE_ACTION);
             runtimeTools.add(ToolName.CANCEL_SCHEDULED_ACTION);
+            runtimeTools.add(ToolName.WEB_SEARCH);
             registry.declarePolicyTools(runtimeTools);
 
             EmbeddedBrain brain = new EmbeddedBrain(
