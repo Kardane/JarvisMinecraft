@@ -45,7 +45,16 @@ public final class ConversationArchiveVerificationMain {
             "jarvis-conversation-disabled-"
         );
         ConfigManager config =
-            new ConfigManager(JarvisConfig::defaults);
+            new ConfigManager(() -> {
+                Properties properties = new Properties();
+                properties.setProperty(
+                    "jarvis.conversation-archive.enabled",
+                    "false"
+                );
+                return JarvisConfigLoader.load(
+                    PropertiesJarvisConfigSource.from(properties)
+                );
+            });
 
         AsyncConversationArchive archive =
             new AsyncConversationArchive(

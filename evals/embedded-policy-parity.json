@@ -105,7 +105,53 @@
         "get_server_status",
         "get_player_location"
       ],
-      "expectedTools": [],
+      "expectedTools": [
+        "get_player_location"
+      ],
+      "expectedFallback": null
+    },
+    {
+      "name": "history-route-context-tools",
+      "mode": "CLASSIFICATION",
+      "category": "HISTORY_QUERY",
+      "confidence": 0.96,
+      "abstainBelow": null,
+      "activeTools": [
+        "get_player",
+        "get_player_location",
+        "lookup_area_history",
+        "lookup_player_history",
+        "teleport_staff"
+      ],
+      "expectedTools": [
+        "get_player",
+        "get_player_location",
+        "lookup_area_history",
+        "lookup_player_history"
+      ],
+      "expectedFallback": null
+    },
+    {
+      "name": "region-route-context-tools",
+      "mode": "CLASSIFICATION",
+      "category": "REGION_QUERY",
+      "confidence": 0.96,
+      "abstainBelow": null,
+      "activeTools": [
+        "get_player",
+        "get_player_location",
+        "get_regions_at_location",
+        "get_region_info",
+        "check_build_permission",
+        "teleport_staff"
+      ],
+      "expectedTools": [
+        "get_player",
+        "get_player_location",
+        "get_regions_at_location",
+        "get_region_info",
+        "check_build_permission"
+      ],
       "expectedFallback": null
     }
   ],

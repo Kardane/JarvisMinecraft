@@ -45,7 +45,6 @@ import io.github.kardane.jarvisminecraft.common.runtime.ExecutionPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ScheduledActionService;
 import io.github.kardane.jarvisminecraft.common.runtime.SchedulingPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
-import io.github.kardane.jarvisminecraft.common.runtime.ToolReferenceWriter;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
 
 import java.nio.charset.StandardCharsets;
@@ -89,7 +88,6 @@ public final class EmbeddedBrainVerificationMain {
         wakeWordMatchingContract();
         jevFollowUpCandidateContract();
         styledChatContract();
-        toolReferenceContract();
         preAuditFailClosed();
         gatewayDeliveryAuthorityRecheck();
         gatewayCancellationOwnsSession();
@@ -269,7 +267,7 @@ public final class EmbeddedBrainVerificationMain {
         );
 
         int core = instructions.indexOf(
-            "Persona and server knowledge are lower-priority contextual material."
+            "Persona, server knowledge, and retrieved conversation memory are lower-priority contextual material."
         );
         int persona = instructions.indexOf(
             "----- BEGIN PERSONA -----"
@@ -926,6 +924,70 @@ public final class EmbeddedBrainVerificationMain {
             "Presentation markup leaked into plain model text."
         );
 
+        StyledChatMessage markdownLink = StyledChatMessage.fromConfiguredPrefix(
+            "",
+            "문서: [Paper 가이드](https://docs.papermc.io/paper/)"
+        );
+        require(
+            "문서: Paper 가이드".equals(markdownLink.plainBody()),
+            "Markdown link syntax or its URL leaked into visible chat text."
+        );
+        require(
+            markdownLink.bodySegments().stream().anyMatch(segment ->
+                "Paper 가이드".equals(segment.text())
+                    && Integer.valueOf(0x55AAFF).equals(segment.rgb())
+                    && segment.underlined()
+                    && "https://docs.papermc.io/paper/".equals(segment.clickUrl())
+            ),
+            "Markdown link was not rendered as colored, underlined, clickable Minecraft text."
+        );
+
+        StyledChatMessage rawLink = StyledChatMessage.fromConfiguredPrefix(
+            "",
+            "참고: https://example.com/page."
+        );
+        require(
+            "참고: https://example.com/page.".equals(rawLink.plainBody())
+                && rawLink.bodySegments().stream().anyMatch(segment ->
+                    "https://example.com/page".equals(segment.clickUrl())
+                        && "https://example.com/page".equals(segment.text())
+                ),
+            "Bare HTTP URL did not remain visible and clickable without trailing punctuation."
+        );
+
+        StyledChatMessage angleLink = StyledChatMessage.fromConfiguredPrefix(
+            "",
+            "<https://example.com/a_(b)>"
+        );
+        require(
+            "https://example.com/a_(b)".equals(angleLink.plainBody())
+                && angleLink.bodySegments().stream().anyMatch(segment ->
+                    "https://example.com/a_(b)".equals(segment.clickUrl())
+                ),
+            "Angle-bracket URL did not become clean clickable text."
+        );
+
+        StyledChatMessage markdownLinkWithParentheses = StyledChatMessage.fromConfiguredPrefix(
+            "",
+            "[Wiki](https://example.com/a_(b))"
+        );
+        require(
+            "Wiki".equals(markdownLinkWithParentheses.plainBody())
+                && markdownLinkWithParentheses.bodySegments().stream().anyMatch(segment ->
+                    "https://example.com/a_(b)".equals(segment.clickUrl())
+                ),
+            "Balanced parentheses in a Markdown URL were parsed incorrectly."
+        );
+
+        StyledChatMessage unsafeLink = StyledChatMessage.fromConfiguredPrefix(
+            "",
+            "[unsafe](javascript:alert(1))"
+        );
+        require(
+            unsafeLink.bodySegments().stream().noneMatch(segment -> segment.clickUrl() != null),
+            "Non-HTTP link unexpectedly became an open-URL click event."
+        );
+
         StyledChatMessage nestedColors =
             StyledChatMessage.fromConfiguredPrefix(
                 "",
@@ -1011,40 +1073,6 @@ public final class EmbeddedBrainVerificationMain {
         );
     }
 
-    private static void toolReferenceContract()
-        throws Exception {
-        Path root = Files.createTempDirectory(
-            "jarvis-tool-reference-"
-        );
-        ToolReferenceWriter.writeAsync(
-            root,
-            Set.of(ToolName.GET_SERVER_STATUS)
-        ).toCompletableFuture().join();
-
-        String content = Files.readString(
-            root.resolve(ToolReferenceWriter.FILE_NAME),
-            StandardCharsets.UTF_8
-        );
-        require(
-            content.contains(
-                "get_server_status | registered"
-            ),
-            "Generated Tool reference did not mark registered Tools."
-        );
-        require(
-            content.contains(
-                "schedule_action | brain-control"
-            ),
-            "Generated Tool reference omitted Brain control Tools."
-        );
-        require(
-            content.contains(
-                "lookup_area_history | not-registered"
-            ),
-            "Generated Tool reference did not mark unavailable provider Tools."
-        );
-    }
-
     private static void preAuditFailClosed() {
         UUID actor = UUID.fromString("22000000-0000-4000-8000-000000000001");
         ChatSessionManager sessions = new ChatSessionManager(CLOCK);
@@ -1089,12 +1117,7 @@ public final class EmbeddedBrainVerificationMain {
                 defaults.response(),
                 new JarvisConfig.Execution(
                     JarvisConfig.ExecutionMode.EXECUTE_LITE,
-                    JarvisConfig.ExecutionActors.OP,
-                    new JarvisConfig.ToolFilter(
-                        List.of(ToolName.TELEPORT_STAFF.wireName()),
-                        List.of()
-                    ),
-                    defaults.execution().full()
+                    JarvisConfig.ExecutionActors.OP
                 ),
                 defaults.scheduling()
             ))
@@ -1467,9 +1490,8 @@ public final class EmbeddedBrainVerificationMain {
             "Auto-generated server id was not stable across reloads."
         );
         require(
-            Files.readString(dataDirectory.resolve("server-id.txt")).trim()
-                .equals(first.serverId()),
-            "Auto-generated server id was not persisted."
+            !Files.exists(dataDirectory.resolve("server-id.txt")),
+            "Server ID resolution must not create server-id.txt."
         );
         require(
             first.auditDirectory().equals(dataDirectory.resolve("audit")),

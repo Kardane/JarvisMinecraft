@@ -286,10 +286,6 @@ public final class AsyncConversationArchive
         }
 
         Set<String> queryTokens = tokenize(query);
-        boolean memoryIntent = isMemoryIntent(query);
-        if (queryTokens.isEmpty() && !memoryIntent) {
-            return ConversationMemorySnapshot.empty();
-        }
 
         Instant oldestAllowed = clock.instant().minus(
             Duration.ofDays(settings.lookbackDays())
@@ -364,8 +360,7 @@ public final class AsyncConversationArchive
                 candidate(
                     turn,
                     query,
-                    queryTokens,
-                    memoryIntent
+                    queryTokens
                 )
             )
             .filter(Objects::nonNull)
@@ -520,8 +515,7 @@ public final class AsyncConversationArchive
     private MemoryCandidate candidate(
         MemoryTurn turn,
         String query,
-        Set<String> queryTokens,
-        boolean memoryIntent
+        Set<String> queryTokens
     ) {
         String combined = (
             turn.userText()
@@ -542,16 +536,7 @@ public final class AsyncConversationArchive
         boolean phraseMatch =
             normalizedQuery.length() >= 4
                 && combined.contains(normalizedQuery);
-        if (
-            overlap == 0
-                && !phraseMatch
-                && !memoryIntent
-        ) {
-            return null;
-        }
-
-        int score = overlap * 100
-            + (phraseMatch ? 50 : 0);
+        int score = overlap * 100 + (phraseMatch ? 50 : 0);
         return new MemoryCandidate(
             turn.at(),
             turn.userText(),
@@ -572,23 +557,6 @@ public final class AsyncConversationArchive
             }
         }
         return tokens;
-    }
-
-    private boolean isMemoryIntent(String query) {
-        String value = query.toLowerCase(Locale.ROOT);
-        return value.contains("기억")
-            || value.contains("전에")
-            || value.contains("예전")
-            || value.contains("지난번")
-            || value.contains("아까")
-            || value.contains("말했")
-            || value.contains("얘기했")
-            || value.contains("취향")
-            || value.contains("remember")
-            || value.contains("previous")
-            || value.contains("earlier")
-            || value.contains("last time")
-            || value.contains("preference");
     }
 
     private String renderMemory(

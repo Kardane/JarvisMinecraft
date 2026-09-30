@@ -128,21 +128,21 @@ Core scenarios:
 - Jev `RESPOND` at or above the configured follow-up confidence threshold promotes the candidate to FOLLOW_UP
 - Jev `IGNORE`, low confidence, timeout, or failure produces no JARVIS response
 - unrelated public chat during an active session is not automatically treated as a follow-up
-- generated `tools.md` reflects registered, unavailable-provider, and Brain-control Tools
-- conversation archive disabled by default creates no archive files
+- `tools.properties` reflects registered Tools and preserves operator choices
+- disabling the conversation archive creates no archive files
 - enabling conversation archive writes DIRECT/FOLLOW_UP USER and ASSISTANT JSONL records
 - archive rotation respects max-file-bytes/max-files
 - Tool results and ACTIVE proactive ambient context do not appear in conversation archive files
 - conversation memory retrieves only the same requester/server and previous sessions
 - relevant memory outranks unrelated prior turns
-- explicit memory-intent queries can fall back to recent previous-session turns
+- unrelated queries can include recent previous-session turns when slots remain
 - retrieved context stays within max-context-bytes
 - one request retains one immutable memory snapshot across every Luna Tool round
 - edit `persona.md`, reload, and confirm only new requests use the new persona
 - add ordered `knowledge/*.md`, reload, and confirm server-specific context is available
 - malformed/oversized prompt content fails reload while the previous config/persona/knowledge stays active
 - mutation Tools are not exposed in `READ_TALK`
-- allowlisted `teleport_staff/weather_set/time_set` in `EXECUTE_LITE`
+- `teleport_staff/weather_set/time_set` enabled in `tools.properties` in `EXECUTE_LITE`
 - a non-OP admitted under `audience=ALL` can converse but receives zero Minecraft Tools
 - Tool/reply blocked across de-op/logout/session-end races
 - read-only fallback after Jev failure
@@ -162,12 +162,6 @@ Example configuration:
 execution:
   mode: EXECUTE_LITE
   actors: OP
-  lite:
-    allow-tools:
-      - teleport_staff
-      - weather_set
-      - time_set
-
 scheduling:
   enabled: true
   max-delay-seconds: 60

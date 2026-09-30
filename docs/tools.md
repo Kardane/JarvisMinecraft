@@ -35,7 +35,7 @@ Even if the Brain invents an arbitrary Tool name or command root, the Adapter do
 | run_command | command.execute | mutation | CRITICAL |
 
 The two structured world Tools do not execute a raw console command. Each operates only on one currently loaded world
-through direct platform APIs and must pass both the execution-policy allowlist and a fresh current-online-OP
+through direct platform APIs and must pass `tools.properties`, execution-mode checks, and a fresh current-online-OP
 check.
 
 ### v0.1.1
@@ -306,7 +306,7 @@ Policy rules:
 - the audit summary records only the command root, not the full command arguments, to avoid persisting potentially sensitive command text;
 - the Tool result returns only the root, platform result code, and completion flag.
 
-The generic command Tool is intentionally classified `CRITICAL` and uses the same action-id deduplication, pre-execution audit, deadline, and current-OP checks as other state-changing Tools. The per-root `actions.properties` policy is the explicit execution authority for this Tool and is independent from the coarse structured-Tool allowlists under `jarvis.execution.*`.
+The generic command Tool is intentionally classified `CRITICAL` and uses the same action-id deduplication, pre-execution audit, deadline, and current-OP checks as other state-changing Tools. `run_command` and each command root must be enabled in `tools.properties`; the `EXECUTE` mode is required.
 
 ## 11. lookup_area_history — v0.1.1
 

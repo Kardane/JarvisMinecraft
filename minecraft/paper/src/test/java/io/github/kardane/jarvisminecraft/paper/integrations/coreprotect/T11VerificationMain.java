@@ -25,6 +25,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 public final class T11VerificationMain {
     private static final UUID ACTOR = UUID.fromString("00000000-0000-4000-8000-000000001101");
@@ -42,6 +43,7 @@ public final class T11VerificationMain {
         pagingAndSessionBindingContract();
         emptyAndPartialResultContract();
         timeoutContract();
+        queryFailureDiagnosticContract();
         playerUuidContract();
         toolRegistrationContract();
         System.out.println("T11 verification OK");
@@ -145,6 +147,31 @@ public final class T11VerificationMain {
         }
     }
 
+    private static void queryFailureDiagnosticContract() throws Exception {
+        FakeBackend backend = new FakeBackend();
+        backend.failure = new IllegalStateException("query details must not be logged");
+        AtomicReference<CoreProtectHistoryProvider.QueryFailure> diagnostic = new AtomicReference<>();
+        try (ProviderFixture fixture = provider(backend, Duration.ofSeconds(1), diagnostic::set)) {
+            ToolResult result = await(fixture.provider.lookupArea(
+                context(),
+                new AreaHistoryArguments(CENTER, 10, 1800, null, 10)
+            ));
+            require(
+                result.error() != null
+                    && result.error().code() == Protocol.ErrorCode.PROVIDER_UNAVAILABLE,
+                "unexpected backend failure must retain the public provider error"
+            );
+            require(
+                diagnostic.get() != null
+                    && "area".equals(diagnostic.get().operation())
+                    && IllegalStateException.class.getName().equals(diagnostic.get().exceptionType())
+                    && diagnostic.get().rootCauseType() == null
+                    && !diagnostic.get().toString().contains("query details"),
+                "query failure diagnostics must identify the exception type without its message"
+            );
+        }
+    }
+
     private static void playerUuidContract() throws Exception {
         FakeBackend backend = new FakeBackend();
         backend.playerRecords = records(2, ACTOR);
@@ -183,6 +210,14 @@ public final class T11VerificationMain {
     }
 
     private static ProviderFixture provider(FakeBackend backend, Duration timeout) {
+        return provider(backend, timeout, ignored -> { });
+    }
+
+    private static ProviderFixture provider(
+        FakeBackend backend,
+        Duration timeout,
+        java.util.function.Consumer<CoreProtectHistoryProvider.QueryFailure> diagnostic
+    ) {
         ThreadPoolExecutor executor = new ThreadPoolExecutor(
             1, 1, 0L, TimeUnit.MILLISECONDS, new ArrayBlockingQueue<>(8),
             runnable -> {
@@ -196,7 +231,14 @@ public final class T11VerificationMain {
             thread.setDaemon(true);
             return thread;
         });
-        CoreProtectHistoryProvider provider = new CoreProtectHistoryProvider(backend, CLOCK, executor, timer, timeout);
+        CoreProtectHistoryProvider provider = new CoreProtectHistoryProvider(
+            backend,
+            CLOCK,
+            executor,
+            timer,
+            timeout,
+            diagnostic
+        );
         return new ProviderFixture(provider, executor, timer);
     }
 
@@ -226,6 +268,7 @@ public final class T11VerificationMain {
         private List<BlockChange> playerRecords = List.of();
         private CoreProtectHistoryProvider.LookupBatch batch;
         private CountDownLatch block;
+        private RuntimeException failure;
 
         @Override
         public boolean isEnabled() {
@@ -245,12 +288,18 @@ public final class T11VerificationMain {
         @Override
         public CoreProtectHistoryProvider.LookupBatch lookupArea(Object capturedCenter, Location center, int radius, int lookbackSeconds) {
             waitIfRequested();
+            if (failure != null) {
+                throw failure;
+            }
             return batch == null ? CoreProtectHistoryProvider.LookupBatch.complete(areaRecords, "CoreProtect fake") : batch;
         }
 
         @Override
         public CoreProtectHistoryProvider.LookupBatch lookupPlayer(UUID playerUuid, int lookbackSeconds) {
             waitIfRequested();
+            if (failure != null) {
+                throw failure;
+            }
             return CoreProtectHistoryProvider.LookupBatch.complete(playerRecords, "CoreProtect fake player history");
         }
 

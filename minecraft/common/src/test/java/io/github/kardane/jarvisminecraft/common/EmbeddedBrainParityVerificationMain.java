@@ -50,6 +50,7 @@ public final class EmbeddedBrainParityVerificationMain {
     public static void main(String[] args) throws Exception {
         JsonObject fixture = loadFixture();
         sharedRouteFixtures(fixture.getAsJsonArray("routeCases"));
+        cmiPlayerProfileRoute();
         sharedArgumentFixtures(fixture.getAsJsonArray("argumentCases"));
         sharedLimitFixtures(fixture.getAsJsonObject("limits"));
         sessionIsolationAndCancellation();
@@ -57,6 +58,25 @@ public final class EmbeddedBrainParityVerificationMain {
         schedulerLimitsAndCancellation();
         stateChangingTimeoutIsOutcomeUnknownAndNotRetried();
         System.out.println("Embedded Brain E12 parity verification OK");
+    }
+
+    private static void cmiPlayerProfileRoute() {
+        DeterministicRoutePolicy policy = new DeterministicRoutePolicy();
+        Set<ToolName> active = EnumSet.of(ToolName.GET_CMI_PLAYER_INFO);
+        DeterministicRoutePolicy.RoutingDecision decision = policy.route(
+            new JevClassification(
+                JevCategory.PLAYER_QUERY,
+                1.0,
+                Map.of(JevCategory.PLAYER_QUERY, 1.0),
+                "jev-test",
+                "cmi-profile-route"
+            ),
+            active
+        );
+        require(
+            decision.availableTools().equals(active),
+            "Enabled CMI profile Tool was omitted from player-query routing."
+        );
     }
 
     private static JsonObject loadFixture() throws Exception {

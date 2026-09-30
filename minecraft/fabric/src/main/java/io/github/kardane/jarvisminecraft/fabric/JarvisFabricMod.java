@@ -20,7 +20,6 @@ import io.github.kardane.jarvisminecraft.common.runtime.CommonRuntime;
 import io.github.kardane.jarvisminecraft.common.runtime.ServerScheduler;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolPolicy;
 import io.github.kardane.jarvisminecraft.common.runtime.ToolRegistry;
-import io.github.kardane.jarvisminecraft.common.runtime.ToolReferenceWriter;
 import io.github.kardane.jarvisminecraft.common.tools.StandardMinecraftTools;
 import io.github.kardane.jarvisminecraft.common.chat.ChatSessionManager;
 import io.github.kardane.jarvisminecraft.common.chat.InteractionCoordinator;
@@ -327,16 +326,6 @@ public final class JarvisFabricMod implements ModInitializer {
             clock,
             toolPolicy
         ).register(registry);
-        ToolReferenceWriter.writeAsync(
-            dataDirectory,
-            registry.registeredTools()
-        ).exceptionally(failure -> {
-            LOGGER.warning(
-                "Could not write generated JARVIS Tool reference."
-            );
-            return null;
-        });
-
         CommonRuntime commonRuntime = new CommonRuntime(
             registry,
             serverScheduler,

@@ -8,8 +8,6 @@ import java.util.Set;
 import io.github.kardane.jarvisminecraft.common.logging.JarvisLogLevel;
 import io.github.kardane.jarvisminecraft.common.prompt.PromptContentLoader;
 
-import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.Risk;
-import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolName;
 
 public record JarvisConfig(
     Interaction interaction,
@@ -185,12 +183,7 @@ public record JarvisConfig(
             ),
             ConversationArchive.defaults(),
             ConversationMemory.defaults(),
-            new Execution(
-                ExecutionMode.READ_TALK,
-                ExecutionActors.OP,
-                new ToolFilter(List.of(), List.of()),
-                new ToolFilter(List.of(), List.of())
-            ),
+            new Execution(ExecutionMode.READ_TALK, ExecutionActors.OP),
             new Scheduling(true, 60, 60),
             Logging.defaults()
         );
@@ -599,39 +592,11 @@ public record JarvisConfig(
 
     public record Execution(
         ExecutionMode mode,
-        ExecutionActors actors,
-        ToolFilter lite,
-        ToolFilter full
+        ExecutionActors actors
     ) {
         public Execution {
             Objects.requireNonNull(mode, "execution.mode");
             Objects.requireNonNull(actors, "execution.actors");
-            Objects.requireNonNull(lite, "execution.lite");
-            Objects.requireNonNull(full, "execution.full");
-            validateExecutionFilter(lite, true);
-            validateExecutionFilter(full, false);
-        }
-    }
-
-    public record ToolFilter(
-        List<String> allowTools,
-        List<String> denyTools
-    ) {
-        public ToolFilter {
-            allowTools = normalizedList(
-                allowTools,
-                "execution.allowTools",
-                0,
-                128,
-                96
-            );
-            denyTools = normalizedList(
-                denyTools,
-                "execution.denyTools",
-                0,
-                128,
-                96
-            );
         }
     }
 
@@ -688,68 +653,6 @@ public record JarvisConfig(
                 30
             );
         }
-    }
-
-    private static void validateExecutionFilter(
-        ToolFilter filter,
-        boolean lite
-    ) {
-        for (String wireName : filter.allowTools()) {
-            ToolName tool = requireKnownTool(
-                wireName,
-                "execution.allowTools"
-            );
-            if (
-                tool == ToolName.SCHEDULE_ACTION
-                    || tool == ToolName.CANCEL_SCHEDULED_ACTION
-            ) {
-                throw new IllegalArgumentException(
-                    "Scheduling control Tools are configured through jarvis.scheduling, not execution allow-tools: "
-                        + wireName
-                );
-            }
-            if (!tool.stateChanging()) {
-                throw new IllegalArgumentException(
-                    "execution allow-tools may contain only state-changing Tools: "
-                        + wireName
-                );
-            }
-            if (lite && tool.risk() != Risk.LOW) {
-                throw new IllegalArgumentException(
-                    "execution.lite.allow-tools may contain only LOW-risk Tools: "
-                        + wireName
-                );
-            }
-        }
-        for (String wireName : filter.denyTools()) {
-            ToolName tool = requireKnownTool(
-                wireName,
-                "execution.denyTools"
-            );
-            if (
-                tool == ToolName.SCHEDULE_ACTION
-                    || tool == ToolName.CANCEL_SCHEDULED_ACTION
-            ) {
-                throw new IllegalArgumentException(
-                    "Scheduling control Tools are configured through jarvis.scheduling, not execution deny-tools: "
-                        + wireName
-                );
-            }
-        }
-    }
-
-    private static ToolName requireKnownTool(
-        String wireName,
-        String field
-    ) {
-        for (ToolName tool : ToolName.values()) {
-            if (tool.wireName().equals(wireName)) {
-                return tool;
-            }
-        }
-        throw new IllegalArgumentException(
-            field + " contains an unknown Tool: " + wireName
-        );
     }
 
     private static List<String> normalizedList(

@@ -22,6 +22,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Consumer;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
@@ -55,6 +56,7 @@ public final class CoreProtectHistoryProvider implements AutoCloseable {
     private final ScheduledExecutorService timeoutScheduler;
     private final Duration queryTimeout;
     private final boolean ownsExecutors;
+    private final Consumer<QueryFailure> queryFailureSink;
     private final LinkedHashMap<UUID, Snapshot> snapshots = new LinkedHashMap<>(16, 0.75f, true);
 
     public CoreProtectHistoryProvider(
@@ -64,7 +66,34 @@ public final class CoreProtectHistoryProvider implements AutoCloseable {
         ScheduledExecutorService timeoutScheduler,
         Duration queryTimeout
     ) {
-        this(backend, clock, lookupExecutor, timeoutScheduler, queryTimeout, false);
+        this(
+            backend,
+            clock,
+            lookupExecutor,
+            timeoutScheduler,
+            queryTimeout,
+            false,
+            ignored -> { }
+        );
+    }
+
+    public CoreProtectHistoryProvider(
+        Backend backend,
+        Clock clock,
+        ExecutorService lookupExecutor,
+        ScheduledExecutorService timeoutScheduler,
+        Duration queryTimeout,
+        Consumer<QueryFailure> queryFailureSink
+    ) {
+        this(
+            backend,
+            clock,
+            lookupExecutor,
+            timeoutScheduler,
+            queryTimeout,
+            false,
+            queryFailureSink
+        );
     }
 
     private CoreProtectHistoryProvider(
@@ -73,13 +102,15 @@ public final class CoreProtectHistoryProvider implements AutoCloseable {
         ExecutorService lookupExecutor,
         ScheduledExecutorService timeoutScheduler,
         Duration queryTimeout,
-        boolean ownsExecutors
+        boolean ownsExecutors,
+        Consumer<QueryFailure> queryFailureSink
     ) {
         this.backend = Objects.requireNonNull(backend, "backend");
         this.clock = Objects.requireNonNull(clock, "clock");
         this.lookupExecutor = Objects.requireNonNull(lookupExecutor, "lookupExecutor");
         this.timeoutScheduler = Objects.requireNonNull(timeoutScheduler, "timeoutScheduler");
         this.queryTimeout = Objects.requireNonNull(queryTimeout, "queryTimeout");
+        this.queryFailureSink = Objects.requireNonNull(queryFailureSink, "queryFailureSink");
         if (queryTimeout.isZero() || queryTimeout.isNegative()) {
             throw new IllegalArgumentException("queryTimeout must be positive");
         }
@@ -88,6 +119,18 @@ public final class CoreProtectHistoryProvider implements AutoCloseable {
 
     /** Creates a provider with its own bounded worker and timeout threads. */
     public static CoreProtectHistoryProvider create(Backend backend, Clock clock) {
+        return create(backend, clock, ignored -> { });
+    }
+
+    /** Creates a provider and reports safe query diagnostics without query arguments or messages. */
+    public static CoreProtectHistoryProvider create(
+        Backend backend,
+        Clock clock,
+        Consumer<QueryFailure> queryFailureSink
+    ) {
+        Objects.requireNonNull(backend, "backend");
+        Objects.requireNonNull(clock, "clock");
+        Objects.requireNonNull(queryFailureSink, "queryFailureSink");
         ThreadFactory workerFactory = daemonFactory("jarvis-coreprotect-lookup");
         ExecutorService workers = new ThreadPoolExecutor(
             2,
@@ -106,7 +149,8 @@ public final class CoreProtectHistoryProvider implements AutoCloseable {
             workers,
             timer,
             DEFAULT_QUERY_TIMEOUT,
-            true
+            true,
+            queryFailureSink
         );
     }
 
@@ -142,7 +186,7 @@ public final class CoreProtectHistoryProvider implements AutoCloseable {
             return completed(error(ErrorCode.PROVIDER_UNAVAILABLE, "CoreProtect query setup failed.", true));
         }
 
-        return submit(context, () -> {
+        return submit("area", context, () -> {
             Instant windowEnd = clock.instant();
             LookupBatch batch = backend.lookupArea(
                 capturedCenter,
@@ -178,7 +222,7 @@ public final class CoreProtectHistoryProvider implements AutoCloseable {
             return completed(pageFromCursor(context, key, arguments.cursor(), arguments.limit()));
         }
 
-        return submit(context, () -> {
+        return submit("player", context, () -> {
             Instant windowEnd = clock.instant();
             LookupBatch batch = backend.lookupPlayer(arguments.playerUuid(), arguments.lookbackSeconds());
             return firstPage(
@@ -280,7 +324,11 @@ public final class CoreProtectHistoryProvider implements AutoCloseable {
         );
     }
 
-    private <T> CompletionStage<ToolResult> submit(ToolExecutionContext context, QueryWork<ToolResult> work) {
+    private CompletionStage<ToolResult> submit(
+        String operation,
+        ToolExecutionContext context,
+        QueryWork<ToolResult> work
+    ) {
         Instant now = clock.instant();
         Instant deadline = context.deadlineAt();
         if (deadline == null || !deadline.isAfter(now)) {
@@ -307,6 +355,7 @@ public final class CoreProtectHistoryProvider implements AutoCloseable {
                 try {
                     result.complete(work.run());
                 } catch (RuntimeException failure) {
+                    reportQueryFailure(operation, failure);
                     result.complete(error(ErrorCode.PROVIDER_UNAVAILABLE, "CoreProtect history query failed.", true));
                 } finally {
                     timeout.cancel(false);
@@ -321,6 +370,30 @@ public final class CoreProtectHistoryProvider implements AutoCloseable {
             result.complete(error(ErrorCode.BUSY, "CoreProtect lookup queue is full.", true));
         }
         return result;
+    }
+
+    private void reportQueryFailure(String operation, RuntimeException failure) {
+        Throwable root = failure;
+        for (
+            int depth = 0;
+            depth < 16
+                && root.getCause() != null
+                && root.getCause() != root;
+            depth += 1
+        ) {
+            root = root.getCause();
+        }
+        try {
+            queryFailureSink.accept(
+                new QueryFailure(
+                    operation,
+                    failure.getClass().getName(),
+                    root == failure ? null : root.getClass().getName()
+                )
+            );
+        } catch (RuntimeException ignored) {
+            // Diagnostics must not change the Tool result.
+        }
     }
 
     private synchronized void remember(UUID id, Snapshot snapshot) {
@@ -450,6 +523,17 @@ public final class CoreProtectHistoryProvider implements AutoCloseable {
         LookupBatch lookupArea(Object capturedCenter, Location center, int radius, int lookbackSeconds);
 
         LookupBatch lookupPlayer(UUID playerUuid, int lookbackSeconds);
+    }
+
+    public record QueryFailure(
+        String operation,
+        String exceptionType,
+        String rootCauseType
+    ) {
+        public QueryFailure {
+            Objects.requireNonNull(operation, "operation");
+            Objects.requireNonNull(exceptionType, "exceptionType");
+        }
     }
 
     public record LookupBatch(

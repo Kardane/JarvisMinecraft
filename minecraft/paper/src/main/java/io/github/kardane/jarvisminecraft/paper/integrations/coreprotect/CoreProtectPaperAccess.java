@@ -94,7 +94,7 @@ public final class CoreProtectPaperAccess implements CoreProtectHistoryProvider.
             null,
             null,
             null,
-            BLOCK_ACTIONS,
+            new ArrayList<>(BLOCK_ACTIONS),
             apiRadius,
             apiCenter
         );
@@ -164,7 +164,7 @@ public final class CoreProtectPaperAccess implements CoreProtectHistoryProvider.
             null,
             null,
             null,
-            BLOCK_ACTIONS,
+            new ArrayList<>(BLOCK_ACTIONS),
             0,
             null
         );

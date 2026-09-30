@@ -102,7 +102,14 @@ public final class T06VerificationMain {
 
         ToolRegistry registry = new ToolRegistry();
         new PaperToolService(platform, clock).register(registry);
-        require(registry.tools().equals(StandardMinecraftTools.TOOLS), "v0.1 Tool registry mismatch");
+        require(
+            registry.tools().equals(
+                StandardMinecraftTools.TOOLS.stream()
+                    .filter(tool -> tool != ToolName.RUN_COMMAND)
+                    .collect(java.util.stream.Collectors.toSet())
+            ),
+            "v0.1 Tool registry mismatch"
+        );
 
         ToolRegistry.ToolExecutionContext context = new ToolRegistry.ToolExecutionContext(
             "main",
@@ -320,6 +327,16 @@ public final class T06VerificationMain {
             return CompletableFuture.completedFuture(
                 new TeleportSnapshot(requesterUuid, targetPlayerUuid, "world", "world", true)
             );
+        }
+
+        @Override
+        public java.util.Set<String> commandRoots() {
+            return java.util.Set.of();
+        }
+
+        @Override
+        public CommandExecutionSnapshot executeConsoleCommand(String command) {
+            throw new UnsupportedOperationException("Console commands are unavailable in the fake platform.");
         }
 
         @Override

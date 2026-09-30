@@ -10,6 +10,7 @@ import net.minecraft.server.PlayerManager;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
+import net.minecraft.text.ClickEvent;
 import net.minecraft.text.HoverEvent;
 import net.minecraft.text.MutableText;
 import net.minecraft.text.Style;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -426,6 +428,11 @@ public final class MinecraftFabricPlatformAccess implements FabricPlatformAccess
                 .withStrikethrough(segment.strikethrough())
                 .withUnderline(segment.underlined())
                 .withItalic(segment.italic());
+            if (segment.clickUrl() != null) {
+                style = style.withClickEvent(
+                    new ClickEvent.OpenUrl(URI.create(segment.clickUrl()))
+                );
+            }
             output.append(
                 Text.literal(segment.text()).setStyle(style)
             );

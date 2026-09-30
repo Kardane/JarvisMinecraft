@@ -5,6 +5,7 @@ import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolArgument
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.ToolResult;
 
 import java.util.EnumMap;
+import java.util.EnumSet;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -16,6 +17,8 @@ import static io.github.kardane.jarvisminecraft.common.protocol.Protocol.ToolNam
 public final class ToolRegistry {
     private final Map<ToolName, Entry<?>> entries = new EnumMap<>(ToolName.class);
     private final ToolPolicy policy;
+    private final Set<ToolName> declaredPolicyTools =
+        EnumSet.noneOf(ToolName.class);
 
     public ToolRegistry() {
         this(null);
@@ -65,10 +68,16 @@ public final class ToolRegistry {
         entries.putAll(stagedRegistry.entries);
     }
 
-    public void declarePolicyTools(Set<ToolName> tools) {
+    public synchronized void declarePolicyTools(Set<ToolName> tools) {
         Objects.requireNonNull(tools, "tools");
         if (policy != null) {
-            policy.syncTools(tools);
+            EnumSet<ToolName> missing = EnumSet.noneOf(ToolName.class);
+            missing.addAll(tools);
+            missing.removeAll(declaredPolicyTools);
+            if (!missing.isEmpty()) {
+                policy.syncTools(missing);
+                declaredPolicyTools.addAll(missing);
+            }
         }
     }
 

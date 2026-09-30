@@ -524,7 +524,7 @@ public final class JarvisConfigVerificationMain {
             new AtomicBoolean(false);
         AtomicReference<JarvisConfig> candidate =
             new AtomicReference<>(
-                JarvisConfig.defaults()
+                promptConfig(false, false, 8, 16, 32)
             );
 
         RuntimeConfigurationManager manager =

@@ -13,7 +13,7 @@ jarvis:
     wake-words:
       - "자비스"
       - "jarvis"
-      - "재비스"
+      - "wkqltm"
     wake-word:
       # Match configured wake words anywhere in the message, not only at the start.
       anywhere: true
@@ -27,7 +27,7 @@ jarvis:
     # Candidate messages do not extend this timer.
     follow-up-seconds: 30
     # Minimum Jev RESPOND confidence for a wake-word-free follow-up.
-    follow-up-confidence-threshold: 0.70
+    follow-up-confidence-threshold: 0.6
 
     audience:
       mode: OP
@@ -40,13 +40,13 @@ jarvis:
       # Server-wide gap after a proactive conversation starts.
       cooldown-seconds: 15
       # Minimum Jev START_CONVERSATION confidence.
-      confidence-threshold: 0.75
+      confidence-threshold: 0.6
 
   model:
     name: "gpt-6-luna"
     reasoning:
       mode: AUTO
-      fallback: MEDIUM
+      fallback: LOW
 
   # Validated operator prompt content is enabled by default.
   personality:
@@ -63,10 +63,10 @@ jarvis:
     # metrics.icon, and final Luna reply bodies.
     # Configured fields support legacy & codes and <#RRGGBB> hex colors.
     # Example: "&5[JARVIS]&r " or "<#FF00FF>[JARVIS]&r "
-    prefix: "[JARVIS] "
+    prefix: "<#9eddda>[JVS] &7>&r "
     waiting-message:
       enabled: true
-      threshold-ms: 1800
+      threshold-ms: 3000
       messages:
         - "<#94A3B8>잠시만요.&r"
         - "<#7DD3FC>확인해볼게요.&r"
@@ -97,7 +97,7 @@ jarvis:
     # & formatting and <#RRGGBB> hex colors as response.prefix.
     metrics:
       enabled: true
-      icon: "<#7DD3FC>📊"
+      icon: "&8📊"
 
   # Optional persistent archive of direct/follow-up USER and JARVIS messages.
   # Stored under plugins/JarvisMinecraft/conversations/*.jsonl.
@@ -108,34 +108,23 @@ jarvis:
     max-file-bytes: 1048576
     max-files: 30
 
-  # Optional retrieval-backed long-term conversation memory.
+  # Previous-session conversation context is retrieved automatically.
   # Reads prior USER/JARVIS JSONL records for the same requester UUID only.
   # For continuous memory across future conversations, enable conversation-archive too.
   # Retrieved memory is bounded, previous-session only, and never grants Tool authority.
   conversation-memory:
     enabled: true
     lookback-days: 30
-    max-source-files: 4
-    max-turns: 6
+    max-source-files: 16
+    max-turns: 6 # Maximum previous conversation turns per response (1-12).
     max-context-bytes: 8192
 
   execution:
     # READ_TALK: read-only Tools only.
-    # EXECUTE_LITE: read-only + explicitly allowed LOW-risk state-changing Tools.
-    # EXECUTE: read-only + explicitly allowed state-changing Tools.
-    mode: READ_TALK
+    # EXECUTE_LITE: read-only + LOW-risk state-changing Tools enabled in tools.properties.
+    # EXECUTE: Tools enabled in tools.properties.
+    mode: EXECUTE_LITE
     actors: OP
-
-    lite:
-      # Tool wire names only. Example: [teleport_staff, weather_set, time_set]
-      allow-tools: []
-      # deny-tools overrides allow-tools and may also hide read-only Tools.
-      deny-tools: []
-
-    full:
-      # State-changing Tool wire names must be explicitly listed.
-      allow-tools: []
-      deny-tools: []
 
   scheduling:
     # Enables schedule_action for structured LOW-risk mutation Tools.

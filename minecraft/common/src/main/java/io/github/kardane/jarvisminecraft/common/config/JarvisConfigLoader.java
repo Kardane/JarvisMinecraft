@@ -273,30 +273,6 @@ public final class JarvisConfigLoader {
                 "jarvis.execution.actors",
                 JarvisConfig.ExecutionActors.class,
                 defaultExecution.actors()
-            ),
-            new JarvisConfig.ToolFilter(
-                list(
-                    source,
-                    "jarvis.execution.lite.allow-tools",
-                    defaultExecution.lite().allowTools()
-                ),
-                list(
-                    source,
-                    "jarvis.execution.lite.deny-tools",
-                    defaultExecution.lite().denyTools()
-                )
-            ),
-            new JarvisConfig.ToolFilter(
-                list(
-                    source,
-                    "jarvis.execution.full.allow-tools",
-                    defaultExecution.full().allowTools()
-                ),
-                list(
-                    source,
-                    "jarvis.execution.full.deny-tools",
-                    defaultExecution.full().denyTools()
-                )
             )
         );
 

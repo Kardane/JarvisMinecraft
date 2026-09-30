@@ -24,7 +24,8 @@ public final class DeterministicRoutePolicy {
                 ToolName.GET_ONLINE_PLAYERS,
                 ToolName.GET_PLAYER,
                 ToolName.GET_PLAYER_LOCATION,
-                ToolName.GET_NEARBY_PLAYERS
+                ToolName.GET_NEARBY_PLAYERS,
+                ToolName.GET_CMI_PLAYER_INFO
             )
         );
         routes.put(
@@ -33,11 +34,18 @@ public final class DeterministicRoutePolicy {
         );
         routes.put(
             JevCategory.HISTORY_QUERY,
-            EnumSet.of(ToolName.LOOKUP_AREA_HISTORY, ToolName.LOOKUP_PLAYER_HISTORY)
+            EnumSet.of(
+                ToolName.GET_PLAYER,
+                ToolName.GET_PLAYER_LOCATION,
+                ToolName.LOOKUP_AREA_HISTORY,
+                ToolName.LOOKUP_PLAYER_HISTORY
+            )
         );
         routes.put(
             JevCategory.REGION_QUERY,
             EnumSet.of(
+                ToolName.GET_PLAYER,
+                ToolName.GET_PLAYER_LOCATION,
                 ToolName.GET_REGIONS_AT_LOCATION,
                 ToolName.GET_REGION_INFO,
                 ToolName.CHECK_BUILD_PERMISSION

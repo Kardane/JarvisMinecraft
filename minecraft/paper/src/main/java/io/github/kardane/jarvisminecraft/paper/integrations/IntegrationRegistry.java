@@ -110,14 +110,14 @@ public final class IntegrationRegistry implements AutoCloseable {
             if (plugin == null || plugin.getName() == null) {
                 continue;
             }
-            String key = pluginKey(plugin.getName());
-            installed.add(key);
+            Set<String> pluginKeys = pluginKeys(plugin.getName(), plugin.getDescription().getProvides());
+            installed.addAll(pluginKeys);
             String version = plugin.getDescription().getVersion();
             if (version != null && !version.isBlank()) {
-                versions.put(key, version);
+                versions.put(pluginKey(plugin.getName()), version);
             }
             if (plugin.isEnabled()) {
-                enabled.add(key);
+                enabled.addAll(pluginKeys);
             }
         }
 
@@ -302,6 +302,21 @@ public final class IntegrationRegistry implements AutoCloseable {
 
     private static String pluginKey(String value) {
         return value.toLowerCase(Locale.ROOT);
+    }
+
+    static Set<String> pluginKeys(String name, Collection<String> provides) {
+        Set<String> keys = new LinkedHashSet<>();
+        if (name != null && !name.isBlank()) {
+            keys.add(pluginKey(name));
+        }
+        if (provides != null) {
+            provides.stream()
+                .filter(Objects::nonNull)
+                .filter(value -> !value.isBlank())
+                .map(IntegrationRegistry::pluginKey)
+                .forEach(keys::add);
+        }
+        return Set.copyOf(keys);
     }
 
     record ProviderModule(

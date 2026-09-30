@@ -69,7 +69,7 @@ jarvis.conversation-archive.enabled=true
 jarvis.conversation-archive.max-file-bytes=1048576
 jarvis.conversation-archive.max-files=30
 
-# Optional retrieval-backed long-term conversation memory.
+# Previous-session conversation context is retrieved automatically.
 # Reads previous-session archive records for the same requester UUID only.
 # Enable conversation-archive as well to keep accumulating future memory.
 jarvis.conversation-memory.enabled=true
@@ -79,17 +79,10 @@ jarvis.conversation-memory.max-turns=6
 jarvis.conversation-memory.max-context-bytes=8192
 
 # READ_TALK: read-only Tools only.
-# EXECUTE_LITE: read-only + explicitly allowed LOW-risk state-changing Tools.
-# EXECUTE: read-only + explicitly allowed state-changing Tools.
+# EXECUTE_LITE: read-only + LOW-risk state-changing Tools enabled in tools.properties.
+# EXECUTE: Tools enabled in tools.properties.
 jarvis.execution.mode=READ_TALK
 jarvis.execution.actors=OP
-
-# Tool wire names use | as the separator.
-# Example: jarvis.execution.lite.allow-tools=teleport_staff|weather_set|time_set
-jarvis.execution.lite.allow-tools=
-jarvis.execution.lite.deny-tools=
-jarvis.execution.full.allow-tools=
-jarvis.execution.full.deny-tools=
 
 # Enables schedule_action. Pending schedules are memory-only.
 jarvis.scheduling.enabled=true

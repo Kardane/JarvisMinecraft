@@ -102,7 +102,14 @@ public final class T07VerificationMain {
 
         ToolRegistry registry = new ToolRegistry();
         new FabricToolService(platform, clock).register(registry);
-        require(registry.tools().equals(StandardMinecraftTools.TOOLS), "v0.1 Tool registry mismatch");
+        require(
+            registry.tools().equals(
+                StandardMinecraftTools.TOOLS.stream()
+                    .filter(tool -> tool != ToolName.RUN_COMMAND)
+                    .collect(java.util.stream.Collectors.toSet())
+            ),
+            "v0.1 Tool registry mismatch"
+        );
 
         ToolRegistry.ToolExecutionContext context = new ToolRegistry.ToolExecutionContext(
             "main",
@@ -298,6 +305,16 @@ public final class T07VerificationMain {
         @Override
         public ServerStatusSnapshot serverStatus() {
             return new ServerStatusSnapshot(19.9, 12.5, 3, 42, 1024, 4096);
+        }
+
+        @Override
+        public Set<String> commandRoots() {
+            return Set.of();
+        }
+
+        @Override
+        public CommandExecutionSnapshot executeConsoleCommand(String command) {
+            throw new AssertionError("not used by fake Tool tests");
         }
 
         @Override

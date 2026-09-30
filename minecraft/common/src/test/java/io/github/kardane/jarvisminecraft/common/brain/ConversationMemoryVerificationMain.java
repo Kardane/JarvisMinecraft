@@ -40,7 +40,9 @@ public final class ConversationMemoryVerificationMain {
             "jarvis-memory-disabled-"
         );
         ConfigManager config =
-            new ConfigManager(JarvisConfig::defaults);
+            new ConfigManager(() ->
+                config(false, false, 4, 6, 8 * 1024)
+            );
         AsyncConversationArchive archive =
             new AsyncConversationArchive(
                 "main",

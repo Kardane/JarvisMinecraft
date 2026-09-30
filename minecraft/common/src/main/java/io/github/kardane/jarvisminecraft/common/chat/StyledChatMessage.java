@@ -5,6 +5,7 @@ import java.util.ArrayList;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
+import java.net.URI;
 
 public record StyledChatMessage(
     List<Segment> prefix,
@@ -151,7 +152,7 @@ public record StyledChatMessage(
     private static List<Segment> parseConfiguredText(
         String value
     ) {
-        return parseFormatting(value, false);
+        return parseFormatting(value, false, false);
     }
 
     private static List<Segment> parseModelBody(
@@ -159,13 +160,15 @@ public record StyledChatMessage(
     ) {
         return parseFormatting(
             normalizeModelMarkdown(value),
+            true,
             true
         );
     }
 
     private static List<Segment> parseFormatting(
         String value,
-        boolean modelBody
+        boolean modelBody,
+        boolean parseLinks
     ) {
         List<Segment> segments = new ArrayList<>();
         StringBuilder text = new StringBuilder();
@@ -190,6 +193,58 @@ public record StyledChatMessage(
                         style
                     );
                     index = close;
+                    continue;
+                }
+            }
+
+            if (modelBody && parseLinks) {
+                LinkMatch angleLink = angleUrlAt(value, index);
+                if (angleLink != null) {
+                    flush(segments, text, style);
+                    segments.add(
+                        new Segment(
+                            angleLink.label(),
+                            LINK_RGB,
+                            false,
+                            style.bold(),
+                            style.strikethrough(),
+                            true,
+                            style.italic(),
+                            angleLink.url()
+                        )
+                    );
+                    index = angleLink.endIndex();
+                    continue;
+                }
+
+                LinkMatch markdownLink = markdownLinkAt(value, index);
+                if (markdownLink != null) {
+                    flush(segments, text, style);
+                    addLinkSegments(
+                        segments,
+                        markdownLink.label(),
+                        markdownLink.url()
+                    );
+                    index = markdownLink.endIndex();
+                    continue;
+                }
+
+                LinkMatch url = bareUrlAt(value, index);
+                if (url != null) {
+                    flush(segments, text, style);
+                    segments.add(
+                        new Segment(
+                            url.label(),
+                            LINK_RGB,
+                            false,
+                            style.bold(),
+                            style.strikethrough(),
+                            true,
+                            style.italic(),
+                            url.url()
+                        )
+                    );
+                    index = url.endIndex();
                     continue;
                 }
             }
@@ -301,6 +356,185 @@ public record StyledChatMessage(
 
         flush(segments, text, style);
         return List.copyOf(segments);
+    }
+
+    private static final int LINK_RGB = 0x55AAFF;
+
+    private static LinkMatch markdownLinkAt(String value, int start) {
+        if (value.charAt(start) != '[') {
+            return null;
+        }
+        int labelEnd = value.indexOf(']', start + 1);
+        if (
+            labelEnd <= start + 1
+                || labelEnd + 1 >= value.length()
+                || value.charAt(labelEnd + 1) != '('
+        ) {
+            return null;
+        }
+        int urlStart = labelEnd + 2;
+        int urlEnd = markdownLinkEnd(value, urlStart);
+        if (urlEnd <= urlStart) {
+            return null;
+        }
+        String rawUrl = value.substring(urlStart, urlEnd);
+        if (rawUrl.startsWith("<") && rawUrl.endsWith(">")) {
+            rawUrl = rawUrl.substring(1, rawUrl.length() - 1);
+        }
+        String safeUrl = safeHttpUrl(rawUrl);
+        return safeUrl == null
+            ? null
+            : new LinkMatch(
+                value.substring(start + 1, labelEnd),
+                safeUrl,
+                urlEnd
+            );
+    }
+
+    private static LinkMatch angleUrlAt(String value, int start) {
+        if (value.charAt(start) != '<') {
+            return null;
+        }
+        int end = value.indexOf('>', start + 1);
+        if (end <= start + 1) {
+            return null;
+        }
+        String rawUrl = value.substring(start + 1, end);
+        String safeUrl = safeHttpUrl(rawUrl);
+        return safeUrl == null ? null : new LinkMatch(rawUrl, safeUrl, end);
+    }
+
+    private static int markdownLinkEnd(String value, int start) {
+        int nestedParentheses = 0;
+        for (int index = start; index < value.length(); index += 1) {
+            char current = value.charAt(index);
+            if (current == '(') {
+                nestedParentheses += 1;
+            } else if (current == ')') {
+                if (nestedParentheses == 0) {
+                    return index;
+                }
+                nestedParentheses -= 1;
+            }
+        }
+        return -1;
+    }
+
+    private static LinkMatch bareUrlAt(String value, int start) {
+        if (
+            !value.regionMatches(true, start, "https://", 0, 8)
+                && !value.regionMatches(true, start, "http://", 0, 7)
+        ) {
+            return null;
+        }
+        if (
+            start > 0
+                && (Character.isLetterOrDigit(value.charAt(start - 1))
+                    || value.charAt(start - 1) == '_')
+        ) {
+            return null;
+        }
+
+        int end = start;
+        while (end < value.length()) {
+            char current = value.charAt(end);
+            if (
+                Character.isWhitespace(current)
+                    || Character.isISOControl(current)
+                    || current == '<'
+                    || current == '>'
+                    || current == '"'
+                    || current == '\''
+                    || current == '`'
+            ) {
+                break;
+            }
+            end += 1;
+        }
+        while (end > start && isTrailingUrlPunctuation(value, start, end)) {
+            end -= 1;
+        }
+        if (end <= start) {
+            return null;
+        }
+        String rawUrl = value.substring(start, end);
+        String safeUrl = safeHttpUrl(rawUrl);
+        return safeUrl == null ? null : new LinkMatch(rawUrl, safeUrl, end - 1);
+    }
+
+    private static boolean isTrailingUrlPunctuation(
+        String value,
+        int start,
+        int end
+    ) {
+        char trailing = value.charAt(end - 1);
+        if (trailing == ')' || trailing == ']' || trailing == '}') {
+            char opening = trailing == ')' ? '(' : trailing == ']' ? '[' : '{';
+            int openCount = 0;
+            int closeCount = 0;
+            for (int index = start; index < end; index += 1) {
+                if (value.charAt(index) == opening) {
+                    openCount += 1;
+                } else if (value.charAt(index) == trailing) {
+                    closeCount += 1;
+                }
+            }
+            return closeCount > openCount;
+        }
+        return trailing == '.'
+            || trailing == ','
+            || trailing == '!'
+            || trailing == '?'
+            || trailing == ';'
+            || trailing == ':';
+    }
+
+    private static String safeHttpUrl(String value) {
+        if (value.isBlank() || value.chars().anyMatch(Character::isWhitespace)) {
+            return null;
+        }
+        try {
+            URI uri = URI.create(value);
+            String scheme = uri.getScheme();
+            if (
+                !uri.isAbsolute()
+                    || uri.getHost() == null
+                    || uri.getHost().isBlank()
+                    || uri.getUserInfo() != null
+                    || scheme == null
+                    || !(scheme.equalsIgnoreCase("http")
+                        || scheme.equalsIgnoreCase("https"))
+            ) {
+                return null;
+            }
+            return uri.toASCIIString();
+        } catch (IllegalArgumentException invalidUrl) {
+            return null;
+        }
+    }
+
+    private static void addLinkSegments(
+        List<Segment> output,
+        String label,
+        String url
+    ) {
+        for (Segment part : parseFormatting(label, true, false)) {
+            output.add(
+                new Segment(
+                    part.text(),
+                    LINK_RGB,
+                    false,
+                    part.bold(),
+                    part.strikethrough(),
+                    true,
+                    part.italic(),
+                    url
+                )
+            );
+        }
+    }
+
+    private record LinkMatch(String label, String url, int endIndex) {
     }
 
     private static String normalizeModelMarkdown(
@@ -537,8 +771,30 @@ public record StyledChatMessage(
         boolean bold,
         boolean strikethrough,
         boolean underlined,
-        boolean italic
+        boolean italic,
+        String clickUrl
     ) {
+        public Segment(
+            String text,
+            Integer rgb,
+            boolean obfuscated,
+            boolean bold,
+            boolean strikethrough,
+            boolean underlined,
+            boolean italic
+        ) {
+            this(
+                text,
+                rgb,
+                obfuscated,
+                bold,
+                strikethrough,
+                underlined,
+                italic,
+                null
+            );
+        }
+
         public Segment {
             Objects.requireNonNull(text, "text");
             if (
@@ -548,6 +804,14 @@ public record StyledChatMessage(
                 throw new IllegalArgumentException(
                     "rgb must be a 24-bit value."
                 );
+            }
+            if (clickUrl != null) {
+                String safeUrl = safeHttpUrl(clickUrl);
+                if (safeUrl == null || !safeUrl.equals(clickUrl)) {
+                    throw new IllegalArgumentException(
+                        "clickUrl must be an absolute HTTP or HTTPS URL without credentials."
+                    );
+                }
             }
         }
     }

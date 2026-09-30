@@ -5,6 +5,7 @@ import io.github.kardane.jarvisminecraft.common.chat.PlayerIdentity;
 import io.github.kardane.jarvisminecraft.common.chat.StyledChatMessage;
 import io.github.kardane.jarvisminecraft.common.protocol.ToolModels.WeatherType;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import net.minecraft.network.chat.MutableComponent;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
+import java.net.URI;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 
@@ -417,6 +419,11 @@ public final class MinecraftNeoForgePlatformAccess implements NeoForgePlatformAc
                 .withStrikethrough(segment.strikethrough())
                 .withUnderlined(segment.underlined())
                 .withItalic(segment.italic());
+            if (segment.clickUrl() != null) {
+                style = style.withClickEvent(
+                    new ClickEvent.OpenUrl(URI.create(segment.clickUrl()))
+                );
+            }
             output.append(
                 Component.literal(segment.text()).setStyle(style)
             );

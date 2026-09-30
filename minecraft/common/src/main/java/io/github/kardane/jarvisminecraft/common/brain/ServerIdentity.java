@@ -2,21 +2,18 @@ package io.github.kardane.jarvisminecraft.common.brain;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
-import static java.nio.file.StandardOpenOption.CREATE_NEW;
-import static java.nio.file.StandardOpenOption.WRITE;
 
 /**
  * Resolves the stable logical identity for one local Minecraft server.
  *
- * <p>An explicit override wins. Otherwise a generated ID is persisted under
- * the platform data directory and reused across restarts.</p>
+ * <p>An explicit override wins. Existing persisted IDs are retained for archive
+ * compatibility; new installations derive a stable ID from the data path.</p>
  */
 public final class ServerIdentity {
     public static final String FILE_NAME = "server-id.txt";
@@ -37,8 +34,6 @@ public final class ServerIdentity {
 
         Path identityFile = dataDirectory.resolve(FILE_NAME);
         try {
-            Files.createDirectories(dataDirectory);
-
             if (Files.exists(identityFile)) {
                 if (!Files.isRegularFile(identityFile)) {
                     throw new IllegalStateException(
@@ -49,22 +44,14 @@ public final class ServerIdentity {
                 return read(identityFile);
             }
 
-            String generated = "local-" + UUID.randomUUID();
-            try {
-                Files.writeString(
-                    identityFile,
-                    generated + System.lineSeparator(),
-                    StandardCharsets.UTF_8,
-                    CREATE_NEW,
-                    WRITE
-                );
-                return generated;
-            } catch (FileAlreadyExistsException racedWriter) {
-                return read(identityFile);
-            }
+            String canonicalPath = dataDirectory.toAbsolutePath()
+                .normalize().toString();
+            return "local-" + UUID.nameUUIDFromBytes(
+                canonicalPath.getBytes(StandardCharsets.UTF_8)
+            );
         } catch (IOException failure) {
             throw new IllegalStateException(
-                "Could not load or create the JARVIS local server identity.",
+                "Could not load the JARVIS local server identity.",
                 failure
             );
         }

@@ -127,15 +127,13 @@ is played only to the requester. Sound feedback failure is non-critical.
 Phase 5 now consumes `jarvis.execution.*` through `ExecutionPolicy`.
 
 - `READ_TALK`: active read-only Tools only.
-- `EXECUTE_LITE`: read-only Tools plus explicitly allowlisted LOW-risk state-changing Tools.
-- `EXECUTE`: read-only Tools plus explicitly allowlisted state-changing Tools.
-- selected-mode `deny-tools` overrides allow and may also hide read-only Tools.
+- `EXECUTE_LITE`: read-only Tools plus LOW-risk state-changing Tools enabled in `tools.properties`.
+- `EXECUTE`: Tools enabled in `tools.properties`.
 - non-OP requesters still receive no Minecraft Tools regardless of mode.
 - proactive origins are hard-blocked from state-changing Tools.
 
-Allow/deny entries use exact `ToolName.wireName()` values. Unknown names are a
-configuration error; allow lists may contain only state-changing Tools, and the
-LITE allow list may contain only LOW-risk Tools.
+Tool entries use exact `ToolName.wireName()` values in `tools.properties`.
+The selected execution mode still limits state-changing Tools by risk.
 
 An in-flight request cannot gain newly permitted mutation Tools after it starts.
 Policy tightening is re-applied before every model round and again immediately
@@ -143,11 +141,11 @@ before Tool execution, including after pre-execution audit.
 
 Phase 6 adds two LOW-risk structured actions to the registered catalog:
 `weather_set` and `time_set`. They are available only when the selected
-execution mode explicitly allowlists them. Both are rechecked by
+execution mode permits them and `tools.properties` enables them. Both are rechecked by
 `ExecutionPolicy`, pre-execution audit, `CommonRuntime`, current online OP
 authority, and the platform loaded-world lookup before mutation.
 
-A separate `CommandActionPolicy` governs the generic `run_command` mutation Tool. It is intentionally not represented as another `jarvis.execution.*` allowlist: the server's actual dispatcher roots are synchronized to `actions.properties`, every new root defaults to `false`, and the operator's per-root boolean is the final command authority. The Tool still passes normal requester authority, proactive-mutation blocking, pre-execution audit, action deduplication, deadline, and server-thread execution. `execute ... run` and `return run` recursively validate the nested command root, and vanilla `minecraft:` aliases normalize to the same root.
+`ToolPolicy` governs the generic `run_command` mutation Tool. The server's actual dispatcher roots are synchronized to `tools.properties` as `command.<root>` entries, every new root defaults to `false`, and both `run_command` and the relevant root must be enabled. The Tool also requires `EXECUTE` mode and passes requester authority, proactive-mutation blocking, pre-execution audit, action deduplication, deadline, and server-thread execution. `execute ... run` and `return run` recursively validate the nested command root, and vanilla `minecraft:` aliases normalize to the same root.
 
 Platform Adapters expose only two generic command primitives to common code: enumerate current command roots and dispatch one console command. Paper uses the Bukkit/Paper command map; Fabric and NeoForge use their server Brigadier dispatchers. The policy file is re-read at execution time so boolean edits apply without rebuilding the Brain runtime.
 
@@ -220,7 +218,7 @@ requests; an in-flight request never changes persona midway through execution.
 
 When `jarvis.conversation-archive.enabled=true`, production wiring wraps the in-memory history store with `ArchivingConversationHistoryStore` and asynchronously mirrors only USER/ASSISTANT entries into `AsyncConversationArchive`. The archive lives under the platform JARVIS configuration root and uses bounded rotated JSONL files. Tool messages and ACTIVE proactive ambient-chat context/responses are excluded. Archive disk work runs on the dedicated `jarvis-conversation-archive` daemon executor and archive failure does not change request/Tool semantics.
 
-`AsyncConversationArchive` also implements the `ConversationMemoryStore` retrieval boundary. When `jarvis.conversation-memory.enabled=true`, each new request performs one bounded previous-session lookup before the current USER message is appended. Retrieval is scoped to the same logical server ID and requester UUID, excludes the current session/request, scans only the newest configured archive files inside the lookback window, ranks turns by lexical relevance with an explicit-memory-intent recent fallback, and emits at most the configured turn/UTF-8 byte budget. A 350 ms request-local deadline makes retrieval fail-open to an empty memory snapshot.
+`AsyncConversationArchive` also implements the `ConversationMemoryStore` retrieval boundary. When `jarvis.conversation-memory.enabled=true`, each new request performs one bounded previous-session lookup before the current USER message is appended. Retrieval is scoped to the same logical server ID and requester UUID, excludes the current session/request, scans only the newest configured archive files inside the lookback window, ranks turns by lexical relevance and fills remaining slots with recent turns, and emits at most the configured turn/UTF-8 byte budget. A 350 ms request-local deadline makes retrieval fail-open to an empty memory snapshot.
 
 The resulting immutable `ConversationMemorySnapshot` is captured once per request and reused across every Luna Tool round. It is rendered inside the ordinary model input as untrusted historical recollection, not as system instructions. Built-in Core Policy, current Tool exposure, current authority, live Tool results, and the latest user request remain authoritative. There is no automatically maintained user-profile file and no extra model call solely for memory summarization; Luna synthesizes the selected bounded excerpts as part of the normal response.
 

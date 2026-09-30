@@ -51,6 +51,7 @@ public final class T13VerificationMain {
         verifiesNoOptionalPlugins();
         verifiesCoreProtectOnly();
         verifiesWorldGuardRequiresWorldEdit();
+        verifiesWorldGuardSupportsWorldEditAlias();
         verifiesCmiRequiresCmiLib();
         verifiesCmiCapabilitiesUseProviderVersion();
         verifiesAllSupportedPlugins();
@@ -110,6 +111,34 @@ public final class T13VerificationMain {
             state.provider().equals("WorldGuard")
                 && state.availability() == IntegrationRegistry.ProviderAvailability.DEPENDENCY_MISSING
         ), "missing WorldEdit should be reported");
+    }
+
+    private static void verifiesWorldGuardSupportsWorldEditAlias() {
+        ToolRegistry tools = baseRegistry();
+        AtomicInteger coreLoads = new AtomicInteger();
+        AtomicInteger worldGuardLoads = new AtomicInteger();
+        Set<String> faweNames = IntegrationRegistry.pluginKeys("FastAsyncWorldEdit", List.of("WorldEdit"));
+        Set<String> installed = new java.util.HashSet<>(faweNames);
+        installed.add("WorldGuard");
+        Set<String> enabled = new java.util.HashSet<>(faweNames);
+        enabled.add("WorldGuard");
+
+        IntegrationRegistry assembled = assemble(
+            tools,
+            installed,
+            enabled,
+            fakeLoader(coreLoads, worldGuardLoads),
+            new ArrayList<>()
+        );
+
+        require(faweNames.contains("fastasyncworldedit") && faweNames.contains("worldedit"),
+            "a provided plugin alias must be included with its concrete name");
+        require(worldGuardLoads.get() == 1, "WorldGuard should load when FAWE provides WorldEdit");
+        require(tools.contains(ToolName.GET_REGIONS_AT_LOCATION), "WorldGuard Tools missing with FAWE alias");
+        require(assembled.providerStates().stream().anyMatch(state ->
+            state.provider().equals("WorldGuard")
+                && state.availability() == IntegrationRegistry.ProviderAvailability.ACTIVE
+        ), "WorldGuard should be active when a WorldEdit provider alias is enabled");
     }
 
     private static void verifiesCmiRequiresCmiLib() {

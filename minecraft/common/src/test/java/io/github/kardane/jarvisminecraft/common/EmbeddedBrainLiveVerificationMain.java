@@ -102,12 +102,7 @@ public final class EmbeddedBrainLiveVerificationMain {
             defaults.response(),
             new JarvisConfig.Execution(
                 JarvisConfig.ExecutionMode.EXECUTE_LITE,
-                JarvisConfig.ExecutionActors.OP,
-                new JarvisConfig.ToolFilter(
-                    List.of(ToolName.TELEPORT_STAFF.wireName()),
-                    List.of()
-                ),
-                defaults.execution().full()
+                JarvisConfig.ExecutionActors.OP
             ),
             defaults.scheduling()
         );
@@ -681,6 +676,16 @@ public final class EmbeddedBrainLiveVerificationMain {
                     true
                 )
             );
+        }
+
+        @Override
+        public java.util.Set<String> commandRoots() {
+            return java.util.Set.of();
+        }
+
+        @Override
+        public CommandExecutionSnapshot executeConsoleCommand(String command) {
+            throw new UnsupportedOperationException("Console commands are unavailable in the live test platform.");
         }
 
         public List<String> messages() {

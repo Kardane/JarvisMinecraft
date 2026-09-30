@@ -113,7 +113,12 @@ public final class ExecutionPolicy {
         }
 
         if (tool == ToolName.RUN_COMMAND) {
-            return Decision.allowed(config.mode());
+            return config.mode() == JarvisConfig.ExecutionMode.EXECUTE
+                ? Decision.allowed(config.mode())
+                : Decision.denied(
+                    DenialReason.NOT_ALLOWLISTED,
+                    config.mode()
+                );
         }
 
         if (tool == ToolName.SCHEDULE_ACTION) {
@@ -140,22 +145,6 @@ public final class ExecutionPolicy {
             return Decision.allowed(config.mode());
         }
 
-        JarvisConfig.ToolFilter filter = switch (config.mode()) {
-            case READ_TALK -> null;
-            case EXECUTE_LITE -> config.lite();
-            case EXECUTE -> config.full();
-        };
-
-        if (
-            filter != null
-                && contains(filter.denyTools(), tool)
-        ) {
-            return Decision.denied(
-                DenialReason.DENYLISTED,
-                config.mode()
-            );
-        }
-
         if (!tool.stateChanging()) {
             return Decision.allowed(config.mode());
         }
@@ -167,25 +156,12 @@ public final class ExecutionPolicy {
             );
             case EXECUTE_LITE ->
                 tool.risk() == Risk.LOW
-                    && contains(
-                        config.lite().allowTools(),
-                        tool
-                    )
                     ? Decision.allowed(config.mode())
                     : Decision.denied(
                         DenialReason.NOT_ALLOWLISTED,
                         config.mode()
                     );
-            case EXECUTE ->
-                contains(
-                    config.full().allowTools(),
-                    tool
-                )
-                    ? Decision.allowed(config.mode())
-                    : Decision.denied(
-                        DenialReason.NOT_ALLOWLISTED,
-                        config.mode()
-                    );
+            case EXECUTE -> Decision.allowed(config.mode());
         };
     }
 
@@ -241,10 +217,4 @@ public final class ExecutionPolicy {
             || "PROACTIVE_CANDIDATE".equalsIgnoreCase(origin);
     }
 
-    private boolean contains(
-        java.util.List<String> values,
-        ToolName tool
-    ) {
-        return values.contains(tool.wireName());
-    }
 }

@@ -17,10 +17,10 @@ Optional:
 
 - `JARVIS_SERVER_ID` / `jarvis.serverId` — explicit logical server ID override
 
-When no override is supplied, JARVIS creates a stable local ID once and reuses it on later starts:
+When no override is supplied, JARVIS derives a stable local ID from the normalized platform data directory path. Existing IDs are read for archive compatibility:
 
-- Paper: `plugins/JarvisMinecraft/server-id.txt`
-- Fabric / NeoForge: `config/jarvisminecraft/server-id.txt`
+- Paper legacy file: `plugins/JarvisMinecraft/server-id.txt`
+- Fabric / NeoForge legacy file: `config/jarvisminecraft/server-id.txt`
 
 Reference values are shown in `config/jarvis.env.example`.
 
@@ -28,7 +28,7 @@ Do not log provider keys, raw process environments, or complete configuration ob
 
 ## Platform configuration
 
-The runtime-policy snapshot and operator prompt content are deliberately separate from provider credentials. Phase 2 applies the interaction subset at runtime:
+The runtime-policy snapshot and operator prompt content are deliberately separate from provider credentials. Paper and Paper 26.3 keep `/jm reload` available when a Provider key is missing: the Brain stays inactive, a warning is logged without a key value, and adding the key to `config.yml` followed by `/jm reload` starts it. Phase 2 applies the interaction subset at runtime:
 
 - `jarvis.interaction.wake-words`
 - `jarvis.interaction.wake-word.anywhere`
@@ -67,7 +67,7 @@ command.execute=false
 command.essentials:home=false
 ~~~
 
-A Tool must be enabled in `tools.properties` before it is exposed to the model or executed. This is a hard gate in addition to the normal execution-mode `allow-tools` / `deny-tools` policy. Changes are read at runtime and do not require `/jm reload`.
+A Tool must be enabled in `tools.properties` before it is exposed to the model or executed. Execution mode and current OP authority still constrain use. Changes are read at runtime and do not require `/jm reload`.
 
 `run_command` has two gates: `run_command=true` enables the Tool, then the matching `command.<root>=true` authorizes the command root. It executes as server console only for a current online OP. For `execute ... run` and `return run`, every nested command root must also be enabled. Vanilla `minecraft:` aliases are normalized to the same root.
 
@@ -181,9 +181,8 @@ chat message.
 Phase 5 applies `jarvis.execution.*`:
 
 - `READ_TALK`: active read-only Tools only.
-- `EXECUTE_LITE`: read-only Tools plus LOW-risk state-changing Tools explicitly listed in `lite.allow-tools`.
-- `EXECUTE`: read-only Tools plus state-changing Tools explicitly listed in `full.allow-tools`.
-- `deny-tools` takes precedence and may hide read-only Tools too.
+- `EXECUTE_LITE`: read-only Tools plus LOW-risk state-changing Tools enabled in `tools.properties`.
+- `EXECUTE`: Tools enabled in `tools.properties`.
 - execution actor remains `OP`; broader chat audience does not grant Tool authority.
 
 Tool names are exact wire names. Current LOW-risk mutation names are:
@@ -192,8 +191,8 @@ Tool names are exact wire names. Current LOW-risk mutation names are:
 - `weather_set`
 - `time_set`
 
-Unknown names, read-only entries in allow lists, and non-LOW entries in the
-LITE allow list fail configuration validation.
+Tool names in `tools.properties` are exact wire names. Newly registered
+state-changing Tools default to `false`.
 
 Example:
 
@@ -202,11 +201,6 @@ jarvis:
   execution:
     mode: EXECUTE_LITE
     actors: OP
-    lite:
-      allow-tools:
-        - weather_set
-        - time_set
-      deny-tools: []
 ```
 
 The default remains `READ_TALK`, so merely upgrading to Phase 6 does not
@@ -364,7 +358,7 @@ jarvis.conversation-archive.max-files
 
 Defaults:
 
-- enabled: `false`
+- enabled: `true`
 - max file size: 1 MiB
 - max files: 30
 
@@ -417,7 +411,7 @@ jarvis.conversation-memory.max-context-bytes
 
 Defaults:
 
-- enabled: `false`
+- enabled: `true`
 - lookback: 30 days
 - newest source files scanned: 4
 - retrieved turns: 6
@@ -425,9 +419,8 @@ Defaults:
 
 For each request, retrieval is limited to the same logical server ID and requester UUID,
 excludes the current session/request, and runs on the archive executor. Relevant past
-turns are selected using deterministic lexical overlap. Queries that explicitly ask for
-memory (for example "전에", "기억", "지난번", "remember", or "last time") may fall
-back to the most recent previous-session turns when lexical overlap is weak.
+turns are ranked using deterministic lexical overlap, with recent previous-session
+turns filling unused slots for every request. `max-turns` controls the number included.
 
 Retrieval has a 350 ms request-local deadline and fails open to no memory if storage is
 slow or unavailable. The selected digest is captured once and remains stable across all
@@ -460,24 +453,11 @@ instead of a flat white-text list. In-game output uses distinct title, section,
 label, healthy, warning, error, and muted colors while retaining readable plain
 text semantics for console output.
 
-## Generated Tool reference
+## Tool policy
 
-Every platform asynchronously generates a current Tool catalog in its JARVIS
-configuration directory:
-
-```text
-tools.md
-```
-
-The file lists every known Tool wire name with its runtime source, capability,
-risk, and state-changing flag. Registered optional-provider Tools are reflected
-from the actual startup registry. Scheduling control Tools are marked
-`brain-control`. The file is generated operational reference material and may
-be overwritten on each server startup.
-
-A Tool appearing as registered does not grant authority. Actual exposure still
-depends on current OP authority, Jev route, execution policy, scheduling policy,
-and provider availability.
+Runtime Tools are synchronized into `tools.properties`. The server no longer
+generates `tools.md`. Actual exposure depends on current OP authority, Jev route,
+execution mode, scheduling policy, and provider availability.
 
 `web_search` is a read-only virtual Tool backed by OpenAI Responses built-in
 web search rather than a Minecraft-side function handler. It is generated in
@@ -492,16 +472,15 @@ At platform startup JARVIS:
 
 1. creates missing prompt-content templates without overwriting existing files;
 2. loads and validates one atomic runtime snapshot containing structured config plus enabled persona/knowledge;
-3. validates server ID and provider credentials;
-4. builds the platform Tool registry;
-5. activates optional Paper Providers only when their dependencies/API discovery succeed;
-6. constructs `CommonRuntime`;
-7. constructs `ChatSessionManager`;
-8. constructs `EmbeddedBrainGateway` and `EmbeddedBrain`;
-9. constructs the Jev HTTP classifier, Luna client, AI scheduler, JSONL audit sink, and optional conversation archive;
-10. starts accepting chat requests from players allowed by the configured audience.
+3. validates the server ID and builds the platform Tool registry;
+4. activates optional Paper Providers only when their dependencies/API discovery succeed;
+5. constructs `CommonRuntime`;
+6. constructs `ChatSessionManager`;
+7. keeps `/jm reload` available if either Provider key is missing;
+8. when both keys are present, constructs `EmbeddedBrainGateway`, `EmbeddedBrain`, the Jev HTTP classifier, Luna client, AI scheduler, JSONL audit sink, and optional conversation archive;
+9. starts accepting chat requests from players allowed by the configured audience.
 
-Configuration failure disables/stops JARVIS startup rather than falling back to a weaker policy.
+Invalid runtime policy disables JARVIS startup rather than falling back to a weaker policy. Missing Provider keys leave the Paper plugin enabled with an inactive Brain so an operator can add the keys and run `/jm reload`.
 
 There is no separate Brain startup order.
 
@@ -732,7 +711,7 @@ E12 Embedded policy parity/safety verification, T06/T07/T08
 platform contract tests, existing Provider tests, and E16 deployable-artifact
 content verification.
 
-CI also boots a clean Paper, Fabric, and NeoForge server with each packaged artifact and an E16 smoke flag. The smoke exits before provider credentials are required; normal production startup still requires both provider keys.
+CI also boots a clean Paper, Fabric, and NeoForge server with each packaged artifact and an E16 smoke flag. The smoke exits before provider credentials are required; normal Paper startup keeps the plugin enabled with an inactive Brain until both Provider keys are available.
 
 Live provider verification requires real credentials:
 
